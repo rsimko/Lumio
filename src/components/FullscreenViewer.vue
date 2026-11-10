@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
         v-if="thumb?.src"
         :src="thumb.src"
         :alt="store.selectedAsset?.fileName ?? ''"
-        class="max-h-full max-w-full select-none object-contain"
+        class="block h-auto max-h-full w-auto max-w-full select-none object-contain"
         draggable="false"
         @error="markPreviewFailed(thumb)"
       />

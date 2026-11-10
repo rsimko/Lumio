@@ -317,6 +317,17 @@ export const useLibraryStore = defineStore('library', () => {
     navigateBy(delta * Math.max(1, navRowSize.value));
   }
 
+  function openInFilmstrip(id?: string): void {
+    if (id) selectionId.value = id;
+    if (!selectionId.value && assets.value.length) {
+      selectionId.value = assets.value[0]?.id ?? null;
+    }
+    if (!selectionId.value) return;
+    // Opening from any browsing layout switches to the filmstrip view and makes
+    // sure its strip is visible so the selected photo has context.
+    setViewMode('filmstrip');
+  }
+
   function openFullscreen(id?: string): void {
     if (id) selectionId.value = id;
     if (!selectionId.value && assets.value.length) {
@@ -629,6 +640,7 @@ export const useLibraryStore = defineStore('library', () => {
     openFullscreen,
     closeFullscreen,
     toggleFullscreen,
+    openInFilmstrip,
     settingsOpen,
     openSettings,
     closeSettings,

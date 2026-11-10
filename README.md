@@ -15,7 +15,9 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Browse a real nested folder tree, loaded lazily as you expand it.
 - Scan the current folder, or include every subfolder recursively.
 - View photos in five layouts: grid, masonry, justified, list and filmstrip.
-- Open any photo in a distraction-free fullscreen viewer.
+- Double-click any thumbnail to open it in filmstrip view.
+- Open any photo in a distraction-free fullscreen viewer from the info panel, the filmstrip
+  view, or with the keyboard.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted.

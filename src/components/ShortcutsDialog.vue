@@ -21,6 +21,7 @@ const groups: ShortcutGroup[] = [
       { keys: ['←', '→'], action: 'Move selection' },
       { keys: ['↑', '↓'], action: 'Move by row / item' },
       { keys: ['Space', 'Enter'], action: 'Open fullscreen viewer' },
+      { keys: ['Double-click'], action: 'Open a thumbnail in filmstrip view' },
       { keys: ['Esc'], action: 'Close viewer, dialog or clear selection' },
       { keys: ['G'], action: 'Grid view' },
       { keys: ['M'], action: 'Masonry view' },

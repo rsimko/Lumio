@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub const CACHE_VERSION: u32 = 1;
+pub const CACHE_VERSION: u32 = 2;
 
 /// RAW extensions we recognise as primary assets. Preview support depends on
 /// `rawler`, but the association rules apply regardless of decoder support.

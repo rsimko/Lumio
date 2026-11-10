@@ -70,6 +70,13 @@ function onWheel(event: WheelEvent) {
   if (!scroller.value) return;
   scroller.value.scrollLeft += event.deltaY || event.deltaX;
 }
+
+function openItem(id: string) {
+  // From another layout the strip opens the filmstrip view; once already there,
+  // a second double-click goes straight to the fullscreen viewer.
+  if (store.viewMode === 'filmstrip') store.openFullscreen(id);
+  else store.openInFilmstrip(id);
+}
 </script>
 
 <template>
@@ -94,7 +101,7 @@ function onWheel(event: WheelEvent) {
             :asset="item.asset"
             :selected="store.selectionId === item.asset.id"
             @select="store.select(item.asset.id)"
-            @open="store.openFullscreen(item.asset.id)"
+            @open="openItem(item.asset.id)"
           />
         </div>
       </div>

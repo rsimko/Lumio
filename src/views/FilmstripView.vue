@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Images } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Images, Maximize2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
@@ -63,6 +63,15 @@ const counter = computed(() => {
           {{ dimensions }}
         </span>
       </div>
+
+      <button
+        class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-line/70 bg-panel/85 text-ink shadow-panel backdrop-blur transition hover:bg-elevated"
+        title="Open fullscreen viewer (Space)"
+        aria-label="Open fullscreen viewer"
+        @click="store.openFullscreen()"
+      >
+        <Maximize2 class="h-4 w-4" />
+      </button>
 
       <button
         class="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line/70 bg-panel/85 text-ink shadow-panel backdrop-blur transition hover:bg-elevated disabled:pointer-events-none disabled:opacity-30"

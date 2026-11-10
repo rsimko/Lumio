@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Info,
   Loader2,
+  Maximize2,
   PanelRightClose,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -131,6 +132,14 @@ async function revealPrimary() {
               Reveal
             </button>
           </div>
+          <button
+            class="btn mt-1.5 w-full"
+            title="Open in fullscreen viewer (Space)"
+            @click="store.openFullscreen()"
+          >
+            <Maximize2 class="h-3.5 w-3.5" />
+            Fullscreen
+          </button>
         </div>
 
         <section class="mt-4 border-t border-line px-3 py-3">

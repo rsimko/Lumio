@@ -149,13 +149,23 @@ pub fn bucket_edge(requested: u32) -> u32 {
 }
 
 fn resize_for_edge(image: &DynamicImage, edge: u32) -> DynamicImage {
-    if image.width() <= edge && image.height() <= edge {
+    let (width, height) = (image.width(), image.height());
+    if width <= edge && height <= edge {
         return image.clone();
     }
+    // Fit the long edge into the bucket without forcing a square: previews must
+    // keep their original aspect ratio or the viewer shows stretched photos.
+    let scale = edge as f64 / width.max(height) as f64;
+    let target_width = ((width as f64 * scale).round() as u32).max(1);
+    let target_height = ((height as f64 * scale).round() as u32).max(1);
     // Box-filtered downscale is dramatically faster than a convolution kernel
     // at these ratios (roughly 8x on a 45 MP embedded preview) and avoids the
     // ringing that harms busy photographic detail.
-    DynamicImage::ImageRgba8(image::imageops::thumbnail(image, edge, edge))
+    DynamicImage::ImageRgba8(image::imageops::thumbnail(
+        image,
+        target_width,
+        target_height,
+    ))
 }
 
 fn to_rgb8(image: DynamicImage) -> RgbImage {
@@ -225,6 +235,21 @@ mod tests {
         assert_eq!(bucket_edge(300), 512);
         assert_eq!(bucket_edge(1800), 2048);
         assert_eq!(bucket_edge(9000), 2560);
+    }
+
+    #[test]
+    fn resize_preserves_aspect_ratio() {
+        let landscape = DynamicImage::ImageRgb8(RgbImage::new(400, 200));
+        let resized = resize_for_edge(&landscape, 256);
+        assert_eq!((resized.width(), resized.height()), (256, 128));
+
+        let portrait = DynamicImage::ImageRgb8(RgbImage::new(200, 400));
+        let resized = resize_for_edge(&portrait, 256);
+        assert_eq!((resized.width(), resized.height()), (128, 256));
+
+        let small = DynamicImage::ImageRgb8(RgbImage::new(100, 50));
+        let resized = resize_for_edge(&small, 256);
+        assert_eq!((resized.width(), resized.height()), (100, 50));
     }
 
     #[test]

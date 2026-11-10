@@ -95,7 +95,7 @@ watch(
             :show-folder="showFolder"
             :compact="compact"
             @select="store.select(row.asset.id)"
-            @open="store.openFullscreen(row.asset.id)"
+            @open="store.openInFilmstrip(row.asset.id)"
           />
         </div>
       </div>

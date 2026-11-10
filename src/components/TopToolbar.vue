@@ -14,7 +14,6 @@ import {
   PanelRight,
   RefreshCw,
   Rows3,
-  Settings,
   Sun,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -171,9 +170,6 @@ function onSizeInput(event: Event) {
       >
         <Sun v-if="store.resolvedTheme === 'dark'" class="h-3.5 w-3.5" />
         <Moon v-else class="h-3.5 w-3.5" />
-      </button>
-      <button class="btn-icon" title="Settings (⌘,)" @click="store.openSettings()">
-        <Settings class="h-3.5 w-3.5" />
       </button>
     </div>
   </header>

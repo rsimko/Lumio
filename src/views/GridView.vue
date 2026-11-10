@@ -108,7 +108,7 @@ watch(
           :height="layout.cell"
           :selected="store.selectionId === item.asset.id"
           @select="store.select(item.asset.id)"
-          @open="store.openFullscreen(item.asset.id)"
+          @open="store.openInFilmstrip(item.asset.id)"
         />
       </div>
     </div>

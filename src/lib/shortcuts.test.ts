@@ -86,6 +86,7 @@ describe('shortcut bindings', () => {
     expect(matchesShortcut(keyEvent(' ', { metaKey: true }), 'browse.fullscreen', {})).toBe(false);
     expect(matchesShortcut(keyEvent('Enter'), 'browse.fullscreen', { 'browse.fullscreen': 'f' }))
       .toBe(true);
+    expect(matchesShortcut(keyEvent('e', { metaKey: true }), 'browse.editDefault', {})).toBe(true);
   });
 
   it('validates reserved keys, system shortcuts and conflicts', () => {
@@ -95,6 +96,7 @@ describe('shortcut bindings', () => {
     expect(validateShortcutBinding('viewer.close', 'delete', {})).toMatch(/Delete/);
     expect(validateShortcutBinding('view.grid', 'mod+q', {})).toMatch(/macOS/);
     expect(validateShortcutBinding('view.grid', 'enter', {})).toMatch(/fullscreen/);
+    expect(validateShortcutBinding('browse.editDefault', 'mod+e', {})).toBeNull();
     expect(validateShortcutBinding('view.grid', 'shift+g', {})).toBeNull();
     expect(
       validateShortcutBinding('view.grid', 'shift+g', { 'view.list': 'shift+g' }),

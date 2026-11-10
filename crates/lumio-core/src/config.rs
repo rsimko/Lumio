@@ -683,6 +683,11 @@ mod tests {
         ui.mono_font = "system".into();
         ui.ui_font_size = 16;
         ui.list_show_associations = true;
+        ui.external_editors.push(crate::types::ExternalEditor {
+            name: "Photoshop".into(),
+            path: PathBuf::from("/Applications/Photoshop.app"),
+        });
+        ui.default_editor_path = Some(PathBuf::from("/Applications/Photoshop.app"));
         ui.shortcuts.insert("view.grid".into(), "shift+g".into());
         store.update_ui(ui.clone()).unwrap();
 
@@ -696,6 +701,10 @@ mod tests {
                 .get("view.grid")
                 .map(String::as_str),
             Some("shift+g")
+        );
+        assert_eq!(
+            reopened.config().ui.default_editor_path.as_deref(),
+            Some(Path::new("/Applications/Photoshop.app"))
         );
     }
 
@@ -733,6 +742,8 @@ mod tests {
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
         assert!(!ui.list_show_associations);
+        assert!(ui.external_editors.is_empty());
+        assert!(ui.default_editor_path.is_none());
         assert!(ui.shortcuts.is_empty());
     }
 

@@ -41,6 +41,7 @@ const browseShortcuts: BrowseShortcut[] = [
       if (store.selectedCount > 0) store.openDeleteAssets();
     },
   },
+  { id: 'browse.editDefault', run: () => store.editSelectionWithDefault() },
   {
     id: 'browse.thumbLarger',
     run: () => store.setThumbnailSize(store.settings.thumbnailSize + 24),

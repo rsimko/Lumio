@@ -4,6 +4,12 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue';
 
 import { api, errorCode, errorMessage } from '@/api';
 import { resetThumbnails } from '@/composables/useThumbnails';
+import {
+  editorNameFromPath,
+  isApplicationPath,
+  normalizeDefaultEditorPath,
+  normalizeExternalEditors,
+} from '@/lib/editors';
 import { basename, isPathInside, parentPath } from '@/lib/format';
 import {
   DEFAULT_SHORTCUTS,
@@ -26,6 +32,7 @@ import {
 import type {
   AssetRemovalMode,
   ExcludedAsset,
+  ExternalEditor,
   FolderImageCounts,
   FolderMenuTarget,
   FolderNode,
@@ -57,6 +64,8 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   lastFolder: null,
   filmstripVisible: true,
   listShowAssociations: false,
+  externalEditors: [],
+  defaultEditorPath: null,
   shortcuts: {},
 };
 
@@ -110,11 +119,14 @@ function readSystemDark(): boolean {
 function normalizeUiSettings(ui: Partial<UiSettings>): UiSettings {
   const merged = { ...DEFAULT_UI_SETTINGS, ...ui };
   const size = Number.isFinite(merged.uiFontSize) ? Math.round(merged.uiFontSize) : BASE_FONT_SIZE;
+  const externalEditors = normalizeExternalEditors(merged.externalEditors);
   return {
     ...merged,
     uiFont: merged.uiFont === 'system' ? 'system' : 'avenir',
     monoFont: merged.monoFont === 'system' ? 'system' : 'jetbrains',
     uiFontSize: Math.min(17, Math.max(11, size)),
+    externalEditors,
+    defaultEditorPath: normalizeDefaultEditorPath(merged.defaultEditorPath, externalEditors),
     shortcuts: normalizeShortcutOverrides(merged.shortcuts),
   };
 }
@@ -164,6 +176,7 @@ export const useLibraryStore = defineStore('library', () => {
   const shortcutsOpen = ref(false);
   const infoVisible = ref(true);
   const addingRoot = ref(false);
+  const addingEditor = ref(false);
   const removeFolderOpen = ref(false);
   const removeFolderTarget = ref<FolderRemovalTarget | null>(null);
   const removingFolder = ref(false);
@@ -247,6 +260,17 @@ export const useLibraryStore = defineStore('library', () => {
   const selectedAssets = computed(() =>
     assets.value.filter((asset) => selectedIds.value.has(asset.id)),
   );
+
+  const externalEditors = computed<ExternalEditor[]>(() => settings.value.externalEditors);
+
+  const defaultEditor = computed<ExternalEditor | null>(() => {
+    const path = settings.value.defaultEditorPath;
+    return (
+      settings.value.externalEditors.find((editor) => editor.path === path) ??
+      settings.value.externalEditors[0] ??
+      null
+    );
+  });
 
   function isSelected(id: string): boolean {
     return selectedIds.value.has(id);
@@ -452,6 +476,91 @@ export const useLibraryStore = defineStore('library', () => {
   function resetShortcuts(): void {
     if (!Object.keys(settings.value.shortcuts).length) return;
     updateSettings({ shortcuts: {} });
+  }
+
+  async function addExternalEditor(): Promise<void> {
+    if (addingEditor.value) return;
+    addingEditor.value = true;
+    try {
+      const picked = await openDialog({
+        directory: false,
+        multiple: false,
+        title: 'Choose an application',
+        defaultPath: '/Applications',
+        filters: [{ name: 'Applications', extensions: ['app'] }],
+      });
+      if (!picked || Array.isArray(picked)) return;
+      const path = picked.replace(/[\\/]+$/, '');
+      if (!isApplicationPath(path)) {
+        addToast('Choose a macOS application bundle (.app).', 'error');
+        return;
+      }
+      if (settings.value.externalEditors.some((editor) => editor.path === path)) {
+        addToast(`${editorNameFromPath(path)} is already available for editing.`, 'info');
+        return;
+      }
+      const externalEditors = [
+        ...settings.value.externalEditors,
+        { name: editorNameFromPath(path), path },
+      ];
+      updateSettings({
+        externalEditors,
+        defaultEditorPath: settings.value.defaultEditorPath ?? path,
+      });
+    } catch (error) {
+      addToast(errorMessage(error), 'error');
+    } finally {
+      addingEditor.value = false;
+    }
+  }
+
+  function setDefaultEditor(path: string): void {
+    if (!settings.value.externalEditors.some((editor) => editor.path === path)) return;
+    if (settings.value.defaultEditorPath === path) return;
+    updateSettings({ defaultEditorPath: path });
+  }
+
+  function removeExternalEditor(path: string): void {
+    const externalEditors = settings.value.externalEditors.filter(
+      (editor) => editor.path !== path,
+    );
+    if (externalEditors.length === settings.value.externalEditors.length) return;
+    const defaultEditorPath =
+      settings.value.defaultEditorPath === path
+        ? (externalEditors[0]?.path ?? null)
+        : settings.value.defaultEditorPath;
+    updateSettings({ externalEditors, defaultEditorPath });
+  }
+
+  async function editSelectionWithApplication(applicationPath: string): Promise<void> {
+    const targets = selectedAssets.value;
+    if (!targets.length) {
+      addToast('Select a photo to edit.', 'info');
+      return;
+    }
+    try {
+      await api.editAssets(
+        targets.map((asset) => asset.primaryPath),
+        applicationPath,
+      );
+    } catch (error) {
+      addToast(errorMessage(error), 'error');
+    }
+  }
+
+  function editSelectionWithDefault(): void {
+    if (!selectedAssets.value.length) {
+      addToast('Select a photo to edit.', 'info');
+      return;
+    }
+    const editor = defaultEditor.value;
+    if (!editor) {
+      addToast('Add an external editor in Settings to edit photos.', 'info');
+      openSettings();
+      return;
+    }
+    closePhotoMenu();
+    void editSelectionWithApplication(editor.path);
   }
 
   function toggleInfo(): void {
@@ -1414,6 +1523,14 @@ export const useLibraryStore = defineStore('library', () => {
     setFilmstripVisible,
     toggleFilmstrip,
     toggleListAssociations,
+    externalEditors,
+    defaultEditor,
+    addingEditor,
+    addExternalEditor,
+    setDefaultEditor,
+    removeExternalEditor,
+    editSelectionWithApplication,
+    editSelectionWithDefault,
     shortcutBinding,
     shortcutLabel,
     shortcutIsCustom,

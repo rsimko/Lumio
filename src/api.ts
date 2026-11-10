@@ -46,6 +46,8 @@ export const api = {
     invoke<HistogramData>('get_histogram', { asset, edge }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),
   openAsset: (path: string) => invoke<void>('open_asset', { path }),
+  editAssets: (paths: string[], application: string) =>
+    invoke<void>('edit_assets', { paths, application }),
   revealAsset: (path: string) => invoke<void>('reveal_asset', { path }),
 };
 

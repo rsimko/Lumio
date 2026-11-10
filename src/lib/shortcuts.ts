@@ -13,6 +13,7 @@ export type ShortcutGroup = 'Browsing' | 'Library' | 'Fullscreen';
 
 export type ShortcutId =
   | 'browse.fullscreen'
+  | 'browse.editDefault'
   | 'browse.delete'
   | 'browse.thumbLarger'
   | 'browse.thumbSmaller'
@@ -56,6 +57,13 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     context: 'browse',
     binding: 'space',
     aliases: ['enter'],
+  },
+  {
+    id: 'browse.editDefault',
+    label: 'Edit with default application',
+    group: 'Browsing',
+    context: 'browse',
+    binding: 'mod+e',
   },
   {
     id: 'browse.delete',

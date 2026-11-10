@@ -149,6 +149,13 @@ export interface HistogramData {
   pixels: number;
 }
 
+export interface ExternalEditor {
+  /** Display name taken from the application bundle. */
+  name: string;
+  /** Absolute path to the application bundle. */
+  path: string;
+}
+
 export interface UiSettings {
   theme: ThemeSetting;
   uiFont: UiFont;
@@ -163,6 +170,10 @@ export interface UiSettings {
   lastFolder: string | null;
   filmstripVisible: boolean;
   listShowAssociations: boolean;
+  /** Applications offered by “Edit with” in the photo context menu. */
+  externalEditors: ExternalEditor[];
+  /** Path of the editor used by the Edit shortcut. */
+  defaultEditorPath: string | null;
   /** Only actions that differ from the defaults are stored. */
   shortcuts: Record<string, string>;
 }

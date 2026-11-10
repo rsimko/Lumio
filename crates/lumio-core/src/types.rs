@@ -208,6 +208,13 @@ pub struct ThumbnailResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct ExternalEditor {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub theme: String,
     #[serde(default = "default_ui_font")]
@@ -226,6 +233,12 @@ pub struct UiSettings {
     pub filmstrip_visible: bool,
     #[serde(default)]
     pub list_show_associations: bool,
+    /// User-selected applications offered in the photo context menu.
+    #[serde(default)]
+    pub external_editors: Vec<ExternalEditor>,
+    /// Application used by the Edit shortcut. `None` until one is configured.
+    #[serde(default)]
+    pub default_editor_path: Option<PathBuf>,
     /// User overrides keyed by shortcut action. Missing actions use the
     /// frontend defaults, which lets new defaults ship without migrations.
     #[serde(default)]
@@ -260,6 +273,8 @@ impl Default for UiSettings {
             last_folder: None,
             filmstrip_visible: true,
             list_show_associations: false,
+            external_editors: Vec::new(),
+            default_editor_path: None,
             shortcuts: HashMap::new(),
         }
     }

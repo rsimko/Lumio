@@ -390,6 +390,56 @@ pub fn clear_thumbnail_cache(state: State<'_, AppState>) -> Result<(), CommandEr
 }
 
 #[tauri::command]
+pub async fn edit_assets(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+    application: String,
+) -> Result<(), CommandError> {
+    if paths.is_empty() {
+        return Err(CommandError::new("editFailed", "No photos were selected."));
+    }
+    let files = paths
+        .iter()
+        .map(|path| validate_under_roots(&state, &PathBuf::from(path)))
+        .collect::<Result<Vec<_>, _>>()?;
+    let application = PathBuf::from(application);
+    if !application.exists() {
+        return Err(CommandError::new(
+            "editorMissing",
+            "The selected editor is no longer installed.",
+        ));
+    }
+    tauri::async_runtime::spawn_blocking(move || launch_editor(&application, &files))
+        .await
+        .map_err(|error| CommandError::new("internal", format!("Edit task failed: {error}")))?
+        .map_err(|error| CommandError::new("editFailed", error.to_string()))
+}
+
+fn launch_editor(application: &std::path::Path, paths: &[PathBuf]) -> std::io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("-a")
+            .arg(application)
+            .args(paths)
+            .status()?;
+        if status.success() {
+            return Ok(());
+        }
+        return Err(std::io::Error::other(format!(
+            "The application could not open the selected photos ({status})"
+        )));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        std::process::Command::new(application)
+            .args(paths)
+            .spawn()
+            .map(|_| ())
+    }
+}
+
+#[tauri::command]
 pub async fn open_asset(state: State<'_, AppState>, path: String) -> Result<(), CommandError> {
     let path = validate_under_roots(&state, &PathBuf::from(path))?;
     tauri::async_runtime::spawn_blocking(move || {

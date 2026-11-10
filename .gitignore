@@ -1,0 +1,36 @@
+# Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Rust
+target/
+**/*.rs.bk
+
+# Tauri
+src-tauri/gen/schemas/
+
+# Test assets (large / personal)
+test_RAW/
+testdata/
+
+# App data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Environment / secrets
+.env
+.env.*
+!.env.example

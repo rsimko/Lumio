@@ -1,0 +1,113 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+
+import PhotoTile from '@/components/PhotoTile.vue';
+import { useScrollMetrics } from '@/composables/useScrollMetrics';
+import { aspectFor } from '@/composables/useThumbnails';
+import { computeJustified, visibleItems } from '@/lib/layout';
+import { useLibraryStore } from '@/stores/library';
+import type { PhotoAsset } from '@/types';
+
+const store = useLibraryStore();
+const scroller = ref<HTMLElement | null>(null);
+const { width, height, scrollTop } = useScrollMetrics(scroller);
+
+const aspects = computed(() => store.assets.map((asset) => aspectFor(asset)));
+
+const layout = computed(() =>
+  computeJustified(
+    aspects.value,
+    width.value,
+    Math.round(store.settings.thumbnailSize * 1.15),
+  ),
+);
+
+watch(
+  () => layout.value,
+  () => {
+    store.navRowSize = 1;
+  },
+  { immediate: true },
+);
+
+interface VisibleItem {
+  asset: PhotoAsset;
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const visible = computed<VisibleItem[]>(() => {
+  const items = visibleItems(layout.value.items, scrollTop.value, height.value, 400);
+  const result: VisibleItem[] = [];
+  for (const item of items) {
+    const asset = store.assets[item.index];
+    if (!asset) continue;
+    result.push({
+      asset,
+      index: item.index,
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+    });
+  }
+  return result;
+});
+
+function scrollSelectionIntoView() {
+  const el = scroller.value;
+  const index = store.selectedIndex;
+  if (!el || index < 0) return;
+  const item = layout.value.items[index];
+  if (!item) return;
+  const top = item.y;
+  const bottom = item.y + item.height;
+  if (top < el.scrollTop) {
+    el.scrollTop = Math.max(0, top - 20);
+  } else if (bottom > el.scrollTop + el.clientHeight) {
+    el.scrollTop = bottom - el.clientHeight + 20;
+  }
+}
+
+watch([() => store.selectedIndex, () => layout.value], scrollSelectionIntoView);
+
+watch(
+  () => store.selectedFolder,
+  () => {
+    if (scroller.value) scroller.value.scrollTop = 0;
+  },
+);
+</script>
+
+<template>
+  <div ref="scroller" class="h-full overflow-y-auto overscroll-contain">
+    <div
+      class="relative mx-auto"
+      :style="{ height: `${layout.totalHeight}px` }"
+    >
+      <div
+        v-for="item in visible"
+        :key="item.asset.id"
+        class="absolute"
+        :style="{
+          left: `${item.x}px`,
+          top: `${item.y}px`,
+          width: `${item.width}px`,
+          height: `${item.height}px`,
+        }"
+      >
+        <PhotoTile
+          :asset="item.asset"
+          :width="item.width"
+          :height="item.height"
+          :selected="store.selectionId === item.asset.id"
+          @select="store.select(item.asset.id)"
+          @open="store.openFullscreen(item.asset.id)"
+        />
+      </div>
+    </div>
+  </div>
+</template>

@@ -40,6 +40,14 @@ struct StemGroup {
 }
 
 pub fn list_subfolders(path: &Path, excluded: &[PathBuf]) -> Result<Vec<FolderNode>> {
+    list_subfolders_excluding(path, excluded, &[])
+}
+
+pub fn list_subfolders_excluding(
+    path: &Path,
+    excluded: &[PathBuf],
+    excluded_files: &[PathBuf],
+) -> Result<Vec<FolderNode>> {
     let read = fs::read_dir(path).map_err(|error| LumioError::io(path, error))?;
     let mut child_paths = Vec::new();
     for entry in read {
@@ -64,7 +72,7 @@ pub fn list_subfolders(path: &Path, excluded: &[PathBuf]) -> Result<Vec<FolderNo
     // asset count and the count including descendants. Asset counts follow the
     // same RAW/JPEG pairing rules as scan_photos, so a RAW + JPEG pair counts
     // as one photo rather than two files.
-    let dir_counts = collect_dir_counts(path, excluded)?;
+    let dir_counts = collect_dir_counts(path, excluded, excluded_files)?;
     let mut nodes = Vec::new();
     for child_path in child_paths {
         let direct = dir_counts
@@ -93,7 +101,15 @@ pub fn list_subfolders(path: &Path, excluded: &[PathBuf]) -> Result<Vec<FolderNo
 /// Count assets directly in `path` and recursively under it. Used for library
 /// roots, which are shown in the tree before their children are loaded.
 pub fn count_folder_images(path: &Path, excluded: &[PathBuf]) -> Result<FolderImageCounts> {
-    let dir_counts = collect_dir_counts(path, excluded)?;
+    count_folder_images_excluding(path, excluded, &[])
+}
+
+pub fn count_folder_images_excluding(
+    path: &Path,
+    excluded: &[PathBuf],
+    excluded_files: &[PathBuf],
+) -> Result<FolderImageCounts> {
+    let dir_counts = collect_dir_counts(path, excluded, excluded_files)?;
     let direct = dir_counts.get(path).map(AssetCounts::assets).unwrap_or(0);
     let recursive = dir_counts.values().map(AssetCounts::assets).sum();
     Ok(FolderImageCounts { direct, recursive })
@@ -149,7 +165,11 @@ fn file_stem_key(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn collect_dir_counts(root: &Path, excluded: &[PathBuf]) -> Result<HashMap<PathBuf, AssetCounts>> {
+fn collect_dir_counts(
+    root: &Path,
+    excluded: &[PathBuf],
+    excluded_files: &[PathBuf],
+) -> Result<HashMap<PathBuf, AssetCounts>> {
     // Validate the root itself first so an unreadable folder reports an error
     // instead of a misleading zero count.
     fs::read_dir(root).map_err(|error| LumioError::io(root, error))?;
@@ -165,6 +185,9 @@ fn collect_dir_counts(root: &Path, excluded: &[PathBuf]) -> Result<HashMap<PathB
             Err(_) => continue,
         };
         if !entry.file_type().is_file() || is_hidden_or_package(entry.file_name()) {
+            continue;
+        }
+        if is_excluded_file(entry.path(), excluded_files) {
             continue;
         }
         if let Some(parent) = entry.path().parent() {
@@ -194,6 +217,15 @@ fn has_visible_child_dir(path: &Path, excluded: &[PathBuf]) -> Result<bool> {
 }
 
 pub fn scan_photos(root: &Path, recursive: bool, excluded: &[PathBuf]) -> Result<ScanResult> {
+    scan_photos_excluding(root, recursive, excluded, &[])
+}
+
+pub fn scan_photos_excluding(
+    root: &Path,
+    recursive: bool,
+    excluded: &[PathBuf],
+    excluded_files: &[PathBuf],
+) -> Result<ScanResult> {
     let started = Instant::now();
     let mut buckets: BTreeMap<PathBuf, DirBucket> = BTreeMap::new();
     let mut warnings = Vec::new();
@@ -222,7 +254,7 @@ pub fn scan_photos(root: &Path, recursive: bool, excluded: &[PathBuf]) -> Result
             if is_hidden_or_package(entry.file_name()) {
                 continue;
             }
-            add_entry(&mut buckets, entry.path(), &mut warnings);
+            add_entry(&mut buckets, entry.path(), excluded_files, &mut warnings);
         }
     } else {
         let read = fs::read_dir(root).map_err(|error| LumioError::io(root, error))?;
@@ -253,13 +285,18 @@ pub fn scan_photos(root: &Path, recursive: bool, excluded: &[PathBuf]) -> Result
             if is_hidden_or_package(&entry.file_name()) {
                 continue;
             }
-            add_entry(&mut buckets, &entry.path(), &mut warnings);
+            add_entry(&mut buckets, &entry.path(), excluded_files, &mut warnings);
         }
     }
 
     let mut assets = Vec::new();
     for (directory, bucket) in buckets {
-        assets.extend(build_assets_for_dir(root, &directory, bucket));
+        assets.extend(build_assets_for_dir(
+            root,
+            &directory,
+            bucket,
+            excluded_files,
+        ));
     }
 
     assets.sort_by(|left, right| {
@@ -294,11 +331,19 @@ fn is_excluded(path: &Path, excluded: &[PathBuf]) -> bool {
     excluded.iter().any(|hidden| hidden == path)
 }
 
+fn is_excluded_file(path: &Path, excluded_files: &[PathBuf]) -> bool {
+    excluded_files.iter().any(|hidden| hidden == path)
+}
+
 fn add_entry(
     buckets: &mut BTreeMap<PathBuf, DirBucket>,
     path: &Path,
+    excluded_files: &[PathBuf],
     warnings: &mut Vec<ScanWarning>,
 ) {
+    if is_excluded_file(path, excluded_files) {
+        return;
+    }
     let Some(extension) = extension_of(path) else {
         return;
     };
@@ -348,9 +393,17 @@ fn add_entry(
     });
 }
 
-fn build_assets_for_dir(root: &Path, directory: &Path, bucket: DirBucket) -> Vec<PhotoAsset> {
+fn build_assets_for_dir(
+    root: &Path,
+    directory: &Path,
+    bucket: DirBucket,
+    excluded_files: &[PathBuf],
+) -> Vec<PhotoAsset> {
     let mut groups: BTreeMap<String, StemGroup> = BTreeMap::new();
     for record in bucket.records {
+        if is_excluded_file(&record.path, excluded_files) {
+            continue;
+        }
         // Group case-insensitively so `IMG_0001.CR2` associates with a
         // companion saved as `img_0001.jpg` on case-insensitive volumes.
         let group = groups.entry(record.stem.to_ascii_lowercase()).or_default();
@@ -363,7 +416,7 @@ fn build_assets_for_dir(root: &Path, directory: &Path, bucket: DirBucket) -> Vec
         }
     }
 
-    let xmp_by_name = index_xmps(&bucket.xmps);
+    let xmp_by_name = index_xmps(&bucket.xmps, excluded_files);
     let relative_dir = directory
         .strip_prefix(root)
         .ok()
@@ -505,9 +558,12 @@ fn jpeg_priority(extension: &str) -> usize {
     }
 }
 
-fn index_xmps(xmps: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
+fn index_xmps(xmps: &[PathBuf], excluded_files: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
     let mut map: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for path in xmps {
+        if is_excluded_file(path, excluded_files) {
+            continue;
+        }
         let name = display_name(path).to_ascii_lowercase();
         map.entry(name).or_default().push(path.clone());
     }
@@ -774,5 +830,28 @@ mod tests {
         let result = scan_photos(&root, true, &excluded).unwrap();
         assert_eq!(result.assets.len(), 1);
         assert!(result.assets[0].primary_path.starts_with(&beta));
+    }
+
+    #[test]
+    fn hidden_asset_files_are_skipped_from_scans_and_counts() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(temp.path()).unwrap();
+        let raw = root.join("IMG_0001.CR2");
+        let jpeg = root.join("IMG_0001.jpg");
+        let xmp = root.join("IMG_0001.CR2.xmp");
+        fs::write(&raw, b"raw").unwrap();
+        write_jpeg(&jpeg);
+        fs::write(&xmp, b"<xmp/>").unwrap();
+        write_jpeg(&root.join("IMG_0002.jpg"));
+
+        let excluded_files = vec![raw.clone(), jpeg.clone(), xmp.clone()];
+
+        let result = scan_photos_excluding(&root, false, &[], &excluded_files).unwrap();
+        assert_eq!(result.assets.len(), 1);
+        assert_eq!(result.assets[0].file_name, "IMG_0002.jpg");
+
+        let counts = count_folder_images_excluding(&root, &[], &excluded_files).unwrap();
+        assert_eq!(counts.direct, 1);
+        assert_eq!(counts.recursive, 1);
     }
 }

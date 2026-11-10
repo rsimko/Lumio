@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 use lumio_core::LumioError;
 use lumio_core::types::{
-    AddFolderOutcome, FolderImageCounts, FolderNode, PhotoAsset, RootInfo, RootRemovalMode,
-    ScanResult, ThumbnailResult, UiSettings,
+    AddFolderOutcome, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset, FolderImageCounts,
+    FolderNode, MoveAssetsOutcome, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
+    ThumbnailResult, UiSettings,
 };
 use serde::Serialize;
 use tauri::State;
@@ -50,6 +51,7 @@ pub struct Bootstrap {
     pub cache_dir: String,
     pub recovery_warning: Option<String>,
     pub app_version: String,
+    pub hidden_assets: Vec<ExcludedAsset>,
 }
 
 #[tauri::command]
@@ -61,6 +63,7 @@ pub fn get_bootstrap(state: State<'_, AppState>) -> Bootstrap {
         cache_dir: state.thumbs.cache_dir().to_string_lossy().into_owned(),
         recovery_warning: state.recovery_warning.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
+        hidden_assets: config.excluded_assets().to_vec(),
     }
 }
 
@@ -143,7 +146,11 @@ pub async fn list_subfolders(
 ) -> Result<Vec<FolderNode>, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
     let excluded = state.config().excluded_folders().to_vec();
-    match tokio::task::spawn_blocking(move || lumio_core::list_subfolders(&folder, &excluded)).await
+    let excluded_files = state.config().excluded_asset_paths();
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::list_subfolders_excluding(&folder, &excluded, &excluded_files)
+    })
+    .await
     {
         Ok(result) => Ok(result?),
         Err(error) => Err(CommandError::new(
@@ -160,8 +167,11 @@ pub async fn count_folder_images(
 ) -> Result<FolderImageCounts, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
     let excluded = state.config().excluded_folders().to_vec();
-    match tokio::task::spawn_blocking(move || lumio_core::count_folder_images(&folder, &excluded))
-        .await
+    let excluded_files = state.config().excluded_asset_paths();
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::count_folder_images_excluding(&folder, &excluded, &excluded_files)
+    })
+    .await
     {
         Ok(result) => Ok(result?),
         Err(error) => Err(CommandError::new(
@@ -179,8 +189,9 @@ pub async fn scan_folder(
 ) -> Result<ScanResult, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
     let excluded = state.config().excluded_folders().to_vec();
+    let excluded_files = state.config().excluded_asset_paths();
     match tokio::task::spawn_blocking(move || {
-        lumio_core::scan_photos(&folder, recursive, &excluded)
+        lumio_core::scan_photos_excluding(&folder, recursive, &excluded, &excluded_files)
     })
     .await
     {
@@ -190,6 +201,82 @@ pub async fn scan_folder(
             format!("Folder scan task failed: {error}"),
         )),
     }
+}
+
+#[tauri::command]
+pub fn get_hidden_assets(state: State<'_, AppState>) -> Vec<ExcludedAsset> {
+    state.config().excluded_assets().to_vec()
+}
+
+#[tauri::command]
+pub async fn move_assets(
+    state: State<'_, AppState>,
+    assets: Vec<PhotoAsset>,
+    destination: String,
+) -> Result<MoveAssetsOutcome, CommandError> {
+    let destination = validate_under_roots(&state, &PathBuf::from(destination))?;
+    let roots = state.config().roots().to_vec();
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::move_assets(&assets, &destination, &roots)
+    })
+    .await
+    {
+        Ok(result) => Ok(result?),
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Photo move task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn remove_assets(
+    state: State<'_, AppState>,
+    assets: Vec<PhotoAsset>,
+    mode: AssetRemovalMode,
+) -> Result<AssetRemovalOutcome, CommandError> {
+    if mode == AssetRemovalMode::MoveToTrash {
+        let roots = state.config().roots().to_vec();
+        let primary_paths: Vec<PathBuf> = assets
+            .iter()
+            .map(|asset| asset.primary_path.clone())
+            .collect();
+        let outcome =
+            match tokio::task::spawn_blocking(move || lumio_core::trash_assets(&assets, &roots))
+                .await
+            {
+                Ok(result) => result?,
+                Err(error) => {
+                    return Err(CommandError::new(
+                        "internal",
+                        format!("Photo trash task failed: {error}"),
+                    ));
+                }
+            };
+        let mut config = state.config();
+        config.forget_asset_exclusions(&primary_paths)?;
+        return Ok(AssetRemovalOutcome {
+            removed_assets: outcome.trashed_assets,
+            hidden_assets: config.excluded_assets().to_vec(),
+        });
+    }
+
+    let mut config = state.config();
+    let removed_assets = config.hide_assets(&assets)? as u32;
+    Ok(AssetRemovalOutcome {
+        removed_assets,
+        hidden_assets: config.excluded_assets().to_vec(),
+    })
+}
+
+#[tauri::command]
+pub fn restore_assets(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> Result<Vec<ExcludedAsset>, CommandError> {
+    let mut config = state.config();
+    config.restore_assets(&ids)?;
+    Ok(config.excluded_assets().to_vec())
 }
 
 #[tauri::command]

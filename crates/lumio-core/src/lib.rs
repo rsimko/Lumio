@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod config;
 pub mod error;
 pub mod folders;
@@ -7,9 +8,13 @@ pub mod scan;
 pub mod thumbnail;
 pub mod types;
 
+pub use assets::{AssetFileGroup, asset_group_paths, group_assets, move_assets, trash_assets};
 pub use config::ConfigStore;
 pub use error::{LumioError, Result};
 pub use folders::create_folder;
-pub use scan::{count_folder_images, list_subfolders, scan_photos};
+pub use scan::{
+    count_folder_images, count_folder_images_excluding, list_subfolders, list_subfolders_excluding,
+    scan_photos, scan_photos_excluding,
+};
 pub use thumbnail::ThumbnailService;
 pub use types::*;

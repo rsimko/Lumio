@@ -42,6 +42,57 @@ pub enum RootRemovalMode {
     MoveToTrash,
 }
 
+/// How one or more photos should be removed from Lumio.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AssetRemovalMode {
+    /// Hide the photo and every associated file in Lumio. Files stay on disk.
+    LibraryOnly,
+    /// Move the photo and every associated file to the operating system Trash.
+    MoveToTrash,
+}
+
+/// One hidden photo group. Lumio has no catalogue yet, so "delete from the
+/// library" is represented by persisting every file path that belonged to the
+/// photo at the time it was hidden.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcludedAsset {
+    /// Stable identifier derived from the primary path.
+    pub id: String,
+    pub primary_path: PathBuf,
+    /// Display name captured when the photo was hidden.
+    pub name: String,
+    pub hidden_at: u64,
+    /// Primary file plus companion JPEG, XMP sidecar and extra associations.
+    pub paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetRemovalOutcome {
+    pub removed_assets: u32,
+    pub hidden_assets: Vec<ExcludedAsset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveAssetsOutcome {
+    pub destination: PathBuf,
+    pub moved_assets: u32,
+    pub moved_files: u32,
+    pub skipped_assets: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashAssetsOutcome {
+    /// Photo groups whose files were moved to the Trash.
+    pub trashed_assets: u32,
+    /// Individual files moved to the Trash, including companions and sidecars.
+    pub trashed_files: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AddFolderOutcome {
@@ -214,6 +265,10 @@ pub struct AppConfig {
     /// remain on disk; re-adding the folder restores it.
     #[serde(default)]
     pub excluded_folders: Vec<PathBuf>,
+    /// Photos hidden from Lumio with "delete from library only". Every file in
+    /// the group remains on disk and can be restored from Settings.
+    #[serde(default)]
+    pub excluded_assets: Vec<ExcludedAsset>,
     pub ui: UiSettings,
 }
 
@@ -223,6 +278,7 @@ impl Default for AppConfig {
             version: 1,
             roots: Vec::new(),
             excluded_folders: Vec::new(),
+            excluded_assets: Vec::new(),
             ui: UiSettings::default(),
         }
     }

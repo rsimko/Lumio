@@ -40,6 +40,12 @@ pub enum LumioError {
 
     #[error("Could not move folder to Trash: {0}")]
     Trash(String),
+
+    #[error("Could not move files: {0}")]
+    Move(String),
+
+    #[error("Could not move files to Trash: {0}")]
+    TrashFiles(String),
 }
 
 impl LumioError {
@@ -66,6 +72,8 @@ impl LumioError {
             Self::Preview(_) => "preview",
             Self::Cache(_) => "cache",
             Self::Trash(_) => "trash",
+            Self::Move(_) => "move",
+            Self::TrashFiles(_) => "trash",
         }
     }
 }

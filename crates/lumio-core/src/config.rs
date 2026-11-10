@@ -4,10 +4,12 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
+use crate::assets::{asset_group_id, group_assets};
 use crate::error::{LumioError, Result};
 use crate::path_utils::{canonical_dir, display_name, is_hidden_or_package, now_ms};
 use crate::types::{
-    AddFolderOutcome, AppConfig, RootFolder, RootInfo, RootRemovalMode, UiSettings,
+    AddFolderOutcome, AppConfig, ExcludedAsset, PhotoAsset, RootFolder, RootInfo, RootRemovalMode,
+    UiSettings,
 };
 
 const FORBIDDEN_DELETE_PATHS: &[&str] = &[
@@ -99,6 +101,78 @@ impl ConfigStore {
 
     pub fn excluded_folders(&self) -> &[PathBuf] {
         &self.config.excluded_folders
+    }
+
+    pub fn excluded_assets(&self) -> &[ExcludedAsset] {
+        &self.config.excluded_assets
+    }
+
+    pub fn excluded_asset_paths(&self) -> Vec<PathBuf> {
+        let mut seen = std::collections::HashSet::new();
+        let mut paths = Vec::new();
+        for asset in &self.config.excluded_assets {
+            for path in &asset.paths {
+                if seen.insert(path.clone()) {
+                    paths.push(path.clone());
+                }
+            }
+        }
+        paths
+    }
+
+    /// Persist a library-only removal for one or more photo groups.
+    pub fn hide_assets(&mut self, assets: &[PhotoAsset]) -> Result<usize> {
+        let groups = group_assets(assets, &self.config.roots)?;
+        let existing: std::collections::HashSet<PathBuf> = self
+            .config
+            .excluded_assets
+            .iter()
+            .map(|asset| asset.primary_path.clone())
+            .collect();
+        let mut hidden = 0;
+        for group in groups {
+            if existing.contains(&group.primary_path) {
+                continue;
+            }
+            self.config.excluded_assets.push(ExcludedAsset {
+                id: asset_group_id(&group.primary_path),
+                primary_path: group.primary_path,
+                name: group.name,
+                hidden_at: now_ms(),
+                paths: group.paths,
+            });
+            hidden += 1;
+        }
+        if hidden > 0 {
+            self.save()?;
+        }
+        Ok(hidden)
+    }
+
+    /// Forget hidden photo groups by their stable IDs.
+    pub fn restore_assets(&mut self, ids: &[String]) -> Result<usize> {
+        let before = self.config.excluded_assets.len();
+        self.config
+            .excluded_assets
+            .retain(|asset| !ids.iter().any(|id| id == &asset.id));
+        let restored = before - self.config.excluded_assets.len();
+        if restored > 0 {
+            self.save()?;
+        }
+        Ok(restored)
+    }
+
+    /// Drop hidden-group records after the underlying files were removed from
+    /// disk, so stale entries do not accumulate in Settings.
+    pub fn forget_asset_exclusions(&mut self, primary_paths: &[PathBuf]) -> Result<()> {
+        let before = self.config.excluded_assets.len();
+        self.config
+            .excluded_assets
+            .retain(|asset| !primary_paths.iter().any(|path| path == &asset.primary_path));
+        if before != self.config.excluded_assets.len() {
+            self.save()?;
+        }
+        Ok(())
     }
 
     pub fn root_paths(&self) -> Vec<PathBuf> {
@@ -235,6 +309,9 @@ impl ConfigStore {
         self.config
             .excluded_folders
             .retain(|hidden| !hidden.starts_with(&root_path));
+        self.config
+            .excluded_assets
+            .retain(|asset| !asset.primary_path.starts_with(&root_path));
         if self.config.ui.last_root_id.as_deref() == Some(id) {
             self.config.ui.last_root_id = None;
             self.config.ui.last_folder = None;
@@ -261,6 +338,11 @@ impl ConfigStore {
                 self.config
                     .excluded_folders
                     .retain(|hidden| !hidden.starts_with(&canonical));
+                // Hidden photo records for files that just left with the folder
+                // would otherwise linger in Settings forever.
+                self.config
+                    .excluded_assets
+                    .retain(|asset| !asset.primary_path.starts_with(&canonical));
             }
         }
 
@@ -639,6 +721,103 @@ mod tests {
         assert_eq!(ui.ui_font, "avenir");
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
+    }
+
+    #[test]
+    fn hidden_assets_round_trip_and_restore() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+        let photos = temp.path().join("photos");
+        fs::create_dir_all(&photos).unwrap();
+        let raw = photos.join("IMG_0001.CR2");
+        let jpeg = photos.join("IMG_0001.jpg");
+        fs::write(&raw, b"raw").unwrap();
+        fs::write(&jpeg, b"jpeg").unwrap();
+
+        let mut store = ConfigStore::open(&config_path).unwrap();
+        store.add_root(&photos).unwrap();
+
+        let asset = PhotoAsset {
+            id: crate::assets::asset_group_id(&raw),
+            primary_path: raw.clone(),
+            file_name: "IMG_0001.CR2".into(),
+            stem: "IMG_0001".into(),
+            extension: "cr2".into(),
+            kind: crate::types::AssetKind::Raw,
+            companion_jpeg: Some(jpeg.clone()),
+            xmp_sidecar: None,
+            extra_sidecars: Vec::new(),
+            extra_companions: Vec::new(),
+            preview_hint: crate::types::PreviewSource::CompanionJpeg,
+            file_size: 3,
+            modified_ms: 0,
+            width: None,
+            height: None,
+            relative_dir: String::new(),
+        };
+
+        assert_eq!(store.hide_assets(&[asset.clone()]).unwrap(), 1);
+        assert_eq!(store.excluded_assets().len(), 1);
+        assert_eq!(store.excluded_asset_paths().len(), 2);
+        // Hiding must not touch the files.
+        assert!(raw.exists());
+        assert!(jpeg.exists());
+
+        let reopened = ConfigStore::open(&config_path).unwrap();
+        assert_eq!(reopened.excluded_assets().len(), 1);
+        assert_eq!(reopened.excluded_assets()[0].name, "IMG_0001.CR2");
+
+        let mut reopened = reopened;
+        let id = reopened.excluded_assets()[0].id.clone();
+        assert_eq!(reopened.restore_assets(&[id]).unwrap(), 1);
+        assert!(reopened.excluded_assets().is_empty());
+    }
+
+    #[test]
+    fn hidden_assets_disappear_from_scans_until_restored() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+        fs::create_dir_all(temp.path().join("photos")).unwrap();
+        // Scans in the app always receive the canonical folder path, so compare
+        // stored exclusions against canonical paths here too.
+        let photos = fs::canonicalize(temp.path().join("photos")).unwrap();
+        let raw = photos.join("IMG_0001.CR2");
+        let jpeg = photos.join("IMG_0001.jpg");
+        let xmp = photos.join("IMG_0001.CR2.xmp");
+        let other = photos.join("IMG_0002.jpg");
+        fs::write(&raw, b"raw").unwrap();
+        fs::write(&jpeg, b"jpeg").unwrap();
+        fs::write(&xmp, b"<xmp/>").unwrap();
+        fs::write(&other, b"jpeg").unwrap();
+
+        let mut store = ConfigStore::open(&config_path).unwrap();
+        store.add_root(&photos).unwrap();
+        let before = crate::scan::scan_photos(&photos, false, &[]).unwrap();
+        assert_eq!(before.assets.len(), 2);
+        let target = before
+            .assets
+            .iter()
+            .find(|asset| asset.primary_path == raw)
+            .unwrap()
+            .clone();
+
+        store.hide_assets(&[target]).unwrap();
+        let hidden_paths = store.excluded_asset_paths();
+        assert_eq!(hidden_paths.len(), 3);
+        let hidden_scan =
+            crate::scan::scan_photos_excluding(&photos, false, &[], &hidden_paths).unwrap();
+        assert_eq!(hidden_scan.assets.len(), 1);
+        assert_eq!(hidden_scan.assets[0].file_name, "IMG_0002.jpg");
+        let counts =
+            crate::scan::count_folder_images_excluding(&photos, &[], &hidden_paths).unwrap();
+        assert_eq!(counts.direct, 1);
+
+        let id = store.excluded_assets()[0].id.clone();
+        store.restore_assets(&[id]).unwrap();
+        let restored =
+            crate::scan::scan_photos_excluding(&photos, false, &[], &store.excluded_asset_paths())
+                .unwrap();
+        assert_eq!(restored.assets.len(), 2);
     }
 
     #[test]

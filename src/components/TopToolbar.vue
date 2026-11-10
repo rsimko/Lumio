@@ -10,24 +10,58 @@ import {
   List,
   Loader2,
   Moon,
+  PanelBottom,
   PanelRight,
   Rows3,
   Sun,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
+import { isBrowseViewMode, nextBrowseViewMode, type BrowseViewMode } from '@/lib/views';
 import { useLibraryStore, type BreadcrumbItem } from '@/stores/library';
-import type { ViewMode } from '@/types';
 
 const store = useLibraryStore();
 
-const views = [
-  { mode: 'grid' as ViewMode, label: 'Grid', hint: 'Grid (G)', icon: LayoutGrid },
-  { mode: 'masonry' as ViewMode, label: 'Masonry', hint: 'Masonry (M)', icon: Columns3 },
-  { mode: 'justified' as ViewMode, label: 'Justified', hint: 'Justified (J)', icon: Rows3 },
-  { mode: 'list' as ViewMode, label: 'List', hint: 'List (L)', icon: List },
-  { mode: 'filmstrip' as ViewMode, label: 'Filmstrip', hint: 'Filmstrip (F)', icon: Film },
-];
+const browseViews = [
+  { mode: 'grid', label: 'Grid', icon: LayoutGrid },
+  { mode: 'masonry', label: 'Masonry', icon: Columns3 },
+  { mode: 'justified', label: 'Justified', icon: Rows3 },
+  { mode: 'list', label: 'List', icon: List },
+] as const;
+
+const lastBrowseMode = ref<BrowseViewMode>(
+  isBrowseViewMode(store.viewMode) ? store.viewMode : 'grid',
+);
+
+watch(
+  () => store.viewMode,
+  (mode) => {
+    if (isBrowseViewMode(mode)) lastBrowseMode.value = mode;
+  },
+);
+
+const browseMode = computed<BrowseViewMode>(() =>
+  isBrowseViewMode(store.viewMode) ? store.viewMode : lastBrowseMode.value,
+);
+const browseView = computed(
+  () => browseViews.find((view) => view.mode === browseMode.value) ?? browseViews[0],
+);
+const nextBrowseView = computed(() => {
+  const mode = isBrowseViewMode(store.viewMode)
+    ? nextBrowseViewMode(store.viewMode)
+    : lastBrowseMode.value;
+  return browseViews.find((view) => view.mode === mode) ?? browseViews[0];
+});
+const browseActive = computed(() => isBrowseViewMode(store.viewMode));
+const browseTitle = computed(() =>
+  browseActive.value
+    ? `${browseView.value.label} view — click for ${nextBrowseView.value.label} (G/M/J/L)`
+    : `Browse layout: ${browseView.value.label} — click to open (G/M/J/L)`,
+);
+
+function cycleBrowseView() {
+  store.setViewMode(nextBrowseView.value.mode);
+}
 
 const sizeSliderVisible = computed(() =>
   ['grid', 'masonry', 'justified'].includes(store.viewMode),
@@ -93,21 +127,10 @@ function onSizeInput(event: Event) {
 
       <div class="mx-0.5 h-5 w-px bg-line" />
 
-      <div class="segmented" role="group" aria-label="View mode">
-        <button
-          v-for="view in views"
-          :key="view.mode"
-          class="segmented-button"
-          :class="store.viewMode === view.mode ? 'segmented-button-active' : ''"
-          :title="view.hint"
-          :aria-pressed="store.viewMode === view.mode"
-          @click="store.setViewMode(view.mode)"
-        >
-          <component :is="view.icon" class="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div v-if="sizeSliderVisible" class="ml-1 hidden items-center gap-1.5 xl:flex">
+      <div
+        class="hidden items-center gap-1.5 xl:flex"
+        :class="sizeSliderVisible ? '' : 'invisible'"
+      >
         <input
           type="range"
           min="120"
@@ -118,8 +141,33 @@ function onSizeInput(event: Event) {
           :value="store.settings.thumbnailSize"
           title="Thumbnail size (use + or −)"
           aria-label="Thumbnail size"
+          :aria-hidden="!sizeSliderVisible"
+          :tabindex="sizeSliderVisible ? 0 : -1"
           @input="onSizeInput"
         />
+      </div>
+
+      <div class="segmented" role="group" aria-label="View mode">
+        <button
+          class="segmented-button"
+          :class="browseActive ? 'segmented-button-active' : ''"
+          :title="browseTitle"
+          :aria-label="browseTitle"
+          :aria-pressed="browseActive"
+          @click="cycleBrowseView"
+        >
+          <component :is="browseView.icon" class="h-3.5 w-3.5" />
+        </button>
+        <button
+          class="segmented-button"
+          :class="store.viewMode === 'filmstrip' ? 'segmented-button-active' : ''"
+          title="Filmstrip view (F)"
+          aria-label="Filmstrip view (F)"
+          :aria-pressed="store.viewMode === 'filmstrip'"
+          @click="store.setViewMode('filmstrip')"
+        >
+          <PanelBottom class="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <div class="mx-0.5 h-5 w-px bg-line" />

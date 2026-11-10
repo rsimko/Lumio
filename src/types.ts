@@ -54,6 +54,14 @@ export interface FolderMenuTarget {
   y: number;
 }
 
+export interface PhotoMenuTarget {
+  id: string;
+  name: string;
+  count: number;
+  x: number;
+  y: number;
+}
+
 export interface NewFolderTarget {
   path: string;
   rootId: string;

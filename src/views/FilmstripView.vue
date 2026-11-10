@@ -32,10 +32,20 @@ const counter = computed(() => {
   if (store.selectedIndex < 0) return '';
   return `${store.selectedIndex + 1} / ${store.assets.length}`;
 });
+
+function openContextMenu(event: MouseEvent) {
+  const asset = store.selectedAsset;
+  if (!asset) return;
+  store.openPhotoMenu(asset.id, event.clientX, event.clientY);
+}
 </script>
 
 <template>
-  <div ref="stage" class="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-canvas p-6">
+  <div
+    ref="stage"
+    class="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-canvas p-6"
+    @contextmenu.prevent.stop="openContextMenu"
+  >
     <template v-if="store.selectedAsset">
       <img
         v-if="thumb?.src"

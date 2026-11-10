@@ -65,6 +65,7 @@ const title = computed(() => {
     draggable="true"
     @click="emit('select', $event)"
     @dblclick="$emit('open')"
+    @contextmenu.prevent.stop="store.openPhotoMenu(asset.id, $event.clientX, $event.clientY)"
     @dragstart="onDragStart"
     @dragend="store.endAssetDrag()"
   >

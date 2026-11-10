@@ -25,6 +25,7 @@ const groups: ShortcutGroup[] = [
       { keys: ['⇧', 'Click'], action: 'Select a range of photos' },
       { keys: ['⌘', 'A'], action: 'Select all photos' },
       { keys: ['Delete'], action: 'Delete selected photos' },
+      { keys: ['Right-click'], action: 'Delete a photo or the selected photos' },
       { keys: ['Drag'], action: 'Move photos onto a folder row' },
       { keys: ['Space', 'Enter'], action: 'Open fullscreen viewer' },
       { keys: ['Double-click'], action: 'Open a thumbnail in filmstrip view' },

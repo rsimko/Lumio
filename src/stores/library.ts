@@ -24,6 +24,7 @@ import type {
   MonoFont,
   NewFolderTarget,
   PhotoAsset,
+  PhotoMenuTarget,
   RootInfo,
   RootRemovalMode,
   ScanWarning,
@@ -164,6 +165,8 @@ export const useLibraryStore = defineStore('library', () => {
   const movingAssets = ref(false);
   const folderMenuOpen = ref(false);
   const folderMenuTarget = ref<FolderMenuTarget | null>(null);
+  const photoMenuOpen = ref(false);
+  const photoMenuTarget = ref<PhotoMenuTarget | null>(null);
   const newFolderOpen = ref(false);
   const newFolderTarget = ref<NewFolderTarget | null>(null);
   const creatingFolder = ref(false);
@@ -747,6 +750,7 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function openFolderMenu(target: Omit<FolderMenuTarget, 'x' | 'y'>, x: number, y: number): void {
+    closePhotoMenu();
     folderMenuTarget.value = { ...target, x, y };
     folderMenuOpen.value = true;
   }
@@ -754,6 +758,33 @@ export const useLibraryStore = defineStore('library', () => {
   function closeFolderMenu(): void {
     folderMenuOpen.value = false;
     folderMenuTarget.value = null;
+  }
+
+  function openPhotoMenu(id: string, x: number, y: number): void {
+    const asset = assetIndex.value.get(id);
+    if (!asset) return;
+    // Right-clicking outside the current selection replaces it with the
+    // clicked photo; right-clicking inside it keeps the whole selection.
+    if (!selectedIds.value.has(id)) select(id);
+    closeFolderMenu();
+    photoMenuTarget.value = {
+      id,
+      name: selectedCount.value > 1 ? `${selectedCount.value} photos` : asset.fileName,
+      count: selectedCount.value,
+      x,
+      y,
+    };
+    photoMenuOpen.value = true;
+  }
+
+  function closePhotoMenu(): void {
+    photoMenuOpen.value = false;
+    photoMenuTarget.value = null;
+  }
+
+  function deleteFromPhotoMenu(): void {
+    closePhotoMenu();
+    openDeleteAssets();
   }
 
   function removeFromFolderMenu(): void {
@@ -1024,6 +1055,8 @@ export const useLibraryStore = defineStore('library', () => {
   function openDeleteAssets(): void {
     const targets = selectedAssets.value;
     if (!targets.length) return;
+    closeFolderMenu();
+    closePhotoMenu();
     deleteAssetsTargets.value = targets;
     removeAssetsError.value = null;
     deleteAssetsOpen.value = true;
@@ -1241,6 +1274,11 @@ export const useLibraryStore = defineStore('library', () => {
     closeFolderMenu,
     removeFromFolderMenu,
     refreshFromFolderMenu,
+    photoMenuOpen,
+    photoMenuTarget,
+    openPhotoMenu,
+    closePhotoMenu,
+    deleteFromPhotoMenu,
     newFolderOpen,
     newFolderTarget,
     creatingFolder,

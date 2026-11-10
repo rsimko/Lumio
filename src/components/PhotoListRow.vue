@@ -73,6 +73,7 @@ const subline = computed(() => {
     ]"
     @click="emit('select', $event)"
     @dblclick="$emit('open')"
+    @contextmenu.prevent.stop="store.openPhotoMenu(asset.id, $event.clientX, $event.clientY)"
     draggable="true"
     @dragstart="onDragStart"
     @dragend="store.endAssetDrag()"

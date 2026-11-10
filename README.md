@@ -25,9 +25,10 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Drag any selected photo — or a single unselected photo — onto a folder row to move the
   whole group, including its companion JPEG, XMP sidecar and extra associations. Moves work
   between registered library roots and refuse to overwrite existing files.
-- Delete photos from the library only or from disk. Disk deletion moves every associated file
-  to the system Trash after an explicit warning; library-only deletion hides the group and can
-  be reversed in Settings → Hidden photos.
+- Delete photos from the library only or from disk, from the toolbar, the info panel, the
+  Delete key, or by right-clicking a photo. Disk deletion moves every associated file to the
+  system Trash after an explicit warning; library-only deletion hides the group and can be
+  reversed in Settings → Hidden photos.
 - Double-click any thumbnail to open it in filmstrip view.
 - See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.

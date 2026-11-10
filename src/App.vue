@@ -9,6 +9,7 @@ import InfoPanel from '@/components/InfoPanel.vue';
 import LibraryPanel from '@/components/LibraryPanel.vue';
 import MainArea from '@/components/MainArea.vue';
 import NewFolderDialog from '@/components/NewFolderDialog.vue';
+import PhotoContextMenu from '@/components/PhotoContextMenu.vue';
 import RailTabs from '@/components/RailTabs.vue';
 import RemoveFolderDialog from '@/components/RemoveFolderDialog.vue';
 import SettingsDialog from '@/components/SettingsDialog.vue';
@@ -63,6 +64,14 @@ function onKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.preventDefault();
       store.closeFolderMenu();
+    }
+    return;
+  }
+
+  if (store.photoMenuOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      store.closePhotoMenu();
     }
     return;
   }
@@ -260,6 +269,7 @@ onBeforeUnmount(() => {
     <ShortcutsDialog v-if="store.shortcutsOpen" />
     <WarningsDialog v-if="store.warningsOpen" />
     <FolderContextMenu v-if="store.folderMenuOpen" />
+    <PhotoContextMenu v-if="store.photoMenuOpen" />
     <NewFolderDialog v-if="store.newFolderOpen" />
     <RemoveFolderDialog v-if="store.removeFolderOpen" />
     <DeleteAssetsDialog v-if="store.deleteAssetsOpen" />

@@ -25,6 +25,13 @@ export interface FolderNode {
   hasChildren: boolean;
   accessible: boolean;
   error: string | null;
+  imageCount: number;
+  recursiveImageCount: number;
+}
+
+export interface FolderImageCounts {
+  direct: number;
+  recursive: number;
 }
 
 export interface ScanWarning {

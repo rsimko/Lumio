@@ -25,6 +25,7 @@ pub fn run() {
             commands::remove_root,
             commands::update_ui_settings,
             commands::list_subfolders,
+            commands::count_folder_images,
             commands::scan_folder,
             commands::get_thumbnail,
             commands::clear_thumbnail_cache,

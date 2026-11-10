@@ -7,8 +7,9 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 
+import { formatCount } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 import type { FolderNode } from '@/types';
 
@@ -33,6 +34,22 @@ const error = computed(() => store.treeErrors.get(props.node.path) ?? null);
 const isExpanded = computed(() => store.expanded.has(props.node.path));
 const isSelected = computed(() => store.selectedFolder === props.node.path);
 const canExpand = computed(() => props.isRoot || props.node.hasChildren || children.value.length > 0);
+
+const imageCount = computed(() => store.imageCountFor(props.node.path));
+const countTitle = computed(() => {
+  const count = imageCount.value;
+  if (count === null) return undefined;
+  const scope = store.settings.recursive ? 'including subfolders' : 'in this folder';
+  return `${formatCount(count)} ${count === 1 ? 'photo' : 'photos'} ${scope}`;
+});
+
+watch(
+  [() => props.node.path, () => store.folderCountsEpoch],
+  () => {
+    void store.ensureFolderImageCount(props.node.path);
+  },
+  { immediate: true },
+);
 
 const indent = computed(() => `${props.depth * 12}px`);
 
@@ -98,6 +115,20 @@ function removeRoot() {
       >
         {{ node.name }}
       </button>
+
+      <span
+        v-if="imageCount !== null"
+        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium tabular-nums transition-colors"
+        :class="
+          isSelected
+            ? 'bg-accent/10 text-accent'
+            : 'bg-panel-2/70 text-subtle group-hover:text-muted'
+        "
+        :title="countTitle"
+        :aria-label="countTitle"
+      >
+        {{ formatCount(imageCount) }}
+      </span>
 
       <Loader2 v-if="loading" class="h-3 w-3 shrink-0 animate-spin text-subtle" />
       <AlertTriangle

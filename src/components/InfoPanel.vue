@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
+import AssociationBadges from '@/components/AssociationBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
 import SourceBadge from '@/components/SourceBadge.vue';
@@ -121,6 +122,13 @@ async function revealPrimary() {
           <p class="mt-1 break-all text-2xs leading-snug text-subtle selectable">
             {{ asset.primaryPath }}
           </p>
+
+          <div
+            v-if="asset.companionJpeg || asset.xmpSidecar"
+            class="mt-2 flex flex-wrap items-center gap-1.5"
+          >
+            <AssociationBadges :asset="asset" />
+          </div>
 
           <div class="mt-2.5 flex gap-1.5">
             <button class="btn flex-1" title="Open with the default application" @click="openPrimary()">

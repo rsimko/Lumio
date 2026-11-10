@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { FileText } from 'lucide-vue-next';
 import { computed } from 'vue';
 
+import AssociationBadges from '@/components/AssociationBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import {
@@ -53,8 +53,8 @@ const subline = computed(() => {
     :class="[
       selected ? 'bg-accent-soft/70' : 'hover:bg-panel-2/60',
       compact
-        ? 'grid-cols-[minmax(0,1fr)_54px_100px_38px]'
-        : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_44px]',
+        ? 'grid-cols-[minmax(0,1fr)_54px_100px_72px]'
+        : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_72px]',
     ]"
     @click="$emit('select')"
     @dblclick="$emit('open')"
@@ -85,20 +85,8 @@ const subline = computed(() => {
       </div>
       <div class="min-w-0">
         <p class="truncate text-xs font-medium text-ink">{{ asset.fileName }}</p>
-        <p class="mt-0.5 flex items-center gap-1 truncate text-2xs text-subtle">
-          <span class="truncate">{{ subline }}</span>
-          <FileText
-            v-if="asset.xmpSidecar"
-            class="h-2.5 w-2.5 shrink-0 text-success"
-            title="XMP sidecar associated"
-          />
-          <span
-            v-if="asset.companionJpeg"
-            class="shrink-0 rounded bg-success/15 px-1 text-[9px] font-semibold uppercase tracking-wide text-success"
-            title="Companion JPEG associated"
-          >
-            JPG
-          </span>
+        <p class="mt-0.5 truncate text-2xs text-subtle">
+          {{ subline }}
         </p>
       </div>
     </div>
@@ -119,16 +107,15 @@ const subline = computed(() => {
     <template v-if="!compact">
       <span class="truncate text-2xs tabular-nums text-muted">{{ formatBytes(asset.fileSize) }}</span>
       <span class="truncate text-2xs text-muted">{{ formatShortDate(asset.modifiedMs) }}</span>
-      <span class="flex justify-end text-subtle">
-        <FileText
-          v-if="asset.xmpSidecar"
-          class="h-3 w-3"
-          title="XMP sidecar associated"
-        />
-      </span>
     </template>
-    <span v-else class="flex justify-end text-subtle">
-      <FileText v-if="asset.xmpSidecar" class="h-3 w-3" title="XMP sidecar associated" />
+    <span class="flex items-center justify-end gap-1">
+      <AssociationBadges :asset="asset" />
+      <span
+        v-if="!asset.companionJpeg && !asset.xmpSidecar"
+        class="text-2xs text-subtle"
+      >
+        —
+      </span>
     </span>
   </div>
 </template>

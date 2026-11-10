@@ -15,6 +15,9 @@ function rootNode(root: RootInfo): FolderNode {
     hasChildren: true,
     accessible: root.available,
     error: root.error,
+    // Root counts are loaded lazily by the store, like any other folder row.
+    imageCount: 0,
+    recursiveImageCount: 0,
   };
 }
 

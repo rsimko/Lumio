@@ -67,8 +67,8 @@ watch(
       class="grid h-8 shrink-0 items-center gap-3 border-b border-line bg-app/60 px-4 text-2xs font-semibold uppercase tracking-[0.1em] text-subtle"
       :class="
         compact
-          ? 'grid-cols-[minmax(0,1fr)_54px_100px_38px]'
-          : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_44px]'
+          ? 'grid-cols-[minmax(0,1fr)_54px_100px_72px]'
+          : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_72px]'
       "
     >
       <span>Name</span>
@@ -77,8 +77,8 @@ watch(
       <template v-if="!compact">
         <span>Size</span>
         <span>Modified</span>
-        <span />
       </template>
+      <span>Assoc.</span>
     </div>
 
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">

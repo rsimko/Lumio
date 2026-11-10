@@ -6,6 +6,7 @@ import { api, errorCode, errorMessage } from '@/api';
 import { resetThumbnails } from '@/composables/useThumbnails';
 import { basename, isPathInside } from '@/lib/format';
 import type {
+  FolderImageCounts,
   FolderNode,
   PhotoAsset,
   RootInfo,
@@ -75,6 +76,12 @@ export const useLibraryStore = defineStore('library', () => {
   const treeLoading = reactive(new Set<string>());
   const treeErrors = reactive(new Map<string, string>());
   const expanded = reactive(new Set<string>());
+
+  // Asset counts are cached per folder, with direct and recursive values so the
+  // tree can switch immediately when "Include subfolders" changes.
+  const folderImageCounts = reactive(new Map<string, FolderImageCounts>());
+  const folderImageCountsLoading = reactive(new Set<string>());
+  const folderCountsEpoch = ref(0);
 
   const selectedRootId = ref<string | null>(null);
   const selectedFolder = ref<string | null>(null);
@@ -346,6 +353,31 @@ export const useLibraryStore = defineStore('library', () => {
     else openFullscreen();
   }
 
+  function imageCountFor(path: string): number | null {
+    const counts = folderImageCounts.get(path);
+    if (!counts) return null;
+    return settings.value.recursive ? counts.recursive : counts.direct;
+  }
+
+  async function ensureFolderImageCount(path: string): Promise<void> {
+    if (folderImageCounts.has(path) || folderImageCountsLoading.has(path)) return;
+    const epoch = folderCountsEpoch.value;
+    folderImageCountsLoading.add(path);
+    try {
+      const counts = await api.countFolderImages(path);
+      if (epoch === folderCountsEpoch.value) folderImageCounts.set(path, counts);
+    } catch (error) {
+      // Counts are an enhancement; a folder row should still work if counting
+      // fails or the folder disappears between renders.
+      console.error('Could not count images in folder', path, error);
+    } finally {
+      folderImageCountsLoading.delete(path);
+      if (epoch !== folderCountsEpoch.value && !folderImageCounts.has(path)) {
+        void ensureFolderImageCount(path);
+      }
+    }
+  }
+
   async function loadChildren(path: string, force = false): Promise<void> {
     if (treeLoading.has(path)) return;
     if (!force && tree.has(path)) return;
@@ -354,6 +386,12 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const children = await api.listSubfolders(path);
       tree.set(path, children);
+      for (const child of children) {
+        folderImageCounts.set(child.path, {
+          direct: child.imageCount,
+          recursive: child.recursiveImageCount,
+        });
+      }
     } catch (error) {
       treeErrors.set(path, errorMessage(error));
     } finally {
@@ -468,6 +506,10 @@ export const useLibraryStore = defineStore('library', () => {
       roots.value = roots.value.some((root) => root.id === info.id)
         ? roots.value.map((root) => (root.id === info.id ? info : root))
         : [...roots.value, info];
+      for (const key of [...folderImageCounts.keys()]) {
+        if (isPathInside(key, info.path)) folderImageCounts.delete(key);
+      }
+      folderCountsEpoch.value += 1;
       expanded.add(info.path);
       await loadChildren(info.path, true);
       await selectFolder(info.path, info.id);
@@ -488,6 +530,9 @@ export const useLibraryStore = defineStore('library', () => {
         expanded.delete(root.path);
         tree.delete(root.path);
         treeErrors.delete(root.path);
+        for (const key of [...folderImageCounts.keys()]) {
+          if (isPathInside(key, root.path)) folderImageCounts.delete(key);
+        }
       }
       if (selectedRootId.value === id) {
         selectedRootId.value = null;
@@ -512,7 +557,11 @@ export const useLibraryStore = defineStore('library', () => {
   async function refresh(): Promise<void> {
     const folder = selectedFolder.value;
     if (!folder) return;
+    folderImageCounts.clear();
     await loadChildren(folder, true);
+    // Bump after the listing seeds this folder's children so visible rows only
+    // request counts that are still missing from the cache.
+    folderCountsEpoch.value += 1;
     await scanFolder();
   }
 
@@ -627,6 +676,9 @@ export const useLibraryStore = defineStore('library', () => {
     // tree
     loadChildren,
     toggleExpanded,
+    imageCountFor,
+    ensureFolderImageCount,
+    folderCountsEpoch,
     // selection
     selectionId,
     selectedAsset,

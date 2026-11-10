@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   Bootstrap,
   CommandError,
+  FolderImageCounts,
   FolderNode,
   PhotoAsset,
   RootInfo,
@@ -17,6 +18,8 @@ export const api = {
   removeRoot: (id: string) => invoke<RootInfo[]>('remove_root', { id }),
   updateUiSettings: (ui: UiSettings) => invoke<UiSettings>('update_ui_settings', { ui }),
   listSubfolders: (folder: string) => invoke<FolderNode[]>('list_subfolders', { folder }),
+  countFolderImages: (folder: string) =>
+    invoke<FolderImageCounts>('count_folder_images', { folder }),
   scanFolder: (folder: string, recursive: boolean) =>
     invoke<ScanResult>('scan_folder', { folder, recursive }),
   thumbnail: (asset: PhotoAsset, edge: number, preferThumbnail = false) =>

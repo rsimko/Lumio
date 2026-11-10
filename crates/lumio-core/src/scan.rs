@@ -9,8 +9,9 @@ use walkdir::{DirEntry, WalkDir};
 use crate::error::{LumioError, Result};
 use crate::path_utils::{display_name, is_hidden_or_package, modified_ms};
 use crate::types::{
-    AssetKind, FolderNode, PhotoAsset, PreviewSource, ScanResult, ScanWarning, asset_kind_for,
-    extension_of, is_image_extension, is_jpeg_extension, is_raw_extension, raw_priority,
+    AssetKind, FolderImageCounts, FolderNode, PhotoAsset, PreviewSource, ScanResult, ScanWarning,
+    asset_kind_for, extension_of, is_image_extension, is_jpeg_extension, is_raw_extension,
+    raw_priority,
 };
 
 #[derive(Debug, Clone)]
@@ -40,7 +41,7 @@ struct StemGroup {
 
 pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
     let read = fs::read_dir(path).map_err(|error| LumioError::io(path, error))?;
-    let mut nodes = Vec::new();
+    let mut child_paths = Vec::new();
     for entry in read {
         let entry = match entry {
             Ok(entry) => entry,
@@ -56,18 +57,123 @@ pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
         if is_hidden_or_package(&entry.file_name()) {
             continue;
         }
-        let child_path = entry.path();
-        let has_children = has_visible_child_dir(&child_path).unwrap_or(false);
+        child_paths.push(entry.path());
+    }
+
+    // One walk over the subtree gives every immediate child both its direct
+    // asset count and the count including descendants. Asset counts follow the
+    // same RAW/JPEG pairing rules as scan_photos, so a RAW + JPEG pair counts
+    // as one photo rather than two files.
+    let dir_counts = collect_dir_counts(path)?;
+    let mut nodes = Vec::new();
+    for child_path in child_paths {
+        let direct = dir_counts
+            .get(&child_path)
+            .map(AssetCounts::assets)
+            .unwrap_or(0);
+        let recursive = dir_counts
+            .iter()
+            .filter(|(directory, _)| directory.starts_with(&child_path))
+            .map(|(_, counts)| counts.assets())
+            .sum();
         nodes.push(FolderNode {
             name: display_name(&child_path),
-            path: child_path,
-            has_children,
+            path: child_path.clone(),
+            has_children: has_visible_child_dir(&child_path).unwrap_or(false),
             accessible: true,
             error: None,
+            image_count: direct,
+            recursive_image_count: recursive,
         });
     }
     nodes.sort_by(|left, right| compare_ignore_case(&left.name, &right.name));
     Ok(nodes)
+}
+
+/// Count assets directly in `path` and recursively under it. Used for library
+/// roots, which are shown in the tree before their children are loaded.
+pub fn count_folder_images(path: &Path) -> Result<FolderImageCounts> {
+    let dir_counts = collect_dir_counts(path)?;
+    let direct = dir_counts.get(path).map(AssetCounts::assets).unwrap_or(0);
+    let recursive = dir_counts.values().map(AssetCounts::assets).sum();
+    Ok(FolderImageCounts { direct, recursive })
+}
+
+#[derive(Debug, Default)]
+struct AssetCounts {
+    stems: HashMap<String, StemCounts>,
+    standalone_images: u32,
+}
+
+#[derive(Debug, Default)]
+struct StemCounts {
+    raws: u32,
+    jpegs: u32,
+}
+
+impl AssetCounts {
+    fn add(&mut self, path: &Path) {
+        let Some(extension) = extension_of(path) else {
+            return;
+        };
+        if is_raw_extension(&extension) {
+            let stem = file_stem_key(path);
+            self.stems.entry(stem).or_default().raws += 1;
+        } else if is_jpeg_extension(&extension) {
+            let stem = file_stem_key(path);
+            self.stems.entry(stem).or_default().jpegs += 1;
+        } else if is_image_extension(&extension) {
+            self.standalone_images += 1;
+        }
+    }
+
+    fn assets(&self) -> u32 {
+        self.standalone_images
+            + self
+                .stems
+                .values()
+                .map(|counts| {
+                    if counts.raws > 0 {
+                        counts.raws
+                    } else {
+                        counts.jpegs
+                    }
+                })
+                .sum::<u32>()
+    }
+}
+
+fn file_stem_key(path: &Path) -> String {
+    path.file_stem()
+        .map(|value| value.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+fn collect_dir_counts(root: &Path) -> Result<HashMap<PathBuf, AssetCounts>> {
+    // Validate the root itself first so an unreadable folder reports an error
+    // instead of a misleading zero count.
+    fs::read_dir(root).map_err(|error| LumioError::io(root, error))?;
+
+    let mut dirs: HashMap<PathBuf, AssetCounts> = HashMap::new();
+    let walker = WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(keep_entry);
+    for entry in walker {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        if !entry.file_type().is_file() || is_hidden_or_package(entry.file_name()) {
+            continue;
+        }
+        if let Some(parent) = entry.path().parent() {
+            dirs.entry(parent.to_path_buf())
+                .or_default()
+                .add(entry.path());
+        }
+    }
+    Ok(dirs)
 }
 
 fn has_visible_child_dir(path: &Path) -> Result<bool> {
@@ -577,6 +683,49 @@ mod tests {
                 .iter()
                 .all(|asset| asset.companion_jpeg.is_none())
         );
+    }
+
+    #[test]
+    fn folder_counts_follow_association_and_recursive_rules() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let alpha = root.join("alpha");
+        let beta = root.join("beta");
+        fs::create_dir_all(alpha.join("nested")).unwrap();
+        fs::create_dir_all(alpha.join(".hidden")).unwrap();
+        fs::create_dir_all(alpha.join("Library.photoslibrary")).unwrap();
+        fs::create_dir_all(beta.join("empty")).unwrap();
+
+        fs::write(alpha.join("IMG_0001.CR2"), b"raw").unwrap();
+        write_jpeg(&alpha.join("IMG_0001.jpg"));
+        fs::write(alpha.join("IMG_0001.xmp"), b"<xmp/>").unwrap();
+        write_jpeg(&alpha.join("IMG_0002.jpg"));
+        write_jpeg(&alpha.join("nested/deep.jpg"));
+        write_jpeg(&alpha.join(".hidden/ignored.jpg"));
+        write_jpeg(&alpha.join("Library.photoslibrary/ignored.jpg"));
+        write_jpeg(&root.join("root.jpg"));
+
+        let nodes = list_subfolders(root).unwrap();
+        assert_eq!(nodes.len(), 2);
+
+        let alpha_node = nodes.iter().find(|node| node.name == "alpha").unwrap();
+        // The RAW + JPEG pair is one asset; IMG_0002 is a second.
+        assert_eq!(alpha_node.image_count, 2);
+        // The nested folder adds one more photo.
+        assert_eq!(alpha_node.recursive_image_count, 3);
+
+        let beta_node = nodes.iter().find(|node| node.name == "beta").unwrap();
+        assert_eq!(beta_node.image_count, 0);
+        assert_eq!(beta_node.recursive_image_count, 0);
+        assert!(beta_node.has_children);
+
+        let root_counts = count_folder_images(root).unwrap();
+        assert_eq!(root_counts.direct, 1);
+        assert_eq!(root_counts.recursive, 4);
+
+        let alpha_counts = count_folder_images(&alpha).unwrap();
+        assert_eq!(alpha_counts.direct, 2);
+        assert_eq!(alpha_counts.recursive, 3);
     }
 
     #[test]

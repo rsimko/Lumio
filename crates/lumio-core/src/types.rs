@@ -43,6 +43,15 @@ pub struct RootInfo {
     pub added_at: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderImageCounts {
+    /// Assets directly inside this folder.
+    pub direct: u32,
+    /// Assets in this folder and every visible descendant folder.
+    pub recursive: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderNode {
@@ -51,6 +60,10 @@ pub struct FolderNode {
     pub has_children: bool,
     pub accessible: bool,
     pub error: Option<String>,
+    /// Assets directly inside this folder.
+    pub image_count: u32,
+    /// Assets in this folder and every visible descendant folder.
+    pub recursive_image_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use lumio_core::LumioError;
 use lumio_core::types::{
-    FolderNode, PhotoAsset, RootInfo, ScanResult, ThumbnailResult, UiSettings,
+    FolderImageCounts, FolderNode, PhotoAsset, RootInfo, ScanResult, ThumbnailResult, UiSettings,
 };
 use serde::Serialize;
 use tauri::State;
@@ -110,6 +110,21 @@ pub async fn list_subfolders(
         Err(error) => Err(CommandError::new(
             "internal",
             format!("Folder listing task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn count_folder_images(
+    state: State<'_, AppState>,
+    folder: String,
+) -> Result<FolderImageCounts, CommandError> {
+    let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
+    match tokio::task::spawn_blocking(move || lumio_core::count_folder_images(&folder)).await {
+        Ok(result) => Ok(result?),
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Folder count task failed: {error}"),
         )),
     }
 }

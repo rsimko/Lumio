@@ -16,6 +16,8 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Scan the current folder, or include every subfolder recursively.
 - View photos in five layouts: grid, masonry, justified, list and filmstrip.
 - Double-click any thumbnail to open it in filmstrip view.
+- See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
+- Companion JPEG and XMP associations are shown as badges in list view and the info panel.
 - Open any photo in a distraction-free fullscreen viewer from the info panel, the filmstrip
   view, or with the keyboard.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.

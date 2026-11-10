@@ -123,13 +123,6 @@ async function revealPrimary() {
             {{ asset.primaryPath }}
           </p>
 
-          <div
-            v-if="asset.companionJpeg || asset.xmpSidecar"
-            class="mt-2 flex flex-wrap items-center gap-1.5"
-          >
-            <AssociationBadges :asset="asset" />
-          </div>
-
           <div class="mt-2.5 flex gap-1.5">
             <button class="btn flex-1" title="Open with the default application" @click="openPrimary()">
               <ExternalLink class="h-3.5 w-3.5" />
@@ -196,7 +189,15 @@ async function revealPrimary() {
         </section>
 
         <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">Associations</h4>
+          <div class="mb-1.5 flex min-h-4 items-center justify-between gap-2">
+            <h4 class="panel-heading">Associations</h4>
+            <span
+              v-if="asset.companionJpeg || asset.xmpSidecar"
+              class="flex shrink-0 items-center gap-1"
+            >
+              <AssociationBadges :asset="asset" />
+            </span>
+          </div>
 
           <div class="info-row">
             <span class="info-label">Companion JPEG</span>

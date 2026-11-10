@@ -8,16 +8,21 @@ import { basename, isPathInside } from '@/lib/format';
 import type {
   FolderImageCounts,
   FolderNode,
+  MonoFont,
   PhotoAsset,
   RootInfo,
   ScanWarning,
   ThemeSetting,
+  UiFont,
   UiSettings,
   ViewMode,
 } from '@/types';
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
   theme: 'system',
+  uiFont: 'avenir',
+  monoFont: 'jetbrains',
+  uiFontSize: 13,
   viewMode: 'grid',
   recursive: false,
   thumbnailSize: 184,
@@ -26,6 +31,21 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   lastRootId: null,
   lastFolder: null,
   filmstripVisible: true,
+};
+
+const BASE_FONT_SIZE = 13;
+
+const UI_FONT_STACKS: Record<UiFont, string> = {
+  avenir:
+    "'Avenir Next', Avenir, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif",
+  system:
+    "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif",
+};
+
+const MONO_FONT_STACKS: Record<MonoFont, string> = {
+  jetbrains:
+    "'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, monospace",
+  system: "'SF Mono', ui-monospace, Menlo, Monaco, Consolas, monospace",
 };
 
 export type ToastKind = 'info' | 'success' | 'error';
@@ -58,6 +78,17 @@ interface FolderTargetOptions {
 function readSystemDark(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function normalizeUiSettings(ui: Partial<UiSettings>): UiSettings {
+  const merged = { ...DEFAULT_UI_SETTINGS, ...ui };
+  const size = Number.isFinite(merged.uiFontSize) ? Math.round(merged.uiFontSize) : BASE_FONT_SIZE;
+  return {
+    ...merged,
+    uiFont: merged.uiFont === 'system' ? 'system' : 'avenir',
+    monoFont: merged.monoFont === 'system' ? 'system' : 'jetbrains',
+    uiFontSize: Math.min(17, Math.max(11, size)),
+  };
 }
 
 export const useLibraryStore = defineStore('library', () => {
@@ -121,6 +152,18 @@ export const useLibraryStore = defineStore('library', () => {
       if (typeof document === 'undefined') return;
       document.documentElement.classList.toggle('dark', theme === 'dark');
       document.documentElement.style.colorScheme = theme;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => [settings.value.uiFont, settings.value.monoFont, settings.value.uiFontSize] as const,
+    ([uiFont, monoFont, uiFontSize]) => {
+      if (typeof document === 'undefined') return;
+      const root = document.documentElement;
+      root.style.setProperty('--font-ui', UI_FONT_STACKS[uiFont] ?? UI_FONT_STACKS.avenir);
+      root.style.setProperty('--font-mono', MONO_FONT_STACKS[monoFont] ?? MONO_FONT_STACKS.jetbrains);
+      root.style.setProperty('--font-scale', (uiFontSize / BASE_FONT_SIZE).toFixed(4));
     },
     { immediate: true },
   );
@@ -241,6 +284,24 @@ export const useLibraryStore = defineStore('library', () => {
 
   function toggleTheme(): void {
     setTheme(resolvedTheme.value === 'dark' ? 'light' : 'dark');
+  }
+
+  function setUiFont(font: UiFont): void {
+    if (!['avenir', 'system'].includes(font)) return;
+    if (settings.value.uiFont === font) return;
+    updateSettings({ uiFont: font });
+  }
+
+  function setMonoFont(font: MonoFont): void {
+    if (!['jetbrains', 'system'].includes(font)) return;
+    if (settings.value.monoFont === font) return;
+    updateSettings({ monoFont: font });
+  }
+
+  function setUiFontSize(size: number): void {
+    const clamped = Math.min(17, Math.max(11, Math.round(size)));
+    if (clamped === settings.value.uiFontSize) return;
+    updateSettings({ uiFontSize: clamped });
   }
 
   function setViewMode(mode: ViewMode): void {
@@ -586,7 +647,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const bootstrap = await api.bootstrap();
       roots.value = bootstrap.roots;
-      settings.value = { ...DEFAULT_UI_SETTINGS, ...bootstrap.ui };
+      settings.value = normalizeUiSettings(bootstrap.ui);
       cacheDir.value = bootstrap.cacheDir;
       recoveryWarning.value = bootstrap.recoveryWarning;
       appVersion.value = bootstrap.appVersion;
@@ -709,6 +770,9 @@ export const useLibraryStore = defineStore('library', () => {
     viewMode,
     setTheme,
     toggleTheme,
+    setUiFont,
+    setMonoFont,
+    setUiFontSize,
     setViewMode,
     setThumbnailSize,
     setRecursive,

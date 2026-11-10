@@ -118,7 +118,7 @@ function removeRoot() {
 
       <span
         v-if="imageCount !== null"
-        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium tabular-nums transition-colors"
+        class="shrink-0 rounded px-1 py-0.5 text-2xs font-medium tabular-nums transition-colors"
         :class="
           isSelected
             ? 'bg-accent/10 text-accent'

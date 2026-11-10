@@ -23,7 +23,9 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted.
-- Light and dark themes, adjustable panels, thumbnail size, keyboard shortcuts.
+- Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
+  keyboard shortcuts.
+- Settings for the Avenir interface font, bundled JetBrains Mono, and text size.
 - Scan, permission and per-file errors are surfaced without hiding the rest of the folder.
 
 ## Non-destructive by design

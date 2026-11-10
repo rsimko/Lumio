@@ -98,7 +98,7 @@ const footerSource = computed(() => {
 
     <div class="pointer-events-none absolute left-1.5 top-1.5 flex items-center gap-1">
       <span
-        class="rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/90 backdrop-blur-[2px]"
+        class="rounded bg-black/55 px-1 py-0.5 text-3xs font-semibold uppercase tracking-wider text-white/90 backdrop-blur-[2px]"
       >
         {{ asset.extension }}
       </span>
@@ -122,10 +122,10 @@ const footerSource = computed(() => {
       class="pointer-events-none absolute inset-x-0 bottom-0 translate-y-1 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-2 pb-1.5 pt-6 transition duration-150"
       :class="selected ? 'translate-y-0 opacity-100' : 'opacity-0 group-hover:translate-y-0 group-hover:opacity-100'"
     >
-      <p class="truncate text-[11px] font-medium leading-tight text-white">
+      <p class="truncate text-xs font-medium leading-tight text-white">
         {{ asset.fileName }}
       </p>
-      <p class="mt-0.5 truncate text-[9px] leading-tight text-white/65">
+      <p class="mt-0.5 truncate text-2xs leading-tight text-white/65">
         {{ dimensions }} · {{ footerSource }}
       </p>
     </div>

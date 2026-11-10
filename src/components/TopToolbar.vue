@@ -6,7 +6,6 @@ import {
   Film,
   FolderOpen,
   FolderPlus,
-  FolderTree,
   LayoutGrid,
   List,
   Loader2,
@@ -56,7 +55,7 @@ function onSizeInput(event: Event) {
       >
         <Aperture class="h-4 w-4" />
       </div>
-      <span class="text-[14px] font-semibold tracking-[0.01em] text-ink">Lumio</span>
+      <span class="text-sm font-semibold tracking-[0.01em] text-ink">Lumio</span>
     </div>
 
     <div class="mx-0.5 h-5 w-px shrink-0 bg-line" />
@@ -100,16 +99,6 @@ function onSizeInput(event: Event) {
         @click="store.refresh()"
       >
         <RefreshCw class="h-3.5 w-3.5" :class="store.scanState === 'loading' ? 'animate-spin' : ''" />
-      </button>
-
-      <button
-        class="btn-icon"
-        :class="store.settings.recursive ? 'bg-accent-soft text-accent' : ''"
-        title="Include subfolders (R)"
-        :aria-pressed="store.settings.recursive"
-        @click="store.setRecursive(!store.settings.recursive)"
-      >
-        <FolderTree class="h-3.5 w-3.5" />
       </button>
 
       <div class="mx-0.5 h-5 w-px bg-line" />

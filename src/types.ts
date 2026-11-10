@@ -10,6 +10,10 @@ export type ViewMode = 'grid' | 'masonry' | 'justified' | 'list' | 'filmstrip';
 
 export type ThemeSetting = 'system' | 'light' | 'dark';
 
+export type UiFont = 'avenir' | 'system';
+
+export type MonoFont = 'jetbrains' | 'system';
+
 export interface RootInfo {
   id: string;
   path: string;
@@ -77,6 +81,9 @@ export interface ThumbnailResult {
 
 export interface UiSettings {
   theme: ThemeSetting;
+  uiFont: UiFont;
+  monoFont: MonoFont;
+  uiFontSize: number;
   viewMode: ViewMode;
   recursive: boolean;
   thumbnailSize: number;

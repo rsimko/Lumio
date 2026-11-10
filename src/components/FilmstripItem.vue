@@ -71,7 +71,7 @@ const title = computed(() => {
     />
     <span
       v-if="asset.kind === 'raw'"
-      class="absolute left-1 top-1 rounded bg-black/55 px-1 py-px text-[8px] font-semibold uppercase tracking-wider text-white/85 backdrop-blur-[2px]"
+      class="absolute left-1 top-1 rounded bg-black/55 px-1 py-px text-3xs font-semibold uppercase tracking-wider text-white/85 backdrop-blur-[2px]"
     >
       RAW
     </span>

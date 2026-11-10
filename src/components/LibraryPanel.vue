@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FolderPlus, Loader2, X } from 'lucide-vue-next';
+import { FolderPlus, FolderTree, Loader2, X } from 'lucide-vue-next';
 
 import FolderTreeNode from '@/components/FolderTreeNode.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
@@ -37,15 +37,26 @@ function commitResize(width: number) {
   >
     <div class="flex h-10 shrink-0 items-center justify-between px-3">
       <span class="panel-heading">Library</span>
-      <button
-        class="btn-icon-sm"
-        title="Add a folder (⌘O)"
-        :disabled="store.addingRoot"
-        @click="store.addRoot()"
-      >
-        <Loader2 v-if="store.addingRoot" class="h-3.5 w-3.5 animate-spin" />
-        <FolderPlus v-else class="h-3.5 w-3.5" />
-      </button>
+      <div class="flex items-center gap-0.5">
+        <button
+          class="btn-icon-sm"
+          :class="store.settings.recursive ? 'bg-accent-soft text-accent' : ''"
+          title="Include subfolders (R)"
+          :aria-pressed="store.settings.recursive"
+          @click="store.setRecursive(!store.settings.recursive)"
+        >
+          <FolderTree class="h-3.5 w-3.5" />
+        </button>
+        <button
+          class="btn-icon-sm"
+          title="Add a folder (⌘O)"
+          :disabled="store.addingRoot"
+          @click="store.addRoot()"
+        >
+          <Loader2 v-if="store.addingRoot" class="h-3.5 w-3.5 animate-spin" />
+          <FolderPlus v-else class="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
 
     <div
@@ -99,27 +110,6 @@ function commitResize(width: number) {
           :available="root.available"
         />
       </template>
-    </div>
-
-    <div class="shrink-0 border-t border-line px-3 py-2.5">
-      <div class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p class="text-xs font-medium text-ink">Include subfolders</p>
-          <p class="mt-0.5 text-2xs leading-snug text-subtle">
-            Scan nested folders as well.
-          </p>
-        </div>
-        <button
-          class="switch"
-          :class="store.settings.recursive ? 'switch-on' : ''"
-          role="switch"
-          :aria-checked="store.settings.recursive"
-          title="Include subfolders (R)"
-          @click="store.setRecursive(!store.settings.recursive)"
-        >
-          <span class="switch-knob" />
-        </button>
-      </div>
     </div>
 
     <div

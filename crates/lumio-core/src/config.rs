@@ -225,6 +225,56 @@ mod tests {
     }
 
     #[test]
+    fn typography_settings_round_trip() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+
+        let mut store = ConfigStore::open(&config_path).unwrap();
+        let mut ui = store.config().ui.clone();
+        ui.ui_font = "system".into();
+        ui.mono_font = "system".into();
+        ui.ui_font_size = 16;
+        store.update_ui(ui.clone()).unwrap();
+
+        let reopened = ConfigStore::open(&config_path).unwrap();
+        assert_eq!(reopened.config().ui, ui);
+    }
+
+    #[test]
+    fn legacy_ui_settings_receive_typography_defaults() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+        fs::write(
+            &config_path,
+            r#"{
+                "version": 1,
+                "roots": [],
+                "ui": {
+                    "theme": "dark",
+                    "viewMode": "list",
+                    "recursive": true,
+                    "thumbnailSize": 240,
+                    "libraryWidth": 300,
+                    "infoWidth": 360,
+                    "lastRootId": null,
+                    "lastFolder": null,
+                    "filmstripVisible": false
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let store = ConfigStore::open(&config_path).unwrap();
+        assert!(store.recovery_warning().is_none());
+        let ui = &store.config().ui;
+        assert_eq!(ui.theme, "dark");
+        assert_eq!(ui.view_mode, "list");
+        assert_eq!(ui.ui_font, "avenir");
+        assert_eq!(ui.mono_font, "jetbrains");
+        assert_eq!(ui.ui_font_size, 13);
+    }
+
+    #[test]
     fn corrupt_config_is_preserved() {
         let temp = tempfile::tempdir().unwrap();
         let config_path = temp.path().join("settings.json");

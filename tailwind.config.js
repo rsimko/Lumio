@@ -1,4 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+const scaled = (size, lineHeight) => [
+  `calc(${size} * var(--font-scale, 1))`,
+  `calc(${lineHeight} * var(--font-scale, 1))`,
+];
+
 export default {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{vue,ts}'],
@@ -24,21 +29,20 @@ export default {
         success: 'rgb(var(--c-success) / <alpha-value>)',
       },
       fontFamily: {
-        sans: [
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'SF Pro Text',
-          'Segoe UI',
-          'Inter',
-          'Roboto',
-          'Helvetica Neue',
-          'Arial',
-          'sans-serif',
-        ],
-        mono: ['SF Mono', 'ui-monospace', 'Menlo', 'Monaco', 'monospace'],
+        sans: ['var(--font-ui)'],
+        mono: ['var(--font-mono)'],
       },
       fontSize: {
-        '2xs': ['10px', '14px'],
+        '3xs': scaled('8px', '10px'),
+        '2xs': scaled('10px', '14px'),
+        ui: scaled('13px', '18px'),
+        xs: scaled('12px', '16px'),
+        sm: scaled('14px', '20px'),
+        base: scaled('16px', '24px'),
+        lg: scaled('18px', '28px'),
+        xl: scaled('20px', '28px'),
+        '2xl': scaled('24px', '32px'),
+        '3xl': scaled('30px', '36px'),
       },
       boxShadow: {
         panel: '0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08)',

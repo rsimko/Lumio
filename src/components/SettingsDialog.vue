@@ -4,7 +4,7 @@ import { ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
 import { useLibraryStore } from '@/stores/library';
-import type { ThemeSetting } from '@/types';
+import type { MonoFont, ThemeSetting, UiFont } from '@/types';
 
 const store = useLibraryStore();
 const confirmingClear = ref(false);
@@ -15,9 +15,24 @@ const themes: { value: ThemeSetting; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
+const uiFonts: { value: UiFont; label: string }[] = [
+  { value: 'avenir', label: 'Avenir' },
+  { value: 'system', label: 'System' },
+];
+
+const monoFonts: { value: MonoFont; label: string }[] = [
+  { value: 'jetbrains', label: 'JetBrains Mono' },
+  { value: 'system', label: 'System mono' },
+];
+
 function onThumbnailInput(event: Event) {
   const value = Number((event.target as HTMLInputElement).value);
   if (Number.isFinite(value)) store.setThumbnailSize(value);
+}
+
+function onFontSizeInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value);
+  if (Number.isFinite(value)) store.setUiFontSize(value);
 }
 
 async function clearCache() {
@@ -59,6 +74,94 @@ function openShortcuts() {
         <p class="mt-1.5 text-2xs text-subtle">
           The System option follows the macOS appearance automatically.
         </p>
+      </section>
+
+      <section>
+        <h3 class="panel-heading mb-2">Typography</h3>
+        <div class="divide-y divide-line rounded-md border border-line bg-panel">
+          <div class="px-3 py-2.5">
+            <p class="text-xs font-medium text-ink">Interface font</p>
+            <p class="mt-0.5 text-2xs text-subtle">
+              Avenir is used when available, with the system UI font as a fallback.
+            </p>
+            <div class="mt-2 grid grid-cols-2 gap-1.5">
+              <button
+                v-for="font in uiFonts"
+                :key="font.value"
+                class="flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition"
+                :class="
+                  store.settings.uiFont === font.value
+                    ? 'border-accent bg-accent-soft font-medium text-ink'
+                    : 'border-line bg-panel text-muted hover:bg-panel-2'
+                "
+                :aria-pressed="store.settings.uiFont === font.value"
+                @click="store.setUiFont(font.value)"
+              >
+                <Check
+                  v-if="store.settings.uiFont === font.value"
+                  class="h-3 w-3 text-accent"
+                />
+                {{ font.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="px-3 py-2.5">
+            <p class="text-xs font-medium text-ink">Monospace font</p>
+            <p class="mt-0.5 text-2xs text-subtle">
+              Used for file paths, cache locations and keyboard shortcuts.
+            </p>
+            <div class="mt-2 grid grid-cols-2 gap-1.5">
+              <button
+                v-for="font in monoFonts"
+                :key="font.value"
+                class="flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition"
+                :class="
+                  store.settings.monoFont === font.value
+                    ? 'border-accent bg-accent-soft font-medium text-ink'
+                    : 'border-line bg-panel text-muted hover:bg-panel-2'
+                "
+                :aria-pressed="store.settings.monoFont === font.value"
+                @click="store.setMonoFont(font.value)"
+              >
+                <Check
+                  v-if="store.settings.monoFont === font.value"
+                  class="h-3 w-3 text-accent"
+                />
+                {{ font.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="px-3 py-2.5">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium text-ink">Text size</p>
+                <p class="mt-0.5 text-2xs text-subtle">Scales labels and text without resizing panels.</p>
+              </div>
+              <span class="shrink-0 text-2xs tabular-nums text-muted">
+                {{ store.settings.uiFontSize }} px
+              </span>
+            </div>
+            <input
+              type="range"
+              min="11"
+              max="17"
+              step="1"
+              class="mt-2 w-full cursor-pointer"
+              style="accent-color: rgb(var(--c-accent))"
+              :value="store.settings.uiFontSize"
+              aria-label="Text size"
+              @input="onFontSizeInput"
+            />
+            <p class="mt-2 rounded-md border border-line/70 bg-elevated px-2.5 py-2 text-xs text-muted">
+              Preview —
+              <span class="text-ink">The quick brown fox</span>
+              <span class="text-subtle"> · </span>
+              <span class="font-mono text-2xs">ISO 100 · 35 mm</span>
+            </p>
+          </div>
+        </div>
       </section>
 
       <section>

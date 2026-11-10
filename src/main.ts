@@ -1,3 +1,4 @@
+import '@fontsource-variable/jetbrains-mono';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 

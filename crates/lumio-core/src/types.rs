@@ -139,6 +139,12 @@ pub struct ThumbnailResult {
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub theme: String,
+    #[serde(default = "default_ui_font")]
+    pub ui_font: String,
+    #[serde(default = "default_mono_font")]
+    pub mono_font: String,
+    #[serde(default = "default_ui_font_size")]
+    pub ui_font_size: u32,
     pub view_mode: String,
     pub recursive: bool,
     pub thumbnail_size: u32,
@@ -149,10 +155,25 @@ pub struct UiSettings {
     pub filmstrip_visible: bool,
 }
 
+fn default_ui_font() -> String {
+    "avenir".into()
+}
+
+fn default_mono_font() -> String {
+    "jetbrains".into()
+}
+
+fn default_ui_font_size() -> u32 {
+    13
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
             theme: "system".into(),
+            ui_font: default_ui_font(),
+            mono_font: default_mono_font(),
+            ui_font_size: default_ui_font_size(),
             view_mode: "grid".into(),
             recursive: false,
             thumbnail_size: 184,

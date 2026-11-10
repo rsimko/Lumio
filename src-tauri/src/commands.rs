@@ -85,8 +85,15 @@ pub fn update_ui_settings(
     ui.thumbnail_size = ui.thumbnail_size.clamp(120, 480);
     ui.library_width = ui.library_width.clamp(200, 480);
     ui.info_width = ui.info_width.clamp(240, 520);
+    ui.ui_font_size = ui.ui_font_size.clamp(11, 17);
     if !matches!(ui.theme.as_str(), "system" | "light" | "dark") {
         ui.theme = "system".into();
+    }
+    if !matches!(ui.ui_font.as_str(), "avenir" | "system") {
+        ui.ui_font = "avenir".into();
+    }
+    if !matches!(ui.mono_font.as_str(), "jetbrains" | "system") {
+        ui.mono_font = "jetbrains".into();
     }
     if !matches!(
         ui.view_mode.as_str(),

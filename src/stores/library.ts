@@ -47,6 +47,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   lastRootId: null,
   lastFolder: null,
   filmstripVisible: true,
+  listShowAssociations: false,
 };
 
 const BASE_FONT_SIZE = 13;
@@ -399,6 +400,10 @@ export const useLibraryStore = defineStore('library', () => {
 
   function toggleFilmstrip(): void {
     setFilmstripVisible(!settings.value.filmstripVisible);
+  }
+
+  function toggleListAssociations(): void {
+    updateSettings({ listShowAssociations: !settings.value.listShowAssociations });
   }
 
   function toggleInfo(): void {
@@ -1360,6 +1365,7 @@ export const useLibraryStore = defineStore('library', () => {
     setRecursive,
     setFilmstripVisible,
     toggleFilmstrip,
+    toggleListAssociations,
     updateSettings,
     resolvedTheme,
     cacheDir,

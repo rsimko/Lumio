@@ -152,6 +152,7 @@ export interface UiSettings {
   lastRootId: string | null;
   lastFolder: string | null;
   filmstripVisible: boolean;
+  listShowAssociations: boolean;
 }
 
 export interface Bootstrap {

@@ -1,49 +1,57 @@
 <script setup lang="ts">
+import { Paperclip } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
+import PhotoListAssociationRow from '@/components/PhotoListAssociationRow.vue';
 import PhotoListRow from '@/components/PhotoListRow.vue';
 import { useScrollMetrics } from '@/composables/useScrollMetrics';
+import {
+  assetRowTop,
+  buildListRows,
+  firstVisibleListRow,
+  LIST_ROW_HEIGHT,
+  listRowsHeight,
+  type ListRow,
+} from '@/lib/list-rows';
 import { useLibraryStore } from '@/stores/library';
-import type { PhotoAsset } from '@/types';
 
 const store = useLibraryStore();
 const scroller = ref<HTMLElement | null>(null);
 const { width, height, scrollTop } = useScrollMetrics(scroller);
 
-const ROW_HEIGHT = 58;
 const compact = computed(() => width.value > 0 && width.value < 700);
 const showFolder = computed(() => store.scanRecursive || store.assets.some((asset) => asset.relativeDir));
+const showAssociations = computed(() => store.settings.listShowAssociations);
 
-const totalHeight = computed(() => store.assets.length * ROW_HEIGHT);
+const rows = computed(() => buildListRows(store.assets, showAssociations.value));
+const totalHeight = computed(() => listRowsHeight(rows.value));
 
-interface VisibleRow {
-  asset: PhotoAsset;
-  index: number;
-}
-
-const visible = computed<VisibleRow[]>(() => {
-  if (!store.assets.length) return [];
-  const start = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - 6);
-  const end = Math.min(
-    store.assets.length,
-    Math.ceil((scrollTop.value + height.value) / ROW_HEIGHT) + 6,
-  );
-  const rows: VisibleRow[] = [];
-  for (let index = start; index < end; index += 1) {
-    const asset = store.assets[index];
-    if (asset) rows.push({ asset, index });
+const visible = computed<ListRow[]>(() => {
+  const all = rows.value;
+  if (!all.length) return [];
+  const start = firstVisibleListRow(all, scrollTop.value, 400);
+  const bottom = scrollTop.value + height.value + 400;
+  const slice: ListRow[] = [];
+  for (let index = start; index < all.length; index += 1) {
+    const row = all[index];
+    if (row.top > bottom) break;
+    slice.push(row);
   }
-  return rows;
+  return slice;
 });
 
 store.navRowSize = 1;
 
+function rowKey(row: ListRow): string {
+  if (row.type === 'asset') return `${row.asset.id}:asset`;
+  return `${row.asset.id}:${row.association.kind}:${row.association.path}`;
+}
+
 function scrollSelectionIntoView() {
   const el = scroller.value;
-  const index = store.selectedIndex;
-  if (!el || index < 0) return;
-  const top = index * ROW_HEIGHT;
-  const bottom = top + ROW_HEIGHT;
+  const top = assetRowTop(rows.value, store.selectedIndex);
+  if (!el || top === null) return;
+  const bottom = top + LIST_ROW_HEIGHT;
   if (top < el.scrollTop) {
     el.scrollTop = top;
   } else if (bottom > el.scrollTop + el.clientHeight) {
@@ -51,7 +59,7 @@ function scrollSelectionIntoView() {
   }
 }
 
-watch([() => store.selectedIndex, height], scrollSelectionIntoView);
+watch([() => store.selectedIndex, height, showAssociations], scrollSelectionIntoView);
 
 watch(
   () => store.selectedFolder,
@@ -78,24 +86,48 @@ watch(
         <span>Size</span>
         <span>Modified</span>
       </template>
-      <span>Assoc.</span>
+      <button
+        class="-ml-1.5 flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.1em] transition"
+        :class="
+          showAssociations
+            ? 'bg-accent-soft text-accent ring-1 ring-accent/20'
+            : 'text-subtle hover:bg-panel-2 hover:text-ink'
+        "
+        :title="
+          showAssociations
+            ? 'Hide associated JPG and XMP files'
+            : 'Show associated JPG and XMP files beneath each RAW'
+        "
+        :aria-pressed="showAssociations"
+        @click="store.toggleListAssociations()"
+      >
+        <Paperclip class="h-3 w-3" />
+        Assoc.
+      </button>
     </div>
 
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div class="relative" :style="{ height: `${totalHeight}px` }">
         <div
           v-for="row in visible"
-          :key="row.asset.id"
+          :key="rowKey(row)"
           class="absolute inset-x-0"
-          :style="{ top: `${row.index * ROW_HEIGHT}px`, height: `${ROW_HEIGHT}px` }"
+          :style="{ top: `${row.top}px`, height: `${row.height}px` }"
         >
           <PhotoListRow
+            v-if="row.type === 'asset'"
             :asset="row.asset"
             :selected="store.isSelected(row.asset.id)"
             :show-folder="showFolder"
             :compact="compact"
             @select="store.selectWithModifiers(row.asset.id, $event)"
             @open="store.openInFilmstrip(row.asset.id)"
+          />
+          <PhotoListAssociationRow
+            v-else
+            :association="row.association"
+            :asset-name="row.asset.fileName"
+            :compact="compact"
           />
         </div>
       </div>

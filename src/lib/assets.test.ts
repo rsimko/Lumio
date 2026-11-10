@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assetAssociations,
   assetFilePaths,
   collectAssetFilePaths,
   sharedAssociationPaths,
@@ -45,6 +46,23 @@ describe('asset file helpers', () => {
       '/photos/IMG_0001.xmp',
     ]);
     expect(collectAssetFilePaths([photo, photo])).toHaveLength(5);
+  });
+
+  it('lists display associations once and excludes the primary file', () => {
+    const photo = asset({
+      id: 'a',
+      primaryPath: '/photos/IMG_0001.CR2',
+      companionJpeg: '/photos/IMG_0001.jpg',
+      xmpSidecar: '/photos/IMG_0001.CR2.xmp',
+      extraCompanions: ['/photos/IMG_0001.jpg', '/photos/IMG_0001.jpeg'],
+      extraSidecars: ['/photos/IMG_0001.CR2.xmp', '/photos/IMG_0001.xmp'],
+    });
+    expect(assetAssociations(photo)).toEqual([
+      { path: '/photos/IMG_0001.jpg', kind: 'jpeg', extra: false },
+      { path: '/photos/IMG_0001.jpeg', kind: 'jpeg', extra: true },
+      { path: '/photos/IMG_0001.CR2.xmp', kind: 'xmp', extra: false },
+      { path: '/photos/IMG_0001.xmp', kind: 'xmp', extra: true },
+    ]);
   });
 
   it('reports associations shared with photos outside the batch', () => {

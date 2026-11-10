@@ -682,6 +682,7 @@ mod tests {
         ui.ui_font = "system".into();
         ui.mono_font = "system".into();
         ui.ui_font_size = 16;
+        ui.list_show_associations = true;
         store.update_ui(ui.clone()).unwrap();
 
         let reopened = ConfigStore::open(&config_path).unwrap();
@@ -721,6 +722,7 @@ mod tests {
         assert_eq!(ui.ui_font, "avenir");
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
+        assert!(!ui.list_show_associations);
     }
 
     #[test]

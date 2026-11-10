@@ -3,6 +3,33 @@ import type { PhotoAsset } from '@/types';
 /** Custom MIME type used for internal photo drags. */
 export const ASSET_DRAG_MIME = 'application/x-lumio-assets';
 
+export interface AssetAssociation {
+  path: string;
+  kind: 'jpeg' | 'xmp';
+  extra: boolean;
+}
+
+/**
+ * Associated files in display order, with duplicates and the primary file
+ * removed. Extra sidecars are populated defensively by the scanner, so the
+ * primary sidecar can appear twice; the list view must only show it once.
+ */
+export function assetAssociations(asset: PhotoAsset): AssetAssociation[] {
+  const seen = new Set<string>([asset.primaryPath]);
+  const associations: AssetAssociation[] = [];
+  const add = (path: string | null, kind: AssetAssociation['kind'], extra: boolean) => {
+    if (!path || seen.has(path)) return;
+    seen.add(path);
+    associations.push({ path, kind, extra });
+  };
+
+  add(asset.companionJpeg, 'jpeg', false);
+  for (const path of asset.extraCompanions) add(path, 'jpeg', true);
+  add(asset.xmpSidecar, 'xmp', false);
+  for (const path of asset.extraSidecars) add(path, 'xmp', true);
+  return associations;
+}
+
 /** Every file that belongs to one photo, in primary-first order. */
 export function assetFilePaths(asset: PhotoAsset): string[] {
   const paths = [

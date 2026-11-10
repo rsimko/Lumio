@@ -76,12 +76,41 @@ function next() {
   wake();
 }
 
+async function focusWindow(): Promise<void> {
+  try {
+    await getCurrentWindow().setFocus();
+  } catch (error) {
+    console.error('Could not focus the Lumio window', error);
+  }
+  window.focus();
+}
+
+async function enterFullscreen(): Promise<void> {
+  try {
+    await getCurrentWindow().setFullscreen(true);
+  } catch (error) {
+    console.error('Could not enter native fullscreen', error);
+  }
+  // Native fullscreen can leave the webview without a first responder.
+  await focusWindow();
+}
+
+async function leaveFullscreen(): Promise<void> {
+  try {
+    await getCurrentWindow().setFullscreen(false);
+  } catch (error) {
+    console.error('Could not leave native fullscreen', error);
+  }
+  // Focus may only settle once macOS has finished the exit animation, so
+  // restore it immediately and once more after the transition.
+  await focusWindow();
+  window.setTimeout(() => {
+    void focusWindow();
+  }, 320);
+}
+
 onMounted(() => {
-  void getCurrentWindow()
-    .setFullscreen(true)
-    .catch((error: unknown) => {
-      console.error('Could not enter native fullscreen', error);
-    });
+  void enterFullscreen();
   window.addEventListener('resize', onResize);
   window.addEventListener('mousemove', wake);
   wake();
@@ -91,11 +120,7 @@ onBeforeUnmount(() => {
   if (hideTimer) window.clearTimeout(hideTimer);
   window.removeEventListener('resize', onResize);
   window.removeEventListener('mousemove', wake);
-  void getCurrentWindow()
-    .setFullscreen(false)
-    .catch((error: unknown) => {
-      console.error('Could not leave native fullscreen', error);
-    });
+  void leaveFullscreen();
 });
 </script>
 

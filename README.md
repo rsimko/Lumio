@@ -34,6 +34,8 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Double-click any thumbnail to open it in filmstrip view.
 - See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.
+  Toggle **Assoc.** in the list header to reveal every associated JPG and XMP file as indented,
+  connected rows beneath the RAW they belong to.
 - Open any photo in a distraction-free fullscreen viewer from the info panel, the filmstrip
   view, or with the keyboard.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.

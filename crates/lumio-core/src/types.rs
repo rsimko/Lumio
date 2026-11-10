@@ -223,6 +223,8 @@ pub struct UiSettings {
     pub last_root_id: Option<String>,
     pub last_folder: Option<PathBuf>,
     pub filmstrip_visible: bool,
+    #[serde(default)]
+    pub list_show_associations: bool,
 }
 
 fn default_ui_font() -> String {
@@ -252,6 +254,7 @@ impl Default for UiSettings {
             last_root_id: None,
             last_folder: None,
             filmstrip_visible: true,
+            list_show_associations: false,
         }
     }
 }

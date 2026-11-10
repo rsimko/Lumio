@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use lumio_core::LumioError;
 use lumio_core::types::{
-    FolderImageCounts, FolderNode, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
-    ThumbnailResult, UiSettings,
+    AddFolderOutcome, FolderImageCounts, FolderNode, PhotoAsset, RootInfo, RootRemovalMode,
+    ScanResult, ThumbnailResult, UiSettings,
 };
 use serde::Serialize;
 use tauri::State;
@@ -65,7 +65,10 @@ pub fn get_bootstrap(state: State<'_, AppState>) -> Bootstrap {
 }
 
 #[tauri::command]
-pub fn add_root(state: State<'_, AppState>, path: String) -> Result<RootInfo, CommandError> {
+pub fn add_root(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<AddFolderOutcome, CommandError> {
     let mut config = state.config();
     Ok(config.add_root(&PathBuf::from(path))?)
 }
@@ -82,9 +85,13 @@ pub fn remove_root(
 }
 
 #[tauri::command]
-pub fn trash_folder(state: State<'_, AppState>, path: String) -> Result<(), CommandError> {
-    let config = state.config();
-    config.trash_folder(&PathBuf::from(path))?;
+pub fn remove_subfolder(
+    state: State<'_, AppState>,
+    path: String,
+    mode: RootRemovalMode,
+) -> Result<(), CommandError> {
+    let mut config = state.config();
+    config.remove_subfolder(&PathBuf::from(path), mode)?;
     Ok(())
 }
 
@@ -124,7 +131,9 @@ pub async fn list_subfolders(
     folder: String,
 ) -> Result<Vec<FolderNode>, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
-    match tokio::task::spawn_blocking(move || lumio_core::list_subfolders(&folder)).await {
+    let excluded = state.config().excluded_folders().to_vec();
+    match tokio::task::spawn_blocking(move || lumio_core::list_subfolders(&folder, &excluded)).await
+    {
         Ok(result) => Ok(result?),
         Err(error) => Err(CommandError::new(
             "internal",
@@ -139,7 +148,10 @@ pub async fn count_folder_images(
     folder: String,
 ) -> Result<FolderImageCounts, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
-    match tokio::task::spawn_blocking(move || lumio_core::count_folder_images(&folder)).await {
+    let excluded = state.config().excluded_folders().to_vec();
+    match tokio::task::spawn_blocking(move || lumio_core::count_folder_images(&folder, &excluded))
+        .await
+    {
         Ok(result) => Ok(result?),
         Err(error) => Err(CommandError::new(
             "internal",
@@ -155,7 +167,12 @@ pub async fn scan_folder(
     recursive: bool,
 ) -> Result<ScanResult, CommandError> {
     let folder = validate_under_roots(&state, &PathBuf::from(folder))?;
-    match tokio::task::spawn_blocking(move || lumio_core::scan_photos(&folder, recursive)).await {
+    let excluded = state.config().excluded_folders().to_vec();
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::scan_photos(&folder, recursive, &excluded)
+    })
+    .await
+    {
         Ok(result) => Ok(result?),
         Err(error) => Err(CommandError::new(
             "internal",

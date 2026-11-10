@@ -14,19 +14,13 @@ const localError = ref<string | null>(null);
 
 const target = computed(() => store.removeFolderTarget);
 const isRoot = computed(() => target.value?.kind === 'root');
-const isDestructive = computed(() => !isRoot.value || mode.value === 'moveToTrash');
+const isDestructive = computed(() => mode.value === 'moveToTrash');
 const canConfirm = computed(() => {
   if (!target.value || store.removingFolder) return false;
   if (!isDestructive.value) return true;
   return acknowledged.value;
 });
 const error = computed(() => localError.value ?? store.removeFolderError);
-const title = computed(() => (isRoot.value ? 'Remove folder' : 'Delete folder'));
-const subtitle = computed(() =>
-  isRoot.value
-    ? 'Choose what happens to this folder and its contents.'
-    : 'This folder and everything inside it will be moved to the Trash.',
-);
 const confirmLabel = computed(() =>
   isDestructive.value ? 'Move folder to Trash' : 'Remove from library',
 );
@@ -37,7 +31,7 @@ async function confirm() {
   const ok =
     target.value.kind === 'root'
       ? await store.removeRoot(target.value.rootId, mode.value)
-      : await store.removeSubfolder(target.value.path, target.value.rootId);
+      : await store.removeSubfolder(target.value.path, target.value.rootId, mode.value);
   if (!ok) {
     localError.value = store.removeFolderError ?? 'The folder could not be removed.';
   }
@@ -47,8 +41,8 @@ async function confirm() {
 <template>
   <AppDialog
     v-if="target"
-    :title="title"
-    :subtitle="subtitle"
+    title="Remove folder"
+    subtitle="Choose what happens to this folder and its contents."
     @close="store.closeRemoveFolder()"
   >
     <div class="space-y-4">
@@ -66,7 +60,6 @@ async function confirm() {
 
       <div class="space-y-2">
         <button
-          v-if="isRoot"
           type="button"
           class="flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition"
           :class="
@@ -90,8 +83,14 @@ async function confirm() {
               <Check v-if="!isDestructive" class="ml-auto h-3.5 w-3.5 shrink-0 text-accent" />
             </span>
             <span class="mt-1 block text-2xs leading-relaxed text-muted">
-              Lumio stops tracking this folder. Every photo and file stays exactly where it is on
-              disk.
+              <template v-if="isRoot">
+                Lumio stops tracking this folder. Every photo and file stays exactly where it is
+                on disk.
+              </template>
+              <template v-else>
+                Lumio hides this folder from the tree. Every photo and file stays exactly where it
+                is on disk; add it again to restore it.
+              </template>
             </span>
           </span>
         </button>

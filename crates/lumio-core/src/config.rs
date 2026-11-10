@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::error::{LumioError, Result};
 use crate::path_utils::{canonical_dir, display_name, is_hidden_or_package, now_ms};
-use crate::types::{AppConfig, RootFolder, RootInfo, RootRemovalMode, UiSettings};
+use crate::types::{
+    AddFolderOutcome, AppConfig, RootFolder, RootInfo, RootRemovalMode, UiSettings,
+};
 
 const FORBIDDEN_DELETE_PATHS: &[&str] = &[
     "/",
@@ -95,6 +97,10 @@ impl ConfigStore {
         &self.config.roots
     }
 
+    pub fn excluded_folders(&self) -> &[PathBuf] {
+        &self.config.excluded_folders
+    }
+
     pub fn root_paths(&self) -> Vec<PathBuf> {
         self.config
             .roots
@@ -126,24 +132,55 @@ impl ConfigStore {
             .collect()
     }
 
-    pub fn add_root(&mut self, path: &Path) -> Result<RootInfo> {
+    pub fn add_root(&mut self, path: &Path) -> Result<AddFolderOutcome> {
         let canonical = canonical_dir(path)?;
-        if let Some(existing) = self.config.roots.iter().find(|root| root.path == canonical) {
-            return Ok(self
-                .root_infos()
-                .into_iter()
-                .find(|root| root.id == existing.id)
-                .expect("root must exist"));
+        if let Some(existing) = self.config.roots.iter().find(|root| {
+            fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone()) == canonical
+        }) {
+            return Ok(AddFolderOutcome {
+                root: self.root_info_by_id(&existing.id),
+                folder: canonical,
+                restored: false,
+            });
+        }
+
+        // Re-adding a hidden subfolder restores it without creating a second
+        // root; the registered parent already covers it.
+        if self
+            .config
+            .excluded_folders
+            .iter()
+            .any(|hidden| hidden == &canonical)
+        {
+            let containing = self
+                .config
+                .roots
+                .iter()
+                .find(|root| {
+                    let root_path =
+                        fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone());
+                    canonical.starts_with(&root_path)
+                })
+                .map(|root| root.id.clone());
+            if let Some(root_id) = containing {
+                self.config
+                    .excluded_folders
+                    .retain(|hidden| hidden != &canonical);
+                self.save()?;
+                return Ok(AddFolderOutcome {
+                    root: self.root_info_by_id(&root_id),
+                    folder: canonical,
+                    restored: true,
+                });
+            }
         }
 
         // Refuse to add a folder that is already covered by a registered root.
         // The existing root already lets the user browse it.
-        if let Some(existing) = self
-            .config
-            .roots
-            .iter()
-            .find(|root| canonical.starts_with(&root.path))
-        {
+        if let Some(existing) = self.config.roots.iter().find(|root| {
+            let root_path = fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone());
+            canonical.starts_with(&root_path)
+        }) {
             return Err(LumioError::InvalidPath(format!(
                 "{} is already inside the added folder {}",
                 canonical.display(),
@@ -158,20 +195,32 @@ impl ConfigStore {
         };
         self.config.roots.push(root.clone());
         self.save()?;
-        Ok(RootInfo {
-            id: root.id,
-            path: root.path,
-            name: display_name(&canonical),
-            available: true,
-            error: None,
-            added_at: root.added_at,
+        Ok(AddFolderOutcome {
+            root: RootInfo {
+                id: root.id,
+                path: root.path,
+                name: display_name(&canonical),
+                available: true,
+                error: None,
+                added_at: root.added_at,
+            },
+            folder: canonical,
+            restored: false,
         })
+    }
+
+    fn root_info_by_id(&self, id: &str) -> RootInfo {
+        self.root_infos()
+            .into_iter()
+            .find(|root| root.id == id)
+            .expect("root must exist")
     }
 
     pub fn remove_root(&mut self, id: &str, mode: RootRemovalMode) -> Result<bool> {
         let Some(root) = self.config.roots.iter().find(|root| root.id == id).cloned() else {
             return Ok(false);
         };
+        let root_path = fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone());
 
         if mode == RootRemovalMode::MoveToTrash {
             let path = canonical_dir(&root.path)?;
@@ -182,6 +231,10 @@ impl ConfigStore {
         }
 
         self.config.roots.retain(|root| root.id != id);
+        // Hidden subfolders only make sense while their root is registered.
+        self.config
+            .excluded_folders
+            .retain(|hidden| !hidden.starts_with(&root_path));
         if self.config.ui.last_root_id.as_deref() == Some(id) {
             self.config.ui.last_root_id = None;
             self.config.ui.last_folder = None;
@@ -190,13 +243,37 @@ impl ConfigStore {
         Ok(true)
     }
 
-    /// Move a folder inside a registered library root to the system Trash.
-    /// The root itself stays registered, so this is only valid for subfolders.
-    pub fn trash_folder(&self, path: &Path) -> Result<()> {
-        resolve_trashable_subfolder(path, &self.config.roots)?;
-        // Move the path as given rather than its canonical target so a symlinked
-        // entry is removed as a link, leaving the folder it points at intact.
-        move_to_trash(path).map_err(|error| LumioError::Trash(error.to_string()))
+    /// Remove a subfolder from Lumio without unregistering its library root.
+    /// The folder can either be hidden (files untouched) or moved to Trash.
+    pub fn remove_subfolder(&mut self, path: &Path, mode: RootRemovalMode) -> Result<bool> {
+        let (_, canonical) = resolve_trashable_subfolder(path, &self.config.roots)?;
+
+        match mode {
+            RootRemovalMode::LibraryOnly => {
+                if !self.config.excluded_folders.contains(&canonical) {
+                    self.config.excluded_folders.push(canonical.clone());
+                }
+            }
+            RootRemovalMode::MoveToTrash => {
+                // Move the path as given rather than its canonical target so a
+                // symlinked entry is removed as a link, leaving its target intact.
+                move_to_trash(path).map_err(|error| LumioError::Trash(error.to_string()))?;
+                self.config
+                    .excluded_folders
+                    .retain(|hidden| !hidden.starts_with(&canonical));
+            }
+        }
+
+        if let Some(last) = &self.config.ui.last_folder {
+            let last = fs::canonicalize(last).unwrap_or_else(|_| last.clone());
+            if last == canonical || last.starts_with(&canonical) {
+                self.config.ui.last_root_id = None;
+                self.config.ui.last_folder = None;
+            }
+        }
+
+        self.save()?;
+        Ok(true)
     }
 
     pub fn update_ui(&mut self, ui: UiSettings) -> Result<()> {
@@ -370,7 +447,7 @@ mod tests {
         fs::create_dir_all(photos.join("child")).unwrap();
 
         let mut store = ConfigStore::open(&config_path).unwrap();
-        let root = store.add_root(&photos).unwrap();
+        let root = store.add_root(&photos).unwrap().root;
         assert!(root.available);
         assert_eq!(store.roots().len(), 1);
 
@@ -394,6 +471,51 @@ mod tests {
         assert!(reopened.roots().is_empty());
         // Library-only removal must not touch the folder on disk.
         assert!(photos.exists());
+    }
+
+    #[test]
+    fn hidden_subfolder_round_trip_and_restore() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+        let photos = temp.path().join("photos");
+        let child = photos.join("child");
+        let outside = temp.path().join("outside");
+        fs::create_dir_all(&child).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+
+        let mut store = ConfigStore::open(&config_path).unwrap();
+        let root = store.add_root(&photos).unwrap().root;
+        assert!(store.excluded_folders().is_empty());
+
+        // A folder outside every registered root cannot be hidden.
+        assert!(
+            store
+                .remove_subfolder(&outside, RootRemovalMode::LibraryOnly)
+                .is_err()
+        );
+
+        assert!(
+            store
+                .remove_subfolder(&child, RootRemovalMode::LibraryOnly)
+                .unwrap()
+        );
+        let canonical_child = fs::canonicalize(&child).unwrap();
+        assert_eq!(store.excluded_folders().len(), 1);
+        assert_eq!(store.excluded_folders()[0], canonical_child);
+        // Hiding must not touch the folder on disk.
+        assert!(child.exists());
+
+        let mut reopened = ConfigStore::open(&config_path).unwrap();
+        assert_eq!(reopened.excluded_folders().len(), 1);
+        assert_eq!(reopened.excluded_folders()[0], canonical_child);
+
+        // Re-adding a hidden subfolder restores it without creating a new root.
+        let outcome = reopened.add_root(&child).unwrap();
+        assert!(outcome.restored);
+        assert_eq!(outcome.root.id, root.id);
+        assert_eq!(outcome.folder, canonical_child);
+        assert!(reopened.excluded_folders().is_empty());
+        assert_eq!(reopened.roots().len(), 1);
     }
 
     #[test]
@@ -510,6 +632,7 @@ mod tests {
 
         let store = ConfigStore::open(&config_path).unwrap();
         assert!(store.recovery_warning().is_none());
+        assert!(store.excluded_folders().is_empty());
         let ui = &store.config().ui;
         assert_eq!(ui.theme, "dark");
         assert_eq!(ui.view_mode, "list");

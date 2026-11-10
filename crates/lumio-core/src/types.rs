@@ -32,7 +32,7 @@ pub struct RootFolder {
     pub added_at: u64,
 }
 
-/// How a library root should be removed.
+/// How a folder should be removed from Lumio.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum RootRemovalMode {
@@ -40,6 +40,15 @@ pub enum RootRemovalMode {
     LibraryOnly,
     /// Move the folder and its contents to the operating system Trash.
     MoveToTrash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AddFolderOutcome {
+    pub root: RootInfo,
+    /// Canonical folder that was added, or the hidden subfolder that was restored.
+    pub folder: PathBuf,
+    pub restored: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -201,6 +210,10 @@ impl Default for UiSettings {
 pub struct AppConfig {
     pub version: u32,
     pub roots: Vec<RootFolder>,
+    /// Subfolders hidden from Lumio with "remove from library only". The files
+    /// remain on disk; re-adding the folder restores it.
+    #[serde(default)]
+    pub excluded_folders: Vec<PathBuf>,
     pub ui: UiSettings,
 }
 
@@ -209,6 +222,7 @@ impl Default for AppConfig {
         Self {
             version: 1,
             roots: Vec::new(),
+            excluded_folders: Vec::new(),
             ui: UiSettings::default(),
         }
     }

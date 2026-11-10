@@ -39,7 +39,7 @@ struct StemGroup {
     images: Vec<FileRecord>,
 }
 
-pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
+pub fn list_subfolders(path: &Path, excluded: &[PathBuf]) -> Result<Vec<FolderNode>> {
     let read = fs::read_dir(path).map_err(|error| LumioError::io(path, error))?;
     let mut child_paths = Vec::new();
     for entry in read {
@@ -54,7 +54,7 @@ pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
         if !file_type.is_dir() || file_type.is_symlink() {
             continue;
         }
-        if is_hidden_or_package(&entry.file_name()) {
+        if is_hidden_or_package(&entry.file_name()) || is_excluded(&entry.path(), excluded) {
             continue;
         }
         child_paths.push(entry.path());
@@ -64,7 +64,7 @@ pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
     // asset count and the count including descendants. Asset counts follow the
     // same RAW/JPEG pairing rules as scan_photos, so a RAW + JPEG pair counts
     // as one photo rather than two files.
-    let dir_counts = collect_dir_counts(path)?;
+    let dir_counts = collect_dir_counts(path, excluded)?;
     let mut nodes = Vec::new();
     for child_path in child_paths {
         let direct = dir_counts
@@ -79,7 +79,7 @@ pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
         nodes.push(FolderNode {
             name: display_name(&child_path),
             path: child_path.clone(),
-            has_children: has_visible_child_dir(&child_path).unwrap_or(false),
+            has_children: has_visible_child_dir(&child_path, excluded).unwrap_or(false),
             accessible: true,
             error: None,
             image_count: direct,
@@ -92,8 +92,8 @@ pub fn list_subfolders(path: &Path) -> Result<Vec<FolderNode>> {
 
 /// Count assets directly in `path` and recursively under it. Used for library
 /// roots, which are shown in the tree before their children are loaded.
-pub fn count_folder_images(path: &Path) -> Result<FolderImageCounts> {
-    let dir_counts = collect_dir_counts(path)?;
+pub fn count_folder_images(path: &Path, excluded: &[PathBuf]) -> Result<FolderImageCounts> {
+    let dir_counts = collect_dir_counts(path, excluded)?;
     let direct = dir_counts.get(path).map(AssetCounts::assets).unwrap_or(0);
     let recursive = dir_counts.values().map(AssetCounts::assets).sum();
     Ok(FolderImageCounts { direct, recursive })
@@ -149,7 +149,7 @@ fn file_stem_key(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn collect_dir_counts(root: &Path) -> Result<HashMap<PathBuf, AssetCounts>> {
+fn collect_dir_counts(root: &Path, excluded: &[PathBuf]) -> Result<HashMap<PathBuf, AssetCounts>> {
     // Validate the root itself first so an unreadable folder reports an error
     // instead of a misleading zero count.
     fs::read_dir(root).map_err(|error| LumioError::io(root, error))?;
@@ -158,7 +158,7 @@ fn collect_dir_counts(root: &Path) -> Result<HashMap<PathBuf, AssetCounts>> {
     let walker = WalkDir::new(root)
         .follow_links(false)
         .into_iter()
-        .filter_entry(keep_entry);
+        .filter_entry(|entry| keep_entry(entry, excluded));
     for entry in walker {
         let entry = match entry {
             Ok(entry) => entry,
@@ -176,7 +176,7 @@ fn collect_dir_counts(root: &Path) -> Result<HashMap<PathBuf, AssetCounts>> {
     Ok(dirs)
 }
 
-fn has_visible_child_dir(path: &Path) -> Result<bool> {
+fn has_visible_child_dir(path: &Path, excluded: &[PathBuf]) -> Result<bool> {
     let read = fs::read_dir(path).map_err(|error| LumioError::io(path, error))?;
     for entry in read.flatten() {
         let Ok(file_type) = entry.file_type() else {
@@ -185,6 +185,7 @@ fn has_visible_child_dir(path: &Path) -> Result<bool> {
         if file_type.is_dir()
             && !file_type.is_symlink()
             && !is_hidden_or_package(&entry.file_name())
+            && !is_excluded(&entry.path(), excluded)
         {
             return Ok(true);
         }
@@ -192,7 +193,7 @@ fn has_visible_child_dir(path: &Path) -> Result<bool> {
     Ok(false)
 }
 
-pub fn scan_photos(root: &Path, recursive: bool) -> Result<ScanResult> {
+pub fn scan_photos(root: &Path, recursive: bool, excluded: &[PathBuf]) -> Result<ScanResult> {
     let started = Instant::now();
     let mut buckets: BTreeMap<PathBuf, DirBucket> = BTreeMap::new();
     let mut warnings = Vec::new();
@@ -201,7 +202,7 @@ pub fn scan_photos(root: &Path, recursive: bool) -> Result<ScanResult> {
         let walker = WalkDir::new(root)
             .follow_links(false)
             .into_iter()
-            .filter_entry(keep_entry);
+            .filter_entry(|entry| keep_entry(entry, excluded));
         for entry in walker {
             let entry = match entry {
                 Ok(entry) => entry,
@@ -276,7 +277,7 @@ pub fn scan_photos(root: &Path, recursive: bool) -> Result<ScanResult> {
     })
 }
 
-fn keep_entry(entry: &DirEntry) -> bool {
+fn keep_entry(entry: &DirEntry, excluded: &[PathBuf]) -> bool {
     if entry.depth() == 0 {
         return true;
     }
@@ -284,9 +285,13 @@ fn keep_entry(entry: &DirEntry) -> bool {
         return false;
     }
     if entry.file_type().is_dir() {
-        return !is_hidden_or_package(entry.file_name());
+        return !is_hidden_or_package(entry.file_name()) && !is_excluded(entry.path(), excluded);
     }
     true
+}
+
+fn is_excluded(path: &Path, excluded: &[PathBuf]) -> bool {
+    excluded.iter().any(|hidden| hidden == path)
 }
 
 fn add_entry(
@@ -631,7 +636,7 @@ mod tests {
         fs::write(root.join("standalone.jpg.xmp"), b"<xmp/>").unwrap();
         fs::write(root.join("orphan.xmp"), b"<xmp/>").unwrap();
 
-        let result = scan_photos(root, false).unwrap();
+        let result = scan_photos(root, false, &[]).unwrap();
         assert_eq!(result.assets.len(), 2);
 
         let raw = result
@@ -672,10 +677,10 @@ mod tests {
         fs::write(one.join("IMG_1.CR2"), b"raw").unwrap();
         write_jpeg(&two.join("IMG_1.jpg"));
 
-        let direct = scan_photos(root, false).unwrap();
+        let direct = scan_photos(root, false, &[]).unwrap();
         assert!(direct.assets.is_empty());
 
-        let recursive = scan_photos(root, true).unwrap();
+        let recursive = scan_photos(root, true, &[]).unwrap();
         assert_eq!(recursive.assets.len(), 2);
         assert!(
             recursive
@@ -705,7 +710,7 @@ mod tests {
         write_jpeg(&alpha.join("Library.photoslibrary/ignored.jpg"));
         write_jpeg(&root.join("root.jpg"));
 
-        let nodes = list_subfolders(root).unwrap();
+        let nodes = list_subfolders(root, &[]).unwrap();
         assert_eq!(nodes.len(), 2);
 
         let alpha_node = nodes.iter().find(|node| node.name == "alpha").unwrap();
@@ -719,11 +724,11 @@ mod tests {
         assert_eq!(beta_node.recursive_image_count, 0);
         assert!(beta_node.has_children);
 
-        let root_counts = count_folder_images(root).unwrap();
+        let root_counts = count_folder_images(root, &[]).unwrap();
         assert_eq!(root_counts.direct, 1);
         assert_eq!(root_counts.recursive, 4);
 
-        let alpha_counts = count_folder_images(&alpha).unwrap();
+        let alpha_counts = count_folder_images(&alpha, &[]).unwrap();
         assert_eq!(alpha_counts.direct, 2);
         assert_eq!(alpha_counts.recursive, 3);
     }
@@ -739,8 +744,35 @@ mod tests {
         write_jpeg(&root.join(".hidden/photo.jpg"));
         write_jpeg(&root.join("Library.photoslibrary/photo.jpg"));
 
-        let result = scan_photos(root, true).unwrap();
+        let result = scan_photos(root, true, &[]).unwrap();
         assert_eq!(result.assets.len(), 1);
         assert_eq!(result.assets[0].relative_dir, "visible");
+    }
+
+    #[test]
+    fn excluded_folders_are_skipped() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(temp.path()).unwrap();
+        let alpha = root.join("alpha");
+        let beta = root.join("beta");
+        fs::create_dir_all(alpha.join("deep")).unwrap();
+        fs::create_dir_all(&beta).unwrap();
+        write_jpeg(&alpha.join("photo.jpg"));
+        write_jpeg(&alpha.join("deep/photo.jpg"));
+        write_jpeg(&beta.join("photo.jpg"));
+
+        let excluded = vec![alpha.clone()];
+
+        let nodes = list_subfolders(&root, &excluded).unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].name, "beta");
+
+        let counts = count_folder_images(&root, &excluded).unwrap();
+        assert_eq!(counts.direct, 0);
+        assert_eq!(counts.recursive, 1);
+
+        let result = scan_photos(&root, true, &excluded).unwrap();
+        assert_eq!(result.assets.len(), 1);
+        assert!(result.assets[0].primary_path.starts_with(&beta));
     }
 }

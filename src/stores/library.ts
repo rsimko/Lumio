@@ -569,7 +569,8 @@ export const useLibraryStore = defineStore('library', () => {
         title: 'Add a photo folder to Lumio',
       });
       if (!picked || Array.isArray(picked)) return;
-      const info = await api.addRoot(picked);
+      const outcome = await api.addRoot(picked);
+      const info = outcome.root;
       roots.value = roots.value.some((root) => root.id === info.id)
         ? roots.value.map((root) => (root.id === info.id ? info : root))
         : [...roots.value, info];
@@ -579,8 +580,14 @@ export const useLibraryStore = defineStore('library', () => {
       folderCountsEpoch.value += 1;
       expanded.add(info.path);
       await loadChildren(info.path, true);
-      await selectFolder(info.path, info.id);
-      addToast(`Added ${info.name} to the library.`, 'success');
+      const target = isPathInside(outcome.folder, info.path) ? outcome.folder : info.path;
+      await selectFolder(target, info.id);
+      addToast(
+        outcome.restored
+          ? `Restored ${basename(target)} to the library.`
+          : `Added ${info.name} to the library.`,
+        'success',
+      );
     } catch (error) {
       addToast(errorMessage(error), 'error');
     } finally {
@@ -746,7 +753,11 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  async function removeSubfolder(path: string, rootId: string): Promise<boolean> {
+  async function removeSubfolder(
+    path: string,
+    rootId: string,
+    mode: RootRemovalMode,
+  ): Promise<boolean> {
     if (removingFolder.value) return false;
     const root = roots.value.find((candidate) => candidate.id === rootId);
     if (!root || !isPathInside(path, root.path) || path === root.path) return false;
@@ -754,7 +765,7 @@ export const useLibraryStore = defineStore('library', () => {
     removingFolder.value = true;
     removeFolderError.value = null;
     try {
-      await api.trashFolder(path);
+      await api.removeSubfolder(path, mode);
       forgetSubfolderState(path, rootId);
 
       // Close the confirmation before selecting the fallback folder.
@@ -767,7 +778,13 @@ export const useLibraryStore = defineStore('library', () => {
         await selectFolder(parentPath(path), rootId, { force: true });
       }
 
-      addToast(`Moved ${basename(path)} to the Trash.`, 'success');
+      addToast(
+        mode === 'moveToTrash'
+          ? `Moved ${basename(path)} to the Trash.`
+          : `Removed ${basename(path)} from the library. Files are untouched; add it again to restore it.`,
+        'success',
+        mode === 'moveToTrash' ? undefined : 7000,
+      );
       return true;
     } catch (error) {
       removeFolderError.value = errorMessage(error);

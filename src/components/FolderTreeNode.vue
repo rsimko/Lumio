@@ -139,7 +139,7 @@ function removeFolder() {
       />
       <button
         class="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition hover:bg-danger/10 hover:text-danger group-hover:flex"
-        :title="isRoot ? 'Remove folder…' : 'Delete folder…'"
+        title="Remove folder…"
         @click.stop="removeFolder"
       >
         <Trash2 class="h-3 w-3" />

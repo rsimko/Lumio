@@ -23,6 +23,12 @@ export interface FolderRemovalTarget {
   path: string;
 }
 
+export interface AddFolderOutcome {
+  root: RootInfo;
+  folder: string;
+  restored: boolean;
+}
+
 export interface RootInfo {
   id: string;
   path: string;

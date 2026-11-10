@@ -12,8 +12,8 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 ## What works
 
 - Add library folders with the native folder picker, and remove them again.
-- Every folder row has a trash action. Registered roots can be removed from the library or moved to
-  the system Trash; subfolders can be moved to the Trash while their library root stays in place.
+- Every folder row offers the same two actions: remove it from the library (files stay on disk) or
+  move it to the system Trash. Hidden subfolders can be restored by adding them again.
 - Browse a real nested folder tree, loaded lazily as you expand it.
 - Scan the current folder, or include every subfolder recursively.
 - View photos in five layouts: grid, masonry, justified, list and filmstrip.
@@ -37,7 +37,8 @@ Browsing is strictly read-only:
 - No original file is ever copied, moved, renamed or written to while browsing.
 - Thumbnails are written to the application cache directory, never beside your photos.
 - XMP sidecars are detected and associated, but never parsed or modified yet.
-- Removing a root folder from Lumio only forgets it in the app; files on disk are untouched.
+- Removing a folder from Lumio only hides it in the app; files on disk are untouched. Hidden
+  subfolders can be restored with Add Folder.
 - The optional Delete folder from disk action moves a root or any subfolder to the system Trash,
   where it can still be restored. It requires acknowledging a warning, and Lumio refuses filesystem
   roots, home folders, system folders, mount points, hidden/package folders and paths that overlap

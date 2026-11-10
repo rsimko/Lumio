@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import type {
+  AddFolderOutcome,
   Bootstrap,
   CommandError,
   FolderImageCounts,
@@ -12,12 +13,14 @@ import type {
   ThumbnailResult,
   UiSettings,
 } from './types';
+
 export const api = {
   bootstrap: () => invoke<Bootstrap>('get_bootstrap'),
-  addRoot: (path: string) => invoke<RootInfo>('add_root', { path }),
+  addRoot: (path: string) => invoke<AddFolderOutcome>('add_root', { path }),
   removeRoot: (id: string, mode: RootRemovalMode) =>
     invoke<RootInfo[]>('remove_root', { id, mode }),
-  trashFolder: (path: string) => invoke<void>('trash_folder', { path }),
+  removeSubfolder: (path: string, mode: RootRemovalMode) =>
+    invoke<void>('remove_subfolder', { path, mode }),
   updateUiSettings: (ui: UiSettings) => invoke<UiSettings>('update_ui_settings', { ui }),
   listSubfolders: (folder: string) => invoke<FolderNode[]>('list_subfolders', { folder }),
   countFolderImages: (folder: string) =>

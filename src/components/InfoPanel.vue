@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
+  ChartNoAxesColumn,
   Check,
   ExternalLink,
   FileText,
   FolderOpen,
+  Image as ImageIcon,
   Info,
   Loader2,
   Maximize2,
   PanelRightClose,
   Trash2,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import AssociationBadges from '@/components/AssociationBadges.vue';
+import PhotoHistogram from '@/components/PhotoHistogram.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
 import SourceBadge from '@/components/SourceBadge.vue';
@@ -30,6 +33,7 @@ import {
   sourceDescription,
 } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
+import type { HistogramData } from '@/types';
 
 const store = useLibraryStore();
 
@@ -38,6 +42,83 @@ const asset = computed(() => store.selectedAsset);
 const thumb = useThumbnail(
   () => store.selectedAsset,
   () => Math.max(240, store.settings.infoWidth - 24),
+);
+
+type DetailTab = 'preview' | 'histogram';
+
+const detailTab = ref<DetailTab>('preview');
+const histogram = ref<HistogramData | null>(null);
+const histogramStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
+const histogramError = ref<string | null>(null);
+const histogramCache = new Map<string, HistogramData>();
+let histogramRequest = 0;
+
+function resetHistogram(): void {
+  histogramRequest += 1;
+  histogram.value = null;
+  histogramStatus.value = 'idle';
+  histogramError.value = null;
+}
+
+function rememberHistogram(key: string, data: HistogramData): void {
+  if (histogramCache.size >= 64) {
+    const oldest = histogramCache.keys().next().value;
+    if (oldest) histogramCache.delete(oldest);
+  }
+  histogramCache.set(key, data);
+}
+
+async function loadHistogram(): Promise<void> {
+  const current = asset.value;
+  if (!current || detailTab.value !== 'histogram') {
+    resetHistogram();
+    return;
+  }
+
+  const preview = thumb.value;
+  if (!preview || preview.status === 'loading') {
+    resetHistogram();
+    histogramStatus.value = 'loading';
+    return;
+  }
+
+  const key = `${current.id}:${preview.edge}`;
+  const cached = histogramCache.get(key);
+  if (cached) {
+    resetHistogram();
+    histogram.value = cached;
+    histogramStatus.value = 'ready';
+    return;
+  }
+
+  const request = ++histogramRequest;
+  histogram.value = null;
+  histogramError.value = null;
+  histogramStatus.value = 'loading';
+  try {
+    const data = await api.histogram(current, preview.edge);
+    if (request !== histogramRequest) return;
+    rememberHistogram(key, data);
+    histogram.value = data;
+    histogramStatus.value = 'ready';
+  } catch (error) {
+    if (request !== histogramRequest) return;
+    histogramError.value = errorMessage(error);
+    histogramStatus.value = 'error';
+  }
+}
+
+watch(
+  [
+    () => asset.value?.id ?? null,
+    () => detailTab.value,
+    () => thumb.value?.status ?? 'idle',
+    () => thumb.value?.edge ?? 0,
+  ],
+  () => {
+    void loadHistogram();
+  },
+  { immediate: true },
 );
 
 const dimensions = computed(() => {
@@ -90,30 +171,83 @@ async function revealPrimary() {
     <div class="min-h-0 flex-1 overflow-y-auto">
       <template v-if="asset">
         <div class="px-3">
-          <div
-            class="relative flex h-44 items-center justify-center overflow-hidden rounded-md bg-canvas ring-1 ring-line"
-          >
-            <PhotoPlaceholder
-              v-if="!thumb?.src"
-              :asset="asset"
-              :loading="!thumb || thumb.status === 'loading'"
-              :error="thumb?.error"
-            />
-            <img
-              v-else
-              :src="thumb.src"
-              :alt="asset.fileName"
-              class="max-h-full max-w-full object-contain"
-              draggable="false"
-              @dblclick="store.openFullscreen()"
-              @error="markPreviewFailed(thumb)"
-            />
-            <div class="pointer-events-none absolute inset-x-0 top-0 flex bg-gradient-to-b from-black/50 to-transparent p-2">
-              <SourceBadge :source="source" overlay />
+          <div class="mb-1.5 flex items-center justify-between gap-2">
+            <div
+              class="inline-flex items-center gap-0.5 rounded-md border border-line bg-app/60 p-0.5"
+              role="tablist"
+              aria-label="Photo preview and histogram"
+            >
+              <button
+                role="tab"
+                class="flex items-center gap-1 rounded px-2 py-1 text-2xs font-semibold transition"
+                :class="
+                  detailTab === 'preview'
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-subtle hover:bg-panel-2/60 hover:text-ink'
+                "
+                :aria-selected="detailTab === 'preview'"
+                @click="detailTab = 'preview'"
+              >
+                <ImageIcon class="h-3 w-3" />
+                Preview
+              </button>
+              <button
+                role="tab"
+                class="flex items-center gap-1 rounded px-2 py-1 text-2xs font-semibold transition"
+                :class="
+                  detailTab === 'histogram'
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-subtle hover:bg-panel-2/60 hover:text-ink'
+                "
+                :aria-selected="detailTab === 'histogram'"
+                @click="detailTab = 'histogram'"
+              >
+                <ChartNoAxesColumn class="h-3 w-3" />
+                Histogram
+              </button>
             </div>
-            <Loader2
-              v-if="thumb?.status === 'loading'"
-              class="absolute bottom-2 right-2 h-3 w-3 animate-spin text-subtle"
+            <span
+              v-if="detailTab === 'histogram' && histogram"
+              class="text-2xs tabular-nums text-subtle"
+            >
+              {{ formatCount(histogram.pixels) }} px
+            </span>
+          </div>
+
+          <div
+            class="relative h-44 overflow-hidden rounded-md bg-canvas ring-1 ring-line"
+            role="tabpanel"
+          >
+            <div v-if="detailTab === 'preview'" class="relative flex h-full items-center justify-center">
+              <PhotoPlaceholder
+                v-if="!thumb?.src"
+                :asset="asset"
+                :loading="!thumb || thumb.status === 'loading'"
+                :error="thumb?.error"
+              />
+              <img
+                v-else
+                :src="thumb.src"
+                :alt="asset.fileName"
+                class="max-h-full max-w-full object-contain"
+                draggable="false"
+                @dblclick="store.openFullscreen()"
+                @error="markPreviewFailed(thumb)"
+              />
+              <div class="pointer-events-none absolute inset-x-0 top-0 flex bg-gradient-to-b from-black/50 to-transparent p-2">
+                <SourceBadge :source="source" overlay />
+              </div>
+              <Loader2
+                v-if="thumb?.status === 'loading'"
+                class="absolute bottom-2 right-2 h-3 w-3 animate-spin text-subtle"
+              />
+            </div>
+            <PhotoHistogram
+              v-else
+              class="h-full"
+              :data="histogram"
+              :loading="histogramStatus === 'loading'"
+              :error="histogramError"
             />
           </div>
 
@@ -186,7 +320,7 @@ async function revealPrimary() {
         </section>
 
         <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">Preview</h4>
+          <h4 class="panel-heading mb-1.5">Preview source</h4>
           <div class="flex items-center gap-2">
             <SourceBadge :source="source" />
             <span v-if="thumb?.edge" class="text-2xs tabular-nums text-subtle">

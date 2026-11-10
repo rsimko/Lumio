@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{LumioError, Result};
+use crate::histogram::{Histogram, compute_histogram};
 use crate::path_utils::modified_ms;
 use crate::preview::load_preview;
 use crate::types::{CACHE_VERSION, PhotoAsset, PreviewSource, ThumbnailResult};
@@ -103,6 +104,23 @@ impl ThumbnailService {
             edge,
             error: None,
         })
+    }
+
+    /// Builds a histogram from the cached preview. The preview is generated
+    /// through the regular thumbnail pipeline when it is not cached yet, so
+    /// the info panel only pays for one decode.
+    pub fn histogram(&self, asset: &PhotoAsset, requested_edge: u32) -> Result<Histogram> {
+        let preview = self.get(asset, requested_edge, false)?;
+        let path = preview.cache_path.ok_or_else(|| {
+            LumioError::Cache(
+                preview
+                    .error
+                    .unwrap_or_else(|| "No preview is available for this file.".into()),
+            )
+        })?;
+        let image = image::open(&path)
+            .map_err(|error| LumioError::Cache(format!("{}: {error}", path.display())))?;
+        Ok(compute_histogram(&image))
     }
 
     pub fn clear(&self) -> Result<()> {
@@ -250,6 +268,45 @@ mod tests {
         let small = DynamicImage::ImageRgb8(RgbImage::new(100, 50));
         let resized = resize_for_edge(&small, 256);
         assert_eq!((resized.width(), resized.height()), (100, 50));
+    }
+
+    #[test]
+    fn histogram_uses_cached_preview() {
+        let temp = tempfile::tempdir().unwrap();
+        let service = ThumbnailService::new(temp.path()).unwrap();
+        let path = temp.path().join("photo.png");
+        let mut image = RgbImage::new(2, 1);
+        image.put_pixel(0, 0, image::Rgb([0, 0, 0]));
+        image.put_pixel(1, 0, image::Rgb([255, 255, 255]));
+        image.save(&path).unwrap();
+
+        let metadata = fs::metadata(&path).unwrap();
+        let asset = PhotoAsset {
+            id: "test".into(),
+            primary_path: path,
+            file_name: "photo.png".into(),
+            stem: "photo".into(),
+            extension: "png".into(),
+            kind: crate::types::AssetKind::Png,
+            companion_jpeg: None,
+            xmp_sidecar: None,
+            extra_sidecars: Vec::new(),
+            extra_companions: Vec::new(),
+            preview_hint: PreviewSource::Original,
+            file_size: metadata.len(),
+            modified_ms: modified_ms(&metadata),
+            width: Some(2),
+            height: Some(1),
+            relative_dir: String::new(),
+        };
+
+        let histogram = service.histogram(&asset, 256).unwrap();
+        assert_eq!(histogram.pixels, 2);
+        assert_eq!(histogram.red[0], 1);
+        assert_eq!(histogram.red[255], 1);
+        // The second call must reuse the cache and stay consistent.
+        let again = service.histogram(&asset, 256).unwrap();
+        assert_eq!(again, histogram);
     }
 
     #[test]

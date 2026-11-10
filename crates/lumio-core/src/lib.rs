@@ -2,6 +2,7 @@ pub mod assets;
 pub mod config;
 pub mod error;
 pub mod folders;
+pub mod histogram;
 pub mod path_utils;
 pub mod preview;
 pub mod scan;
@@ -12,6 +13,7 @@ pub use assets::{AssetFileGroup, asset_group_paths, group_assets, move_assets, t
 pub use config::ConfigStore;
 pub use error::{LumioError, Result};
 pub use folders::create_folder;
+pub use histogram::{HISTOGRAM_BINS, Histogram, compute_histogram};
 pub use scan::{
     count_folder_images, count_folder_images_excluding, list_subfolders, list_subfolders_excluding,
     scan_photos, scan_photos_excluding,

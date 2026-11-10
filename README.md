@@ -41,6 +41,8 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted.
+- Switch the info panel tile between the preview and an RGB/luminance histogram computed from
+  the same cached preview; both tabs share one tile.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
   keyboard shortcuts.
 - Settings for the Avenir interface font, bundled JetBrains Mono, and text size.

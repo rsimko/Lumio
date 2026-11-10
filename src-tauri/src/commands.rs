@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use lumio_core::Histogram;
 use lumio_core::LumioError;
 use lumio_core::types::{
     AddFolderOutcome, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset, FolderImageCounts,
@@ -279,19 +280,13 @@ pub fn restore_assets(
     Ok(config.excluded_assets().to_vec())
 }
 
-#[tauri::command]
-pub async fn get_thumbnail(
-    state: State<'_, AppState>,
-    mut asset: PhotoAsset,
-    edge: u32,
-    prefer_thumbnail: bool,
-) -> Result<ThumbnailResult, CommandError> {
-    // Never trust a path sent from the webview: re-canonicalize it and check
-    // that it still lives inside one of the registered library roots.
-    asset.primary_path = validate_under_roots(&state, &asset.primary_path)?;
+/// Re-canonicalizes an asset sent by the webview, drops unsafe companion
+/// paths, and refreshes the metadata used to derive thumbnail cache keys.
+fn prepare_asset(state: &AppState, mut asset: PhotoAsset) -> Result<PhotoAsset, CommandError> {
+    asset.primary_path = validate_under_roots(state, &asset.primary_path)?;
     if let Some(companion) = asset.companion_jpeg.clone() {
         let primary_parent = asset.primary_path.parent().map(PathBuf::from);
-        match validate_under_roots(&state, &companion) {
+        match validate_under_roots(state, &companion) {
             Ok(canonical) if canonical.parent().map(PathBuf::from) == primary_parent => {
                 asset.companion_jpeg = Some(canonical);
             }
@@ -299,6 +294,19 @@ pub async fn get_thumbnail(
         }
     }
     refresh_asset_metadata(&mut asset)?;
+    Ok(asset)
+}
+
+#[tauri::command]
+pub async fn get_thumbnail(
+    state: State<'_, AppState>,
+    asset: PhotoAsset,
+    edge: u32,
+    prefer_thumbnail: bool,
+) -> Result<ThumbnailResult, CommandError> {
+    // Never trust a path sent from the webview: re-canonicalize it and check
+    // that it still lives inside one of the registered library roots.
+    let asset = prepare_asset(&state, asset)?;
 
     let edge = edge.clamp(64, 4096);
     let thumbs = state.thumbs.clone();
@@ -330,6 +338,47 @@ pub async fn get_thumbnail(
         Err(error) => Err(CommandError::new(
             "internal",
             format!("Thumbnail task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn get_histogram(
+    state: State<'_, AppState>,
+    asset: PhotoAsset,
+    edge: u32,
+) -> Result<Histogram, CommandError> {
+    let asset = prepare_asset(&state, asset)?;
+    let edge = edge.clamp(64, 4096);
+    let thumbs = state.thumbs.clone();
+    let gate = state.thumb_gate.clone();
+    let inflight = state.inflight.clone();
+
+    // Share the thumbnail queue so a histogram requested while the preview is
+    // still decoding waits for that decode instead of repeating it.
+    let key = format!("{}:{edge}", asset.id);
+    let lock = {
+        let mut map = inflight
+            .lock()
+            .map_err(|_| CommandError::new("internal", "Histogram queue poisoned"))?;
+        map.entry(key)
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    };
+
+    let _guard = lock.lock().await;
+    let permit = gate
+        .acquire()
+        .await
+        .map_err(|_| CommandError::new("internal", "Thumbnail queue closed"))?;
+    match tokio::task::spawn_blocking(move || thumbs.histogram(&asset, edge)).await {
+        Ok(result) => {
+            drop(permit);
+            Ok(result?)
+        }
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Histogram task failed: {error}"),
         )),
     }
 }

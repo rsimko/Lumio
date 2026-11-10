@@ -9,6 +9,7 @@ import type {
   ExcludedAsset,
   FolderImageCounts,
   FolderNode,
+  HistogramData,
   MoveAssetsOutcome,
   PhotoAsset,
   RootInfo,
@@ -41,6 +42,8 @@ export const api = {
   getHiddenAssets: () => invoke<ExcludedAsset[]>('get_hidden_assets'),
   thumbnail: (asset: PhotoAsset, edge: number, preferThumbnail = false) =>
     invoke<ThumbnailResult>('get_thumbnail', { asset, edge, preferThumbnail }),
+  histogram: (asset: PhotoAsset, edge: number) =>
+    invoke<HistogramData>('get_histogram', { asset, edge }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),
   openAsset: (path: string) => invoke<void>('open_asset', { path }),
   revealAsset: (path: string) => invoke<void>('reveal_asset', { path }),

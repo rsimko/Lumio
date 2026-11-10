@@ -139,6 +139,16 @@ export interface ThumbnailResult {
   error: string | null;
 }
 
+export interface HistogramData {
+  /** 256 counts, one per 8-bit red value. */
+  red: number[];
+  green: number[];
+  blue: number[];
+  /** Rec. 709 luminance counts. */
+  luma: number[];
+  pixels: number;
+}
+
 export interface UiSettings {
   theme: ThemeSetting;
   uiFont: UiFont;

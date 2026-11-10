@@ -34,6 +34,7 @@ pub fn run() {
             commands::remove_assets,
             commands::restore_assets,
             commands::get_thumbnail,
+            commands::get_histogram,
             commands::clear_thumbnail_cache,
             commands::open_asset,
             commands::reveal_asset,

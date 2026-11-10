@@ -87,22 +87,22 @@ async function focusWindow(): Promise<void> {
 
 async function enterFullscreen(): Promise<void> {
   try {
-    await getCurrentWindow().setFullscreen(true);
+    // macOS simple fullscreen stays in the current Space. Native fullscreen
+    // moves the window to a new Space and can leave the webview without
+    // keyboard focus when it returns.
+    await getCurrentWindow().setSimpleFullscreen(true);
   } catch (error) {
-    console.error('Could not enter native fullscreen', error);
+    console.error('Could not enter simple fullscreen', error);
   }
-  // Native fullscreen can leave the webview without a first responder.
   await focusWindow();
 }
 
 async function leaveFullscreen(): Promise<void> {
   try {
-    await getCurrentWindow().setFullscreen(false);
+    await getCurrentWindow().setSimpleFullscreen(false);
   } catch (error) {
-    console.error('Could not leave native fullscreen', error);
+    console.error('Could not leave simple fullscreen', error);
   }
-  // Focus may only settle once macOS has finished the exit animation, so
-  // restore it immediately and once more after the transition.
   await focusWindow();
   window.setTimeout(() => {
     void focusWindow();

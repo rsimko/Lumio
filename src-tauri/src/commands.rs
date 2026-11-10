@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use lumio_core::LumioError;
 use lumio_core::types::{
-    FolderImageCounts, FolderNode, PhotoAsset, RootInfo, ScanResult, ThumbnailResult, UiSettings,
+    FolderImageCounts, FolderNode, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
+    ThumbnailResult, UiSettings,
 };
 use serde::Serialize;
 use tauri::State;
@@ -70,9 +71,13 @@ pub fn add_root(state: State<'_, AppState>, path: String) -> Result<RootInfo, Co
 }
 
 #[tauri::command]
-pub fn remove_root(state: State<'_, AppState>, id: String) -> Result<Vec<RootInfo>, CommandError> {
+pub fn remove_root(
+    state: State<'_, AppState>,
+    id: String,
+    mode: RootRemovalMode,
+) -> Result<Vec<RootInfo>, CommandError> {
     let mut config = state.config();
-    config.remove_root(&id)?;
+    config.remove_root(&id, mode)?;
     Ok(config.root_infos())
 }
 

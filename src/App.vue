@@ -7,6 +7,7 @@ import InfoPanel from '@/components/InfoPanel.vue';
 import LibraryPanel from '@/components/LibraryPanel.vue';
 import MainArea from '@/components/MainArea.vue';
 import RailTabs from '@/components/RailTabs.vue';
+import RemoveFolderDialog from '@/components/RemoveFolderDialog.vue';
 import SettingsDialog from '@/components/SettingsDialog.vue';
 import ShortcutsDialog from '@/components/ShortcutsDialog.vue';
 import StatusBar from '@/components/StatusBar.vue';
@@ -34,6 +35,16 @@ function onKeydown(event: KeyboardEvent) {
   }
 
   const modifier = event.metaKey || event.ctrlKey;
+
+  // The removal dialog owns the keyboard while it is open, especially the
+  // confirmation field. Only Escape is handled here to dismiss it safely.
+  if (store.removeFolderOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      store.closeRemoveFolder();
+    }
+    return;
+  }
 
   if (modifier) {
     switch (event.key.toLowerCase()) {
@@ -196,6 +207,7 @@ onBeforeUnmount(() => {
     <SettingsDialog v-if="store.settingsOpen" />
     <ShortcutsDialog v-if="store.shortcutsOpen" />
     <WarningsDialog v-if="store.warningsOpen" />
+    <RemoveFolderDialog v-if="store.removeFolderOpen" />
     <ToastHost />
   </div>
 </template>

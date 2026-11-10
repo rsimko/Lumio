@@ -32,6 +32,16 @@ pub struct RootFolder {
     pub added_at: u64,
 }
 
+/// How a library root should be removed.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RootRemovalMode {
+    /// Forget the folder in Lumio; everything on disk is untouched.
+    LibraryOnly,
+    /// Move the folder and its contents to the operating system Trash.
+    MoveToTrash,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RootInfo {

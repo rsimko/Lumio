@@ -7,6 +7,7 @@ import type {
   FolderNode,
   PhotoAsset,
   RootInfo,
+  RootRemovalMode,
   ScanResult,
   ThumbnailResult,
   UiSettings,
@@ -15,7 +16,8 @@ import type {
 export const api = {
   bootstrap: () => invoke<Bootstrap>('get_bootstrap'),
   addRoot: (path: string) => invoke<RootInfo>('add_root', { path }),
-  removeRoot: (id: string) => invoke<RootInfo[]>('remove_root', { id }),
+  removeRoot: (id: string, mode: RootRemovalMode) =>
+    invoke<RootInfo[]>('remove_root', { id, mode }),
   updateUiSettings: (ui: UiSettings) => invoke<UiSettings>('update_ui_settings', { ui }),
   listSubfolders: (folder: string) => invoke<FolderNode[]>('list_subfolders', { folder }),
   countFolderImages: (folder: string) =>

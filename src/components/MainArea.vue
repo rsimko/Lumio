@@ -67,7 +67,7 @@ function selectRoot(root: RootInfo) {
 }
 
 function removeSelectedRoot() {
-  if (store.selectedRootId) void store.removeRoot(store.selectedRootId);
+  if (store.selectedRootId) store.openRemoveFolder(store.selectedRootId);
 }
 </script>
 
@@ -236,7 +236,7 @@ function removeSelectedRoot() {
             <button
               v-if="store.selectedRootId"
               class="btn text-danger hover:border-danger/40 hover:bg-danger/10"
-              title="Removes the folder from Lumio. Files on disk are never deleted."
+              title="Remove this folder from Lumio or move it to the Trash."
               @click="removeSelectedRoot()"
             >
               Remove from library

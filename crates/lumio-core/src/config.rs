@@ -5,8 +5,43 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::error::{LumioError, Result};
-use crate::path_utils::{canonical_dir, display_name, now_ms};
-use crate::types::{AppConfig, RootFolder, RootInfo, UiSettings};
+use crate::path_utils::{canonical_dir, display_name, is_hidden_or_package, now_ms};
+use crate::types::{AppConfig, RootFolder, RootInfo, RootRemovalMode, UiSettings};
+
+const FORBIDDEN_DELETE_PATHS: &[&str] = &[
+    "/",
+    "/Applications",
+    "/Library",
+    "/Network",
+    "/System",
+    "/Users",
+    "/Volumes",
+    "/bin",
+    "/boot",
+    "/dev",
+    "/etc",
+    "/home",
+    "/lib",
+    "/lib64",
+    "/media",
+    "/mnt",
+    "/opt",
+    "/private",
+    "/private/etc",
+    "/private/tmp",
+    "/private/var",
+    "/proc",
+    "/root",
+    "/run",
+    "/sbin",
+    "/srv",
+    "/sys",
+    "/tmp",
+    "/usr",
+    "/var",
+];
+
+const FORBIDDEN_MOUNT_ROOTS: &[&str] = &["/Volumes", "/media", "/mnt", "/run/media"];
 
 pub struct ConfigStore {
     path: PathBuf,
@@ -133,12 +168,20 @@ impl ConfigStore {
         })
     }
 
-    pub fn remove_root(&mut self, id: &str) -> Result<bool> {
-        let before = self.config.roots.len();
-        self.config.roots.retain(|root| root.id != id);
-        if self.config.roots.len() == before {
+    pub fn remove_root(&mut self, id: &str, mode: RootRemovalMode) -> Result<bool> {
+        let Some(root) = self.config.roots.iter().find(|root| root.id == id).cloned() else {
             return Ok(false);
+        };
+
+        if mode == RootRemovalMode::MoveToTrash {
+            let path = canonical_dir(&root.path)?;
+            ensure_safe_to_trash(&path, &root.id, &self.config.roots)?;
+            // Move the folder to the system Trash before forgetting it so a
+            // failure leaves the library entry intact and nothing is lost.
+            move_to_trash(&path).map_err(|error| LumioError::Trash(error.to_string()))?;
         }
+
+        self.config.roots.retain(|root| root.id != id);
         if self.config.ui.last_root_id.as_deref() == Some(id) {
             self.config.ui.last_root_id = None;
             self.config.ui.last_folder = None;
@@ -155,6 +198,96 @@ impl ConfigStore {
     pub fn save(&self) -> Result<()> {
         save_atomic(&self.path, &self.config)
     }
+}
+
+/// Reject destructive operations that are more likely to be catastrophic than
+/// intentional. The frontend asks for an explicit confirmation, but the backend
+/// must enforce these guards as well.
+fn ensure_safe_to_trash(path: &Path, root_id: &str, roots: &[RootFolder]) -> Result<()> {
+    if path.parent().is_none() {
+        return Err(refuse_delete(path, "the filesystem root cannot be deleted"));
+    }
+
+    if let Some(home) = home_directory() {
+        if path == home {
+            return Err(refuse_delete(
+                path,
+                "the user's home folder cannot be deleted",
+            ));
+        }
+    }
+    if path.parent() == Some(Path::new("/Users")) || path.parent() == Some(Path::new("/home")) {
+        return Err(refuse_delete(path, "user home folders cannot be deleted"));
+    }
+
+    if let Some(parent) = path.parent() {
+        if FORBIDDEN_MOUNT_ROOTS
+            .iter()
+            .any(|mount| parent == Path::new(mount))
+        {
+            return Err(refuse_delete(path, "mounted volumes cannot be deleted"));
+        }
+    }
+
+    if FORBIDDEN_DELETE_PATHS
+        .iter()
+        .any(|forbidden| path == Path::new(forbidden))
+    {
+        return Err(refuse_delete(path, "this is a system folder"));
+    }
+
+    match path.file_name() {
+        Some(name) if is_hidden_or_package(name) => {
+            return Err(refuse_delete(
+                path,
+                "hidden folders and application/photo packages are protected",
+            ));
+        }
+        Some(_) => {}
+        None => return Err(refuse_delete(path, "the path has no folder name")),
+    }
+
+    for other in roots.iter().filter(|other| other.id != root_id) {
+        let other_path = fs::canonicalize(&other.path).unwrap_or_else(|_| other.path.clone());
+        if other_path.starts_with(path) {
+            return Err(refuse_delete(
+                path,
+                "it contains another folder registered with Lumio",
+            ));
+        }
+        if path.starts_with(&other_path) {
+            return Err(refuse_delete(
+                path,
+                "it is inside another folder registered with Lumio",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn refuse_delete(path: &Path, reason: &str) -> LumioError {
+    LumioError::InvalidPath(format!("Refusing to delete {}: {reason}.", path.display()))
+}
+
+fn home_directory() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)?;
+    Some(fs::canonicalize(&home).unwrap_or(home))
+}
+
+fn move_to_trash(path: &Path) -> std::result::Result<(), trash::Error> {
+    let mut context = trash::TrashContext::new();
+    // Finder automation needs extra permissions and can be blocked by macOS.
+    // NSFileManager moves the folder to Trash without prompting for automation
+    // access and still remains recoverable through the Trash.
+    #[cfg(target_os = "macos")]
+    {
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        context.set_delete_method(DeleteMethod::NsFileManager);
+    }
+    context.delete(path)
 }
 
 fn save_atomic(path: &Path, config: &AppConfig) -> Result<()> {
@@ -220,8 +353,62 @@ mod tests {
         assert_eq!(reopened.roots()[0].path, fs::canonicalize(&photos).unwrap());
 
         let mut reopened = reopened;
-        assert!(reopened.remove_root(&root.id).unwrap());
+        assert!(
+            reopened
+                .remove_root(&root.id, RootRemovalMode::LibraryOnly)
+                .unwrap()
+        );
         assert!(reopened.roots().is_empty());
+        // Library-only removal must not touch the folder on disk.
+        assert!(photos.exists());
+    }
+
+    #[test]
+    fn safe_delete_guards_reject_unsafe_paths() {
+        assert!(ensure_safe_to_trash(Path::new("/"), "root", &[]).is_err());
+        assert!(ensure_safe_to_trash(Path::new("/Users"), "root", &[]).is_err());
+        assert!(ensure_safe_to_trash(Path::new("/Volumes/Camera"), "root", &[]).is_err());
+        assert!(ensure_safe_to_trash(Path::new("/media/usb"), "root", &[]).is_err());
+        assert!(ensure_safe_to_trash(Path::new("/mnt/disk"), "root", &[]).is_err());
+        if let Some(home) = home_directory() {
+            assert!(ensure_safe_to_trash(&home, "root", &[]).is_err());
+        }
+
+        let temp = tempfile::tempdir().unwrap();
+        let normal = temp.path().join("photos");
+        let hidden = temp.path().join(".hidden");
+        let package = temp.path().join("Library.photoslibrary");
+        fs::create_dir(&normal).unwrap();
+        fs::create_dir(&hidden).unwrap();
+        fs::create_dir(&package).unwrap();
+
+        assert!(ensure_safe_to_trash(&normal, "root", &[]).is_ok());
+        assert!(ensure_safe_to_trash(&hidden, "root", &[]).is_err());
+        assert!(ensure_safe_to_trash(&package, "root", &[]).is_err());
+    }
+
+    #[test]
+    fn safe_delete_guards_reject_overlapping_roots() {
+        let temp = tempfile::tempdir().unwrap();
+        let parent = temp.path().join("parent");
+        let nested = parent.join("nested");
+        fs::create_dir_all(&nested).unwrap();
+        let parent = fs::canonicalize(parent).unwrap();
+        let nested = fs::canonicalize(nested).unwrap();
+
+        let other_parent = vec![RootFolder {
+            id: "other".into(),
+            path: parent.clone(),
+            added_at: 0,
+        }];
+        assert!(ensure_safe_to_trash(&nested, "root", &other_parent).is_err());
+
+        let other_nested = vec![RootFolder {
+            id: "other".into(),
+            path: nested.clone(),
+            added_at: 0,
+        }];
+        assert!(ensure_safe_to_trash(&parent, "root", &other_nested).is_err());
     }
 
     #[test]

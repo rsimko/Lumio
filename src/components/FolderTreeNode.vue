@@ -63,7 +63,7 @@ function select() {
 }
 
 function removeRoot() {
-  void store.removeRoot(props.rootId);
+  store.openRemoveFolder(props.rootId);
 }
 </script>
 
@@ -139,7 +139,7 @@ function removeRoot() {
       <button
         v-if="isRoot"
         class="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition hover:bg-danger/10 hover:text-danger group-hover:flex"
-        title="Remove from library (files are never deleted)"
+        title="Remove folder…"
         @click.stop="removeRoot"
       >
         <Trash2 class="h-3 w-3" />

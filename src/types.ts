@@ -14,6 +14,8 @@ export type UiFont = 'avenir' | 'system';
 
 export type MonoFont = 'jetbrains' | 'system';
 
+export type RootRemovalMode = 'libraryOnly' | 'moveToTrash';
+
 export interface RootInfo {
   id: string;
   path: string;

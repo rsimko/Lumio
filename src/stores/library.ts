@@ -11,6 +11,7 @@ import type {
   MonoFont,
   PhotoAsset,
   RootInfo,
+  RootRemovalMode,
   ScanWarning,
   ThemeSetting,
   UiFont,
@@ -132,6 +133,10 @@ export const useLibraryStore = defineStore('library', () => {
   const shortcutsOpen = ref(false);
   const infoVisible = ref(true);
   const addingRoot = ref(false);
+  const removeFolderOpen = ref(false);
+  const removeFolderTarget = ref<RootInfo | null>(null);
+  const removingFolder = ref(false);
+  const removeFolderError = ref<string | null>(null);
   const clearingCache = ref(false);
   const toasts = ref<Toast[]>([]);
 
@@ -582,36 +587,113 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  async function removeRoot(id: string): Promise<void> {
+  function forgetRootState(rootPath: string): void {
+    const inside = (path: string) => isPathInside(path, rootPath);
+    for (const key of [...tree.keys()]) {
+      if (inside(key)) tree.delete(key);
+    }
+    for (const key of [...treeErrors.keys()]) {
+      if (inside(key)) treeErrors.delete(key);
+    }
+    for (const key of [...treeLoading]) {
+      if (inside(key)) treeLoading.delete(key);
+    }
+    for (const key of [...expanded]) {
+      if (inside(key)) expanded.delete(key);
+    }
+    for (const key of [...folderImageCounts.keys()]) {
+      if (inside(key)) folderImageCounts.delete(key);
+    }
+    for (const key of [...folderImageCountsLoading]) {
+      if (inside(key)) folderImageCountsLoading.delete(key);
+    }
+    folderCountsEpoch.value += 1;
+  }
+
+  function openRemoveFolder(id: string): void {
     const root = roots.value.find((candidate) => candidate.id === id);
+    if (!root) return;
+    removeFolderTarget.value = root;
+    removeFolderOpen.value = true;
+    removeFolderError.value = null;
+  }
+
+  function closeRemoveFolder(): void {
+    if (removingFolder.value) return;
+    removeFolderOpen.value = false;
+    removeFolderTarget.value = null;
+    removeFolderError.value = null;
+  }
+
+  async function removeRoot(id: string, mode: RootRemovalMode): Promise<boolean> {
+    if (removingFolder.value) return false;
+    const index = roots.value.findIndex((candidate) => candidate.id === id);
+    const root = roots.value[index];
+    if (!root) return false;
+
+    removingFolder.value = true;
+    removeFolderError.value = null;
     try {
-      const updated = await api.removeRoot(id);
+      // The backend moves a folder to Trash before forgetting it, so the
+      // library entry survives if the filesystem operation fails.
+      const updated = await api.removeRoot(id, mode);
       roots.value = updated;
-      if (root) {
-        expanded.delete(root.path);
-        tree.delete(root.path);
-        treeErrors.delete(root.path);
-        for (const key of [...folderImageCounts.keys()]) {
-          if (isPathInside(key, root.path)) folderImageCounts.delete(key);
-        }
+      forgetRootState(root.path);
+
+      if (settings.value.lastRootId === id) {
+        settings.value = { ...settings.value, lastRootId: null, lastFolder: null };
+        queuePersist();
       }
-      if (selectedRootId.value === id) {
+
+      const wasSelected = selectedRootId.value === id;
+      if (wasSelected) {
+        // Cancel in-flight scans and clear rows that belonged to the root.
+        scanToken += 1;
         selectedRootId.value = null;
         selectedFolder.value = null;
+        selectionId.value = null;
         assets.value = [];
         warnings.value = [];
-        selectionId.value = null;
         scanState.value = 'idle';
         scanError.value = null;
         scanErrorCode.value = null;
         scanElapsedMs.value = 0;
       }
+
+      // Close the confirmation first so it cannot be submitted twice.
+      removeFolderOpen.value = false;
+      removeFolderTarget.value = null;
+      removingFolder.value = false;
+
       addToast(
-        root ? `Removed ${root.name} from the library.` : 'Folder removed from the library.',
+        mode === 'moveToTrash'
+          ? `Moved ${root.name} to the Trash.`
+          : `Removed ${root.name} from the library.`,
         'success',
       );
+
+      if (wasSelected) {
+        const next = updated[Math.min(index, updated.length - 1)] ?? updated[0];
+        if (next) {
+          if (next.available) {
+            await selectFolder(next.path, next.id, { force: true });
+          } else {
+            selectedRootId.value = next.id;
+            selectedFolder.value = next.path;
+            scanState.value = 'error';
+            scanError.value = `This folder is unavailable. ${next.error ?? ''}`.trim();
+            scanErrorCode.value = 'notFound';
+          }
+        }
+      }
+
+      return true;
     } catch (error) {
+      removeFolderError.value = errorMessage(error);
       addToast(errorMessage(error), 'error');
+      return false;
+    } finally {
+      removingFolder.value = false;
     }
   }
 
@@ -734,6 +816,12 @@ export const useLibraryStore = defineStore('library', () => {
     addRoot,
     removeRoot,
     addingRoot,
+    removeFolderOpen,
+    removeFolderTarget,
+    removingFolder,
+    removeFolderError,
+    openRemoveFolder,
+    closeRemoveFolder,
     // tree
     loadChildren,
     toggleExpanded,

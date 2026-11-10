@@ -37,6 +37,9 @@ pub enum LumioError {
 
     #[error("Thumbnail cache error: {0}")]
     Cache(String),
+
+    #[error("Could not move folder to Trash: {0}")]
+    Trash(String),
 }
 
 impl LumioError {
@@ -62,6 +65,7 @@ impl LumioError {
             Self::Config(_) => "config",
             Self::Preview(_) => "preview",
             Self::Cache(_) => "cache",
+            Self::Trash(_) => "trash",
         }
     }
 }

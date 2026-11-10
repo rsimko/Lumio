@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -225,6 +226,10 @@ pub struct UiSettings {
     pub filmstrip_visible: bool,
     #[serde(default)]
     pub list_show_associations: bool,
+    /// User overrides keyed by shortcut action. Missing actions use the
+    /// frontend defaults, which lets new defaults ship without migrations.
+    #[serde(default)]
+    pub shortcuts: HashMap<String, String>,
 }
 
 fn default_ui_font() -> String {
@@ -255,6 +260,7 @@ impl Default for UiSettings {
             last_folder: None,
             filmstrip_visible: true,
             list_show_associations: false,
+            shortcuts: HashMap::new(),
         }
     }
 }

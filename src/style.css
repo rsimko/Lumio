@@ -16,8 +16,8 @@
   --c-elevated: 252 253 253;
   --c-main: 228 234 234;
   --c-canvas: 214 222 222;
-  --c-line: 213 222 222;
-  --c-line-strong: 187 201 201;
+  --c-line: 203 213 213;
+  --c-line-strong: 175 190 190;
   --c-ink: 27 29 34;
   --c-muted: 89 105 108;
   --c-subtle: 99 118 121;
@@ -36,8 +36,8 @@
   --c-elevated: 35 43 50;
   --c-main: 21 22 25;
   --c-canvas: 16 17 19;
-  --c-line: 42 52 60;
-  --c-line-strong: 58 71 79;
+  --c-line: 35 44 51;
+  --c-line-strong: 50 62 69;
   --c-ink: 204 219 220;
   --c-muted: 150 167 169;
   --c-subtle: 123 139 143;

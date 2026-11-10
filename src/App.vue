@@ -19,8 +19,52 @@ import ToastHost from '@/components/ToastHost.vue';
 import TopToolbar from '@/components/TopToolbar.vue';
 import WarningsDialog from '@/components/WarningsDialog.vue';
 import { useLibraryStore } from '@/stores/library';
+import type { ShortcutId } from '@/lib/shortcuts';
 
 const store = useLibraryStore();
+
+interface BrowseShortcut {
+  id: ShortcutId;
+  run: () => void;
+}
+
+const browseShortcuts: BrowseShortcut[] = [
+  {
+    id: 'browse.fullscreen',
+    run: () => {
+      if (store.assets.length) store.openFullscreen();
+    },
+  },
+  {
+    id: 'browse.delete',
+    run: () => {
+      if (store.selectedCount > 0) store.openDeleteAssets();
+    },
+  },
+  {
+    id: 'browse.thumbLarger',
+    run: () => store.setThumbnailSize(store.settings.thumbnailSize + 24),
+  },
+  {
+    id: 'browse.thumbSmaller',
+    run: () => store.setThumbnailSize(store.settings.thumbnailSize - 24),
+  },
+  { id: 'browse.thumbReset', run: () => store.setThumbnailSize(184) },
+  { id: 'view.grid', run: () => store.setViewMode('grid') },
+  { id: 'view.masonry', run: () => store.setViewMode('masonry') },
+  { id: 'view.justified', run: () => store.setViewMode('justified') },
+  { id: 'view.list', run: () => store.setViewMode('list') },
+  { id: 'view.filmstrip', run: () => store.setViewMode('filmstrip') },
+  { id: 'library.addFolder', run: () => void store.addRoot() },
+  { id: 'library.refresh', run: () => void store.refresh() },
+  { id: 'library.selectAll', run: () => store.selectAll() },
+  { id: 'library.recursive', run: () => store.setRecursive(!store.settings.recursive) },
+  { id: 'library.filmstrip', run: () => store.toggleFilmstrip() },
+  { id: 'library.info', run: () => store.toggleInfo() },
+  { id: 'library.theme', run: () => store.toggleTheme() },
+  { id: 'library.settings', run: () => store.openSettings() },
+  { id: 'help.shortcuts', run: () => store.openShortcuts() },
+];
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -37,8 +81,6 @@ function onKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') (event.target as HTMLElement).blur();
     return;
   }
-
-  const modifier = event.metaKey || event.ctrlKey;
 
   // The removal dialog owns the keyboard while it is open, especially the
   // confirmation field. Only Escape is handled here to dismiss it safely.
@@ -94,29 +136,6 @@ function onKeydown(event: KeyboardEvent) {
     return;
   }
 
-  if (modifier) {
-    switch (event.key.toLowerCase()) {
-      case 'o':
-        event.preventDefault();
-        void store.addRoot();
-        return;
-      case 'r':
-        event.preventDefault();
-        void store.refresh();
-        return;
-      case 'a':
-        event.preventDefault();
-        store.selectAll();
-        return;
-      case ',':
-        event.preventDefault();
-        store.openSettings();
-        return;
-      default:
-        return;
-    }
-  }
-
   if (event.key === 'Escape') {
     event.preventDefault();
     if (store.fullscreenOpen) store.closeFullscreen();
@@ -125,116 +144,52 @@ function onKeydown(event: KeyboardEvent) {
   }
 
   if (store.fullscreenOpen) {
-    switch (event.key) {
-      case 'ArrowLeft':
-        event.preventDefault();
-        store.navigateHorizontal(-1);
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        store.navigateHorizontal(1);
-        break;
-      case ' ':
-      case 'Enter':
-        event.preventDefault();
-        store.closeFullscreen();
-        break;
-      case 'Delete':
-      case 'Backspace':
-        event.preventDefault();
-        store.closeFullscreen();
-        store.openDeleteAssets();
-        break;
-      default:
-        break;
-    }
-    return;
-  }
-
-  if (event.key === 'Delete' || event.key === 'Backspace') {
-    if (store.selectedCount > 0) {
+    if (store.shortcutMatches(event, 'viewer.previous')) {
       event.preventDefault();
+      store.navigateHorizontal(-1);
+    } else if (store.shortcutMatches(event, 'viewer.next')) {
+      event.preventDefault();
+      store.navigateHorizontal(1);
+    } else if (store.shortcutMatches(event, 'viewer.close')) {
+      event.preventDefault();
+      store.closeFullscreen();
+    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      store.closeFullscreen();
       store.openDeleteAssets();
     }
     return;
   }
 
-  switch (event.key) {
-    case 'ArrowLeft':
-      event.preventDefault();
-      store.navigateHorizontal(-1, event.shiftKey);
-      break;
-    case 'ArrowRight':
-      event.preventDefault();
-      store.navigateHorizontal(1, event.shiftKey);
-      break;
-    case 'ArrowUp':
-      event.preventDefault();
-      store.navigateVertical(-1, event.shiftKey);
-      break;
-    case 'ArrowDown':
-      event.preventDefault();
-      store.navigateVertical(1, event.shiftKey);
-      break;
-    case ' ':
-    case 'Enter':
-      if (store.assets.length) {
+  // Arrow navigation is intentionally fixed: Shift extends the selection.
+  if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+    switch (event.key) {
+      case 'ArrowLeft':
         event.preventDefault();
-        store.openFullscreen();
-      }
-      break;
-    case '+':
-    case '=':
-      event.preventDefault();
-      store.setThumbnailSize(store.settings.thumbnailSize + 24);
-      break;
-    case '-':
-    case '_':
-      event.preventDefault();
-      store.setThumbnailSize(store.settings.thumbnailSize - 24);
-      break;
-    case '0':
-      event.preventDefault();
-      store.setThumbnailSize(184);
-      break;
-    case '?':
-      event.preventDefault();
-      store.openShortcuts();
-      break;
-    default:
-      break;
+        store.navigateHorizontal(-1, event.shiftKey);
+        return;
+      case 'ArrowRight':
+        event.preventDefault();
+        store.navigateHorizontal(1, event.shiftKey);
+        return;
+      case 'ArrowUp':
+        event.preventDefault();
+        store.navigateVertical(-1, event.shiftKey);
+        return;
+      case 'ArrowDown':
+        event.preventDefault();
+        store.navigateVertical(1, event.shiftKey);
+        return;
+      default:
+        break;
+    }
   }
 
-  switch (event.key.toLowerCase()) {
-    case 'g':
-      store.setViewMode('grid');
-      break;
-    case 'm':
-      store.setViewMode('masonry');
-      break;
-    case 'j':
-      store.setViewMode('justified');
-      break;
-    case 'l':
-      store.setViewMode('list');
-      break;
-    case 'f':
-      store.setViewMode('filmstrip');
-      break;
-    case 'r':
-      store.setRecursive(!store.settings.recursive);
-      break;
-    case 'b':
-      store.toggleFilmstrip();
-      break;
-    case 'i':
-      store.toggleInfo();
-      break;
-    case 't':
-      store.toggleTheme();
-      break;
-    default:
-      break;
+  for (const shortcut of browseShortcuts) {
+    if (!store.shortcutMatches(event, shortcut.id)) continue;
+    event.preventDefault();
+    shortcut.run();
+    return;
   }
 }
 

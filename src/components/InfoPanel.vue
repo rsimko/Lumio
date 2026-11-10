@@ -163,7 +163,11 @@ async function revealPrimary() {
   >
     <div class="flex h-10 shrink-0 items-center justify-between px-3">
       <span class="panel-heading">Info</span>
-      <button class="btn-icon-sm" title="Hide info panel (I)" @click="store.toggleInfo()">
+      <button
+        class="btn-icon-sm"
+        :title="`Hide info panel (${store.shortcutLabel('library.info')})`"
+        @click="store.toggleInfo()"
+      >
         <PanelRightClose class="h-3.5 w-3.5" />
       </button>
     </div>
@@ -270,7 +274,7 @@ async function revealPrimary() {
           </div>
           <button
             class="btn mt-1.5 w-full"
-            title="Open in fullscreen viewer (Space)"
+            :title="`Open in fullscreen viewer (${store.shortcutLabel('browse.fullscreen')})`"
             @click="store.openFullscreen()"
           >
             <Maximize2 class="h-3.5 w-3.5" />

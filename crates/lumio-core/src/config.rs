@@ -683,10 +683,20 @@ mod tests {
         ui.mono_font = "system".into();
         ui.ui_font_size = 16;
         ui.list_show_associations = true;
+        ui.shortcuts.insert("view.grid".into(), "shift+g".into());
         store.update_ui(ui.clone()).unwrap();
 
         let reopened = ConfigStore::open(&config_path).unwrap();
         assert_eq!(reopened.config().ui, ui);
+        assert_eq!(
+            reopened
+                .config()
+                .ui
+                .shortcuts
+                .get("view.grid")
+                .map(String::as_str),
+            Some("shift+g")
+        );
     }
 
     #[test]
@@ -723,6 +733,7 @@ mod tests {
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
         assert!(!ui.list_show_associations);
+        assert!(ui.shortcuts.is_empty());
     }
 
     #[test]

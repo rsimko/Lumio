@@ -53,10 +53,15 @@ const nextBrowseView = computed(() => {
   return browseViews.find((view) => view.mode === mode) ?? browseViews[0];
 });
 const browseActive = computed(() => isBrowseViewMode(store.viewMode));
+const viewKeys = computed(() =>
+  (['view.grid', 'view.masonry', 'view.justified', 'view.list'] as const)
+    .map((id) => store.shortcutLabel(id))
+    .join('/'),
+);
 const browseTitle = computed(() =>
   browseActive.value
-    ? `${browseView.value.label} view — click for ${nextBrowseView.value.label} (G/M/J/L)`
-    : `Browse layout: ${browseView.value.label} — click to open (G/M/J/L)`,
+    ? `${browseView.value.label} view — click for ${nextBrowseView.value.label} (${viewKeys.value})`
+    : `Browse layout: ${browseView.value.label} — click to open (${viewKeys.value})`,
 );
 
 function cycleBrowseView() {
@@ -115,7 +120,12 @@ function onSizeInput(event: Event) {
     </nav>
 
     <div class="flex shrink-0 items-center gap-1">
-      <button class="btn" :disabled="store.addingRoot" title="Add folder (⌘O)" @click="store.addRoot()">
+      <button
+        class="btn"
+        :disabled="store.addingRoot"
+        :title="`Add folder (${store.shortcutLabel('library.addFolder')})`"
+        @click="store.addRoot()"
+      >
         <Loader2 v-if="store.addingRoot" class="h-3.5 w-3.5 animate-spin" />
         <FolderPlus v-else class="h-3.5 w-3.5" />
         <span class="hidden lg:inline">Add folder</span>
@@ -135,7 +145,7 @@ function onSizeInput(event: Event) {
           class="w-20 cursor-pointer"
           style="accent-color: rgb(var(--c-accent))"
           :value="store.settings.thumbnailSize"
-          title="Thumbnail size (use + or −)"
+          :title="`Thumbnail size (${store.shortcutLabel('browse.thumbLarger')} / ${store.shortcutLabel('browse.thumbSmaller')})`"
           aria-label="Thumbnail size"
           :aria-hidden="!sizeSliderVisible"
           :tabindex="sizeSliderVisible ? 0 : -1"
@@ -157,8 +167,8 @@ function onSizeInput(event: Event) {
         <button
           class="segmented-button"
           :class="store.viewMode === 'filmstrip' ? 'segmented-button-active' : ''"
-          title="Filmstrip view (F)"
-          aria-label="Filmstrip view (F)"
+          :title="`Filmstrip view (${store.shortcutLabel('view.filmstrip')})`"
+          :aria-label="`Filmstrip view (${store.shortcutLabel('view.filmstrip')})`"
           :aria-pressed="store.viewMode === 'filmstrip'"
           @click="store.setViewMode('filmstrip')"
         >
@@ -172,7 +182,7 @@ function onSizeInput(event: Event) {
         v-if="store.viewMode === 'filmstrip'"
         class="btn-icon"
         :class="store.settings.filmstripVisible ? 'bg-accent-soft text-accent' : ''"
-        title="Show or hide the filmstrip (B)"
+        :title="`Show or hide the filmstrip (${store.shortcutLabel('library.filmstrip')})`"
         :aria-pressed="store.settings.filmstripVisible"
         @click="store.toggleFilmstrip()"
       >
@@ -181,7 +191,7 @@ function onSizeInput(event: Event) {
       <button
         class="btn-icon"
         :class="store.infoVisible ? 'bg-accent-soft text-accent' : ''"
-        title="Toggle info panel (I)"
+        :title="`Toggle info panel (${store.shortcutLabel('library.info')})`"
         :aria-pressed="store.infoVisible"
         @click="store.toggleInfo()"
       >
@@ -189,7 +199,7 @@ function onSizeInput(event: Event) {
       </button>
       <button
         class="btn-icon"
-        :title="store.resolvedTheme === 'dark' ? 'Switch to light theme (T)' : 'Switch to dark theme (T)'"
+        :title="`${store.resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} (${store.shortcutLabel('library.theme')})`"
         @click="store.toggleTheme()"
       >
         <Sun v-if="store.resolvedTheme === 'dark'" class="h-3.5 w-3.5" />

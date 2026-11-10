@@ -42,14 +42,14 @@ function planned(feature: string) {
     <div class="mt-auto flex flex-col items-center gap-1">
       <button
         class="flex h-8 w-8 items-center justify-center rounded-md text-subtle transition hover:bg-panel-2 hover:text-muted"
-        title="Keyboard shortcuts (?)"
+        :title="`Keyboard shortcuts (${store.shortcutLabel('help.shortcuts')})`"
         @click="store.openShortcuts()"
       >
         <Keyboard class="h-4 w-4" />
       </button>
       <button
         class="flex h-8 w-8 items-center justify-center rounded-md text-subtle transition hover:bg-panel-2 hover:text-muted"
-        title="Settings (⌘,)"
+        :title="`Settings (${store.shortcutLabel('library.settings')})`"
         @click="store.openSettings()"
       >
         <Settings class="h-4 w-4" />

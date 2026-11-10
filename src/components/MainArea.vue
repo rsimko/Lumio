@@ -93,7 +93,7 @@ function removeSelectedRoot() {
           <span class="font-medium text-accent">{{ formatCount(store.selectedCount) }} selected</span>
           <button
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition hover:bg-danger/10 hover:text-danger"
-            title="Delete selected photos (Delete)"
+            :title="`Delete selected photos (${store.shortcutLabel('browse.delete')})`"
             @click="store.openDeleteAssets()"
           >
             <Trash2 class="h-3 w-3" />

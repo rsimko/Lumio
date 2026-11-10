@@ -40,7 +40,7 @@ function commitResize(width: number) {
       <div class="flex items-center gap-0.5">
         <button
           class="btn-icon-sm"
-          title="Refresh selected folder (⌘R)"
+          :title="`Refresh selected folder (${store.shortcutLabel('library.refresh')})`"
           :disabled="!store.selectedFolder"
           @click="store.refresh()"
         >
@@ -52,7 +52,7 @@ function commitResize(width: number) {
         <button
           class="btn-icon-sm"
           :class="store.settings.recursive ? 'bg-accent-soft text-accent' : ''"
-          title="Include subfolders (R)"
+          :title="`Include subfolders (${store.shortcutLabel('library.recursive')})`"
           :aria-pressed="store.settings.recursive"
           @click="store.setRecursive(!store.settings.recursive)"
         >
@@ -60,7 +60,7 @@ function commitResize(width: number) {
         </button>
         <button
           class="btn-icon-sm"
-          title="Add a folder (⌘O)"
+          :title="`Add a folder (${store.shortcutLabel('library.addFolder')})`"
           :disabled="store.addingRoot"
           @click="store.addRoot()"
         >

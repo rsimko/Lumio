@@ -163,6 +163,8 @@ export interface UiSettings {
   lastFolder: string | null;
   filmstripVisible: boolean;
   listShowAssociations: boolean;
+  /** Only actions that differ from the defaults are stored. */
+  shortcuts: Record<string, string>;
 }
 
 export interface Bootstrap {

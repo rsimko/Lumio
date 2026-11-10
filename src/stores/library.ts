@@ -6,6 +6,15 @@ import { api, errorCode, errorMessage } from '@/api';
 import { resetThumbnails } from '@/composables/useThumbnails';
 import { basename, isPathInside, parentPath } from '@/lib/format';
 import {
+  DEFAULT_SHORTCUTS,
+  canonicalBinding,
+  formatBindingLabel,
+  matchesShortcut,
+  normalizeShortcutOverrides,
+  resolveShortcutBinding,
+  type ShortcutId,
+} from '@/lib/shortcuts';
+import {
   clickSelection,
   emptySelection,
   navigateSelection,
@@ -48,6 +57,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   lastFolder: null,
   filmstripVisible: true,
   listShowAssociations: false,
+  shortcuts: {},
 };
 
 const BASE_FONT_SIZE = 13;
@@ -105,6 +115,7 @@ function normalizeUiSettings(ui: Partial<UiSettings>): UiSettings {
     uiFont: merged.uiFont === 'system' ? 'system' : 'avenir',
     monoFont: merged.monoFont === 'system' ? 'system' : 'jetbrains',
     uiFontSize: Math.min(17, Math.max(11, size)),
+    shortcuts: normalizeShortcutOverrides(merged.shortcuts),
   };
 }
 
@@ -404,6 +415,43 @@ export const useLibraryStore = defineStore('library', () => {
 
   function toggleListAssociations(): void {
     updateSettings({ listShowAssociations: !settings.value.listShowAssociations });
+  }
+
+  function shortcutBinding(id: ShortcutId): string {
+    return resolveShortcutBinding(settings.value.shortcuts, id);
+  }
+
+  function shortcutLabel(id: ShortcutId): string {
+    return formatBindingLabel(shortcutBinding(id));
+  }
+
+  function shortcutIsCustom(id: ShortcutId): boolean {
+    return Boolean(settings.value.shortcuts[id]);
+  }
+
+  function shortcutMatches(event: KeyboardEvent, id: ShortcutId): boolean {
+    return matchesShortcut(event, id, settings.value.shortcuts);
+  }
+
+  function setShortcut(id: ShortcutId, binding: string): void {
+    const canonical = canonicalBinding(binding);
+    if (!canonical || canonical === shortcutBinding(id)) return;
+    const shortcuts = { ...settings.value.shortcuts };
+    if (canonical === DEFAULT_SHORTCUTS[id]) delete shortcuts[id];
+    else shortcuts[id] = canonical;
+    updateSettings({ shortcuts });
+  }
+
+  function resetShortcut(id: ShortcutId): void {
+    if (!settings.value.shortcuts[id]) return;
+    const shortcuts = { ...settings.value.shortcuts };
+    delete shortcuts[id];
+    updateSettings({ shortcuts });
+  }
+
+  function resetShortcuts(): void {
+    if (!Object.keys(settings.value.shortcuts).length) return;
+    updateSettings({ shortcuts: {} });
   }
 
   function toggleInfo(): void {
@@ -1366,6 +1414,13 @@ export const useLibraryStore = defineStore('library', () => {
     setFilmstripVisible,
     toggleFilmstrip,
     toggleListAssociations,
+    shortcutBinding,
+    shortcutLabel,
+    shortcutIsCustom,
+    shortcutMatches,
+    setShortcut,
+    resetShortcut,
+    resetShortcuts,
     updateSettings,
     resolvedTheme,
     cacheDir,

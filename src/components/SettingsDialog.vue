@@ -221,10 +221,13 @@ function openShortcuts() {
             />
           </div>
 
-          <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+          <div
+            v-if="store.viewMode === 'filmstrip'"
+            class="flex items-center justify-between gap-4 px-3 py-2.5"
+          >
             <div>
               <p class="text-xs font-medium text-ink">Show filmstrip</p>
-              <p class="mt-0.5 text-2xs text-subtle">Keep the quick navigation strip visible.</p>
+              <p class="mt-0.5 text-2xs text-subtle">Keep the navigation strip visible below the photo.</p>
             </div>
             <button
               class="switch"

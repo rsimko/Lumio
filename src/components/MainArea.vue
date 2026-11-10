@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
-  Aperture,
   FolderOpen,
   FolderPlus,
   FolderSearch,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
+import LumioMark from '@/components/LumioMark.vue';
 import { formatCount, formatDuration, pluralize } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 import GridView from '@/views/GridView.vue';
@@ -161,9 +161,7 @@ function removeSelectedRoot() {
 
       <div v-else-if="showWelcome" class="flex h-full items-center justify-center p-8">
         <div class="max-w-md text-center">
-          <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent ring-1 ring-accent/15">
-            <Aperture class="h-7 w-7" />
-          </div>
+          <LumioMark class="mx-auto mb-4 h-14 w-14" />
           <h1 class="text-balance text-xl font-semibold tracking-tight text-ink">
             Your photos, where they live.
           </h1>

@@ -45,7 +45,7 @@ const groups: ShortcutGroup[] = [
       { keys: ['⌘', 'O'], action: 'Add a folder' },
       { keys: ['⌘', 'R'], action: 'Refresh the selected folder' },
       { keys: ['R'], action: 'Toggle include subfolders' },
-      { keys: ['B'], action: 'Toggle filmstrip' },
+      { keys: ['B'], action: 'Toggle filmstrip (filmstrip view only)' },
       { keys: ['I'], action: 'Toggle info panel' },
       { keys: ['T'], action: 'Toggle light / dark appearance' },
       { keys: ['⌘', ','], action: 'Open settings' },

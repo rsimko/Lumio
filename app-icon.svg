@@ -1,26 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3a4550"/>
-      <stop offset="1" stop-color="#232a32"/>
+    <linearGradient id="bg" x1="160" y1="96" x2="864" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4B818A"/>
+      <stop offset="0.55" stop-color="#2F5C64"/>
+      <stop offset="1" stop-color="#1B3A41"/>
     </linearGradient>
-    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f2f4f6"/>
-      <stop offset="1" stop-color="#c4cdd6"/>
+    <radialGradient id="light" cx="300" cy="220" r="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="336" y1="272" x2="336" y2="746" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FCFAF3"/>
+      <stop offset="1" stop-color="#E9E3D2"/>
     </linearGradient>
   </defs>
-  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
-  <circle cx="512" cy="512" r="300" fill="none" stroke="#59636e" stroke-width="10"/>
-  <g transform="translate(512 512)">
-    <g fill="url(#blade)">
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95"/>
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95" transform="rotate(60)"/>
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95" transform="rotate(120)"/>
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95" transform="rotate(180)"/>
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95" transform="rotate(240)"/>
-      <path d="M0 -70 L258 -70 A268 268 0 0 1 129 224 Z" opacity="0.95" transform="rotate(300)"/>
-    </g>
-    <circle r="66" fill="#232a32"/>
-    <circle r="66" fill="none" stroke="#8d99a5" stroke-width="8"/>
-  </g>
+  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#bg)"/>
+  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#light)"/>
+  <rect x="81" y="81" width="862" height="862" rx="195" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="336" y="272" width="118" height="474" rx="32" fill="url(#ink)"/>
+  <rect x="336" y="628" width="364" height="118" rx="32" fill="url(#ink)"/>
+  <circle cx="724" cy="312" r="42" fill="#EBC57C"/>
 </svg>

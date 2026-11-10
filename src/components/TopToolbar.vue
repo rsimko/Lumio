@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  Aperture,
   ChevronRight,
   Columns3,
   Film,
@@ -17,6 +16,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
+import LumioMark from '@/components/LumioMark.vue';
 import { isBrowseViewMode, nextBrowseViewMode, type BrowseViewMode } from '@/lib/views';
 import { useLibraryStore, type BreadcrumbItem } from '@/stores/library';
 
@@ -83,11 +83,7 @@ function onSizeInput(event: Event) {
     class="flex h-[52px] shrink-0 items-center gap-2 border-b border-line bg-panel px-3"
   >
     <div class="flex shrink-0 items-center gap-2 pr-0.5">
-      <div
-        class="grid h-7 w-7 place-items-center rounded-md bg-accent-soft text-accent ring-1 ring-accent/15"
-      >
-        <Aperture class="h-4 w-4" />
-      </div>
+      <LumioMark class="h-7 w-7 shrink-0" />
       <span class="text-sm font-semibold tracking-[0.01em] text-ink">Lumio</span>
     </div>
 
@@ -173,9 +169,10 @@ function onSizeInput(event: Event) {
       <div class="mx-0.5 h-5 w-px bg-line" />
 
       <button
+        v-if="store.viewMode === 'filmstrip'"
         class="btn-icon"
         :class="store.settings.filmstripVisible ? 'bg-accent-soft text-accent' : ''"
-        title="Toggle filmstrip (B)"
+        title="Show or hide the filmstrip (B)"
         :aria-pressed="store.settings.filmstripVisible"
         @click="store.toggleFilmstrip()"
       >

@@ -373,8 +373,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function setViewMode(mode: ViewMode): void {
-    // The filmstrip view needs its strip visible to make sense.
-    updateSettings({ viewMode: mode, filmstripVisible: mode === 'filmstrip' ? true : settings.value.filmstripVisible });
+    // The bottom strip belongs to the filmstrip view alone. Browse layouts must
+    // never leave it reachable, so visibility follows the active view exactly.
+    updateSettings({ viewMode: mode, filmstripVisible: mode === 'filmstrip' });
   }
 
   function setThumbnailSize(size: number): void {
@@ -390,6 +391,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function setFilmstripVisible(value: boolean): void {
+    // Ignore requests from browse layouts: the strip is only meaningful inside
+    // the filmstrip view and must stay hidden everywhere else.
+    if (settings.value.viewMode !== 'filmstrip') return;
     updateSettings({ filmstripVisible: value });
   }
 

@@ -19,7 +19,9 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
   move it to the system Trash. Hidden subfolders can be restored by adding them again.
 - Browse a real nested folder tree, loaded lazily as you expand it.
 - Scan the current folder, or include every subfolder recursively.
-- View photos in five layouts: grid, masonry, justified, list and filmstrip.
+- View photos in five layouts: grid, masonry, justified, list and filmstrip. The bottom
+  navigation strip belongs to the filmstrip view; grid, masonry, justified and list stay
+  strip-free.
 - Select one or many photos: click, ⌘/Ctrl-click to toggle, Shift-click for a range,
   ⌘/Ctrl+A to select all, Shift+arrows to extend and Escape to clear.
 - Drag any selected photo — or a single unselected photo — onto a folder row to move the

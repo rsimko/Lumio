@@ -257,7 +257,11 @@ onBeforeUnmount(() => {
       <section class="flex min-w-0 flex-1 flex-col bg-main">
         <MainArea class="min-h-0 flex-1" />
         <Filmstrip
-          v-if="store.settings.filmstripVisible && store.assets.length > 0"
+          v-if="
+            store.viewMode === 'filmstrip' &&
+            store.settings.filmstripVisible &&
+            store.assets.length > 0
+          "
         />
         <StatusBar />
       </section>

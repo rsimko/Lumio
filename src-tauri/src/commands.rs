@@ -74,6 +74,17 @@ pub fn add_root(
 }
 
 #[tauri::command]
+pub fn create_folder(
+    state: State<'_, AppState>,
+    parent: String,
+    name: String,
+) -> Result<String, CommandError> {
+    let parent = validate_under_roots(&state, &PathBuf::from(parent))?;
+    let path = lumio_core::create_folder(&parent, &name)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn remove_root(
     state: State<'_, AppState>,
     id: String,

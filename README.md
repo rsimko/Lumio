@@ -12,6 +12,7 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 ## What works
 
 - Add library folders with the native folder picker, and remove them again.
+- Right-click any folder to create a subfolder inside it or open the same removal choices.
 - Every folder row offers the same two actions: remove it from the library (files stay on disk) or
   move it to the system Trash. Hidden subfolders can be restored by adding them again.
 - Browse a real nested folder tree, loaded lazily as you expand it.
@@ -43,6 +44,9 @@ Browsing is strictly read-only:
   where it can still be restored. It requires acknowledging a warning, and Lumio refuses filesystem
   roots, home folders, system folders, mount points, hidden/package folders and paths that overlap
   another registered library folder.
+- New folders are created directly inside the right-clicked folder. Names that are empty, hidden,
+  contain path separators, colons or control characters, or collide with an existing folder are
+  rejected.
 
 ## Requirements
 

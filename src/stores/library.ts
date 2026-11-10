@@ -7,9 +7,11 @@ import { resetThumbnails } from '@/composables/useThumbnails';
 import { basename, isPathInside, parentPath } from '@/lib/format';
 import type {
   FolderImageCounts,
+  FolderMenuTarget,
   FolderNode,
   FolderRemovalTarget,
   MonoFont,
+  NewFolderTarget,
   PhotoAsset,
   RootInfo,
   RootRemovalMode,
@@ -138,6 +140,12 @@ export const useLibraryStore = defineStore('library', () => {
   const removeFolderTarget = ref<FolderRemovalTarget | null>(null);
   const removingFolder = ref(false);
   const removeFolderError = ref<string | null>(null);
+  const folderMenuOpen = ref(false);
+  const folderMenuTarget = ref<FolderMenuTarget | null>(null);
+  const newFolderOpen = ref(false);
+  const newFolderTarget = ref<NewFolderTarget | null>(null);
+  const creatingFolder = ref(false);
+  const newFolderError = ref<string | null>(null);
   const clearingCache = ref(false);
   const toasts = ref<Toast[]>([]);
 
@@ -681,6 +689,92 @@ export const useLibraryStore = defineStore('library', () => {
     removeFolderError.value = null;
   }
 
+  function openFolderMenu(target: Omit<FolderMenuTarget, 'x' | 'y'>, x: number, y: number): void {
+    folderMenuTarget.value = { ...target, x, y };
+    folderMenuOpen.value = true;
+  }
+
+  function closeFolderMenu(): void {
+    folderMenuOpen.value = false;
+    folderMenuTarget.value = null;
+  }
+
+  function removeFromFolderMenu(): void {
+    const target = folderMenuTarget.value;
+    if (!target) return;
+    closeFolderMenu();
+    if (target.isRoot) openRemoveFolder(target.rootId);
+    else openDeleteFolder(target.path, target.rootId);
+  }
+
+  function openNewFolder(): void {
+    const target = folderMenuTarget.value;
+    if (!target) return;
+    newFolderTarget.value = { path: target.path, rootId: target.rootId, name: target.name };
+    newFolderError.value = null;
+    closeFolderMenu();
+    newFolderOpen.value = true;
+  }
+
+  function closeNewFolder(): void {
+    if (creatingFolder.value) return;
+    newFolderOpen.value = false;
+    newFolderTarget.value = null;
+    newFolderError.value = null;
+  }
+
+  function clearNewFolderError(): void {
+    newFolderError.value = null;
+  }
+
+  async function createFolder(name: string): Promise<boolean> {
+    if (creatingFolder.value) return false;
+    const target = newFolderTarget.value;
+    if (!target) return false;
+
+    const root = roots.value.find((candidate) => candidate.id === target.rootId);
+    if (!root || !isPathInside(target.path, root.path)) {
+      newFolderError.value = 'That folder is no longer part of the library.';
+      return false;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      newFolderError.value = 'Enter a folder name.';
+      return false;
+    }
+
+    creatingFolder.value = true;
+    newFolderError.value = null;
+    try {
+      const created = await api.createFolder(target.path, trimmed);
+      // Refresh the parent listing immediately so the new row appears even
+      // before the folder is scanned or selected.
+      expanded.add(target.path);
+      await loadChildren(target.path, true);
+
+      // Counts in every ancestor now include the new (empty) folder.
+      for (const key of [...folderImageCounts.keys()]) {
+        if (isPathInside(key, root.path)) folderImageCounts.delete(key);
+      }
+      folderCountsEpoch.value += 1;
+
+      // Close the dialog before selecting so a selection failure cannot leave
+      // the form stuck in a loading state.
+      creatingFolder.value = false;
+      newFolderOpen.value = false;
+      newFolderTarget.value = null;
+
+      await selectFolder(created, target.rootId, { force: true });
+      addToast(`Created ${basename(created)}.`, 'success');
+      return true;
+    } catch (error) {
+      newFolderError.value = errorMessage(error);
+      return false;
+    } finally {
+      creatingFolder.value = false;
+    }
+  }
+
   async function removeRoot(id: string, mode: RootRemovalMode): Promise<boolean> {
     if (removingFolder.value) return false;
     const index = roots.value.findIndex((candidate) => candidate.id === id);
@@ -922,6 +1016,19 @@ export const useLibraryStore = defineStore('library', () => {
     openRemoveFolder,
     openDeleteFolder,
     closeRemoveFolder,
+    folderMenuOpen,
+    folderMenuTarget,
+    openFolderMenu,
+    closeFolderMenu,
+    removeFromFolderMenu,
+    newFolderOpen,
+    newFolderTarget,
+    creatingFolder,
+    newFolderError,
+    openNewFolder,
+    closeNewFolder,
+    clearNewFolderError,
+    createFolder,
     // tree
     loadChildren,
     toggleExpanded,

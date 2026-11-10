@@ -22,6 +22,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_bootstrap,
             commands::add_root,
+            commands::create_folder,
             commands::remove_root,
             commands::remove_subfolder,
             commands::update_ui_settings,

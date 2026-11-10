@@ -2,10 +2,12 @@
 import { onBeforeUnmount, onMounted } from 'vue';
 
 import Filmstrip from '@/components/Filmstrip.vue';
+import FolderContextMenu from '@/components/FolderContextMenu.vue';
 import FullscreenViewer from '@/components/FullscreenViewer.vue';
 import InfoPanel from '@/components/InfoPanel.vue';
 import LibraryPanel from '@/components/LibraryPanel.vue';
 import MainArea from '@/components/MainArea.vue';
+import NewFolderDialog from '@/components/NewFolderDialog.vue';
 import RailTabs from '@/components/RailTabs.vue';
 import RemoveFolderDialog from '@/components/RemoveFolderDialog.vue';
 import SettingsDialog from '@/components/SettingsDialog.vue';
@@ -42,6 +44,24 @@ function onKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.preventDefault();
       store.closeRemoveFolder();
+    }
+    return;
+  }
+
+  // The new-folder dialog owns the keyboard while it is open. The input's
+  // Escape handler stops propagation, but the footer buttons still land here.
+  if (store.newFolderOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      store.closeNewFolder();
+    }
+    return;
+  }
+
+  if (store.folderMenuOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      store.closeFolderMenu();
     }
     return;
   }
@@ -207,6 +227,8 @@ onBeforeUnmount(() => {
     <SettingsDialog v-if="store.settingsOpen" />
     <ShortcutsDialog v-if="store.shortcutsOpen" />
     <WarningsDialog v-if="store.warningsOpen" />
+    <FolderContextMenu v-if="store.folderMenuOpen" />
+    <NewFolderDialog v-if="store.newFolderOpen" />
     <RemoveFolderDialog v-if="store.removeFolderOpen" />
     <ToastHost />
   </div>

@@ -66,6 +66,19 @@ function removeFolder() {
   if (props.isRoot) store.openRemoveFolder(props.rootId);
   else store.openDeleteFolder(props.node.path, props.rootId);
 }
+
+function openMenu(event: MouseEvent) {
+  store.openFolderMenu(
+    {
+      path: props.node.path,
+      rootId: props.rootId,
+      name: props.node.name,
+      isRoot: props.isRoot,
+    },
+    event.clientX,
+    event.clientY,
+  );
+}
 </script>
 
 <template>
@@ -77,6 +90,7 @@ function removeFolder() {
           ? 'bg-accent-soft text-ink'
           : 'text-muted hover:bg-panel-2 hover:text-ink'
       "
+      @contextmenu.prevent.stop="openMenu"
     >
       <div class="flex w-4 shrink-0 items-center justify-center" :style="{ marginLeft: indent }">
         <button

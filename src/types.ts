@@ -23,6 +23,21 @@ export interface FolderRemovalTarget {
   path: string;
 }
 
+export interface FolderMenuTarget {
+  path: string;
+  rootId: string;
+  name: string;
+  isRoot: boolean;
+  x: number;
+  y: number;
+}
+
+export interface NewFolderTarget {
+  path: string;
+  rootId: string;
+  name: string;
+}
+
 export interface AddFolderOutcome {
   root: RootInfo;
   folder: string;

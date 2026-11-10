@@ -17,6 +17,8 @@ import type {
 export const api = {
   bootstrap: () => invoke<Bootstrap>('get_bootstrap'),
   addRoot: (path: string) => invoke<AddFolderOutcome>('add_root', { path }),
+  createFolder: (parent: string, name: string) =>
+    invoke<string>('create_folder', { parent, name }),
   removeRoot: (id: string, mode: RootRemovalMode) =>
     invoke<RootInfo[]>('remove_root', { id, mode }),
   removeSubfolder: (path: string, mode: RootRemovalMode) =>

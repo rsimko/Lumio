@@ -11,7 +11,6 @@ import {
   Loader2,
   Moon,
   PanelRight,
-  RefreshCw,
   Rows3,
   Sun,
 } from 'lucide-vue-next';
@@ -90,15 +89,6 @@ function onSizeInput(event: Event) {
         <Loader2 v-if="store.addingRoot" class="h-3.5 w-3.5 animate-spin" />
         <FolderPlus v-else class="h-3.5 w-3.5" />
         <span class="hidden lg:inline">Add folder</span>
-      </button>
-
-      <button
-        class="btn-icon"
-        title="Refresh folder and folder tree (⌘R)"
-        :disabled="!store.selectedFolder"
-        @click="store.refresh()"
-      >
-        <RefreshCw class="h-3.5 w-3.5" :class="store.scanState === 'loading' ? 'animate-spin' : ''" />
       </button>
 
       <div class="mx-0.5 h-5 w-px bg-line" />

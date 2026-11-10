@@ -707,6 +707,13 @@ export const useLibraryStore = defineStore('library', () => {
     else openDeleteFolder(target.path, target.rootId);
   }
 
+  function refreshFromFolderMenu(): void {
+    const target = folderMenuTarget.value;
+    if (!target) return;
+    closeFolderMenu();
+    void refreshFolder(target.path, target.rootId);
+  }
+
   function openNewFolder(): void {
     const target = folderMenuTarget.value;
     if (!target) return;
@@ -889,15 +896,29 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  async function refresh(): Promise<void> {
-    const folder = selectedFolder.value;
-    if (!folder) return;
-    folderImageCounts.clear();
+  async function refreshFolder(path?: string, rootId?: string): Promise<void> {
+    const folder = path ?? selectedFolder.value;
+    const root = roots.value.find(
+      (candidate) => candidate.id === (rootId ?? selectedRootId.value),
+    );
+    if (!folder || !root || !isPathInside(folder, root.path)) return;
+
+    // Counts under the root may have changed anywhere in the refreshed
+    // subtree. Clear them first, then let visible rows re-request theirs.
+    for (const key of [...folderImageCounts.keys()]) {
+      if (isPathInside(key, root.path)) folderImageCounts.delete(key);
+    }
     await loadChildren(folder, true);
     // Bump after the listing seeds this folder's children so visible rows only
     // request counts that are still missing from the cache.
     folderCountsEpoch.value += 1;
-    await scanFolder();
+
+    // Only the displayed folder needs its assets rescanned.
+    if (folder === selectedFolder.value) await scanFolder();
+  }
+
+  async function refresh(): Promise<void> {
+    await refreshFolder();
   }
 
   async function clearThumbnailCache(): Promise<void> {
@@ -1005,6 +1026,7 @@ export const useLibraryStore = defineStore('library', () => {
     selectFolder,
     scanFolder,
     refresh,
+    refreshFolder,
     addRoot,
     removeRoot,
     removeSubfolder,
@@ -1021,6 +1043,7 @@ export const useLibraryStore = defineStore('library', () => {
     openFolderMenu,
     closeFolderMenu,
     removeFromFolderMenu,
+    refreshFromFolderMenu,
     newFolderOpen,
     newFolderTarget,
     creatingFolder,

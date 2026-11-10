@@ -13,6 +13,8 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 
 - Add library folders with the native folder picker, and remove them again.
 - Right-click any folder to create a subfolder inside it or open the same removal choices.
+- Refresh the selected folder from the library header, or refresh a single folder from its
+  right-click menu without rescanning the rest of the library.
 - Every folder row offers the same two actions: remove it from the library (files stay on disk) or
   move it to the system Trash. Hidden subfolders can be restored by adding them again.
 - Browse a real nested folder tree, loaded lazily as you expand it.

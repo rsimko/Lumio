@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FolderPlus, FolderTree, Loader2, X } from 'lucide-vue-next';
+import { FolderPlus, FolderTree, Loader2, RefreshCw, X } from 'lucide-vue-next';
 
 import FolderTreeNode from '@/components/FolderTreeNode.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
@@ -38,6 +38,17 @@ function commitResize(width: number) {
     <div class="flex h-10 shrink-0 items-center justify-between px-3">
       <span class="panel-heading">Library</span>
       <div class="flex items-center gap-0.5">
+        <button
+          class="btn-icon-sm"
+          title="Refresh selected folder (⌘R)"
+          :disabled="!store.selectedFolder"
+          @click="store.refresh()"
+        >
+          <RefreshCw
+            class="h-3.5 w-3.5"
+            :class="store.scanState === 'loading' ? 'animate-spin' : ''"
+          />
+        </button>
         <button
           class="btn-icon-sm"
           :class="store.settings.recursive ? 'bg-accent-soft text-accent' : ''"

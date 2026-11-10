@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FolderPlus, Trash2 } from 'lucide-vue-next';
+import { FolderPlus, RefreshCw, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { useLibraryStore } from '@/stores/library';
@@ -110,6 +110,16 @@ onBeforeUnmount(() => {
         <FolderPlus class="h-3.5 w-3.5 text-muted" />
         New Folder…
       </button>
+      <button
+        type="button"
+        class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-ink transition hover:bg-panel-2"
+        role="menuitem"
+        @click="store.refreshFromFolderMenu()"
+      >
+        <RefreshCw class="h-3.5 w-3.5 text-muted" />
+        Refresh Folder
+      </button>
+      <div class="my-1 h-px bg-line" />
       <button
         type="button"
         class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-danger transition hover:bg-danger/10"

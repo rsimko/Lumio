@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -76,37 +77,56 @@ function next() {
   wake();
 }
 
-async function focusWindow(): Promise<void> {
+let focusTimers: number[] = [];
+
+async function focusApp(): Promise<void> {
+  // Activating the window is not enough: keyboard shortcuts only work when
+  // the WKWebView is the first responder as well.
   try {
     await getCurrentWindow().setFocus();
   } catch (error) {
     console.error('Could not focus the Lumio window', error);
   }
+  try {
+    await getCurrentWebview().setFocus();
+  } catch (error) {
+    console.error('Could not focus the Lumio webview', error);
+  }
   window.focus();
+}
+
+/**
+ * macOS clears the first responder while its fullscreen Space transition is
+ * running, so focus is restored immediately and again once the animation has
+ * finished.
+ */
+function restoreFocus(delays: number[]): void {
+  void focusApp();
+  for (const delay of delays) {
+    focusTimers.push(
+      window.setTimeout(() => {
+        void focusApp();
+      }, delay),
+    );
+  }
 }
 
 async function enterFullscreen(): Promise<void> {
   try {
-    // macOS simple fullscreen stays in the current Space. Native fullscreen
-    // moves the window to a new Space and can leave the webview without
-    // keyboard focus when it returns.
-    await getCurrentWindow().setSimpleFullscreen(true);
+    await getCurrentWindow().setFullscreen(true);
   } catch (error) {
-    console.error('Could not enter simple fullscreen', error);
+    console.error('Could not enter native fullscreen', error);
   }
-  await focusWindow();
+  restoreFocus([350, 900]);
 }
 
 async function leaveFullscreen(): Promise<void> {
   try {
-    await getCurrentWindow().setSimpleFullscreen(false);
+    await getCurrentWindow().setFullscreen(false);
   } catch (error) {
-    console.error('Could not leave simple fullscreen', error);
+    console.error('Could not leave native fullscreen', error);
   }
-  await focusWindow();
-  window.setTimeout(() => {
-    void focusWindow();
-  }, 320);
+  restoreFocus([350, 900]);
 }
 
 onMounted(() => {

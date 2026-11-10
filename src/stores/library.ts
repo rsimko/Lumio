@@ -4,10 +4,11 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue';
 
 import { api, errorCode, errorMessage } from '@/api';
 import { resetThumbnails } from '@/composables/useThumbnails';
-import { basename, isPathInside } from '@/lib/format';
+import { basename, isPathInside, parentPath } from '@/lib/format';
 import type {
   FolderImageCounts,
   FolderNode,
+  FolderRemovalTarget,
   MonoFont,
   PhotoAsset,
   RootInfo,
@@ -134,7 +135,7 @@ export const useLibraryStore = defineStore('library', () => {
   const infoVisible = ref(true);
   const addingRoot = ref(false);
   const removeFolderOpen = ref(false);
-  const removeFolderTarget = ref<RootInfo | null>(null);
+  const removeFolderTarget = ref<FolderRemovalTarget | null>(null);
   const removingFolder = ref(false);
   const removeFolderError = ref<string | null>(null);
   const clearingCache = ref(false);
@@ -587,8 +588,8 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  function forgetRootState(rootPath: string): void {
-    const inside = (path: string) => isPathInside(path, rootPath);
+  function clearFolderCaches(pathPrefix: string): void {
+    const inside = (path: string) => isPathInside(path, pathPrefix);
     for (const key of [...tree.keys()]) {
       if (inside(key)) tree.delete(key);
     }
@@ -607,13 +608,61 @@ export const useLibraryStore = defineStore('library', () => {
     for (const key of [...folderImageCountsLoading]) {
       if (inside(key)) folderImageCountsLoading.delete(key);
     }
+  }
+
+  function forgetRootState(rootPath: string): void {
+    clearFolderCaches(rootPath);
+    folderCountsEpoch.value += 1;
+  }
+
+  function forgetSubfolderState(path: string, rootId: string): void {
+    // Drop the row from its parent's cached listing so the tree updates
+    // immediately without reloading the whole folder.
+    const parent = parentPath(path);
+    const siblings = tree.get(parent);
+    if (siblings) {
+      tree.set(
+        parent,
+        siblings.filter((child) => child.path !== path),
+      );
+    }
+
+    clearFolderCaches(path);
+
+    // Ancestor counts still include the deleted folder, so refresh all counts
+    // for the root. Visible rows will re-request theirs via folderCountsEpoch.
+    const root = roots.value.find((candidate) => candidate.id === rootId);
+    if (root) {
+      for (const key of [...folderImageCounts.keys()]) {
+        if (isPathInside(key, root.path)) folderImageCounts.delete(key);
+      }
+    }
+
     folderCountsEpoch.value += 1;
   }
 
   function openRemoveFolder(id: string): void {
     const root = roots.value.find((candidate) => candidate.id === id);
     if (!root) return;
-    removeFolderTarget.value = root;
+    removeFolderTarget.value = {
+      kind: 'root',
+      rootId: root.id,
+      name: root.name,
+      path: root.path,
+    };
+    removeFolderOpen.value = true;
+    removeFolderError.value = null;
+  }
+
+  function openDeleteFolder(path: string, rootId: string): void {
+    const root = roots.value.find((candidate) => candidate.id === rootId);
+    if (!root || !isPathInside(path, root.path) || path === root.path) return;
+    removeFolderTarget.value = {
+      kind: 'folder',
+      rootId,
+      name: basename(path),
+      path,
+    };
     removeFolderOpen.value = true;
     removeFolderError.value = null;
   }
@@ -687,6 +736,38 @@ export const useLibraryStore = defineStore('library', () => {
         }
       }
 
+      return true;
+    } catch (error) {
+      removeFolderError.value = errorMessage(error);
+      addToast(errorMessage(error), 'error');
+      return false;
+    } finally {
+      removingFolder.value = false;
+    }
+  }
+
+  async function removeSubfolder(path: string, rootId: string): Promise<boolean> {
+    if (removingFolder.value) return false;
+    const root = roots.value.find((candidate) => candidate.id === rootId);
+    if (!root || !isPathInside(path, root.path) || path === root.path) return false;
+
+    removingFolder.value = true;
+    removeFolderError.value = null;
+    try {
+      await api.trashFolder(path);
+      forgetSubfolderState(path, rootId);
+
+      // Close the confirmation before selecting the fallback folder.
+      removeFolderOpen.value = false;
+      removeFolderTarget.value = null;
+      removingFolder.value = false;
+
+      const wasSelected = !!selectedFolder.value && isPathInside(selectedFolder.value, path);
+      if (wasSelected) {
+        await selectFolder(parentPath(path), rootId, { force: true });
+      }
+
+      addToast(`Moved ${basename(path)} to the Trash.`, 'success');
       return true;
     } catch (error) {
       removeFolderError.value = errorMessage(error);
@@ -815,12 +896,14 @@ export const useLibraryStore = defineStore('library', () => {
     refresh,
     addRoot,
     removeRoot,
+    removeSubfolder,
     addingRoot,
     removeFolderOpen,
     removeFolderTarget,
     removingFolder,
     removeFolderError,
     openRemoveFolder,
+    openDeleteFolder,
     closeRemoveFolder,
     // tree
     loadChildren,

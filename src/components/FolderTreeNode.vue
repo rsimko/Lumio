@@ -62,8 +62,9 @@ function select() {
   void store.selectFolder(props.node.path, props.rootId);
 }
 
-function removeRoot() {
-  store.openRemoveFolder(props.rootId);
+function removeFolder() {
+  if (props.isRoot) store.openRemoveFolder(props.rootId);
+  else store.openDeleteFolder(props.node.path, props.rootId);
 }
 </script>
 
@@ -137,10 +138,9 @@ function removeRoot() {
         title="This folder is currently unavailable"
       />
       <button
-        v-if="isRoot"
         class="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition hover:bg-danger/10 hover:text-danger group-hover:flex"
-        title="Remove folder…"
-        @click.stop="removeRoot"
+        :title="isRoot ? 'Remove folder…' : 'Delete folder…'"
+        @click.stop="removeFolder"
       >
         <Trash2 class="h-3 w-3" />
       </button>

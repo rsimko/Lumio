@@ -16,6 +16,13 @@ export type MonoFont = 'jetbrains' | 'system';
 
 export type RootRemovalMode = 'libraryOnly' | 'moveToTrash';
 
+export interface FolderRemovalTarget {
+  kind: 'root' | 'folder';
+  rootId: string;
+  name: string;
+  path: string;
+}
+
 export interface RootInfo {
   id: string;
   path: string;

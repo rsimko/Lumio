@@ -82,6 +82,13 @@ pub fn remove_root(
 }
 
 #[tauri::command]
+pub fn trash_folder(state: State<'_, AppState>, path: String) -> Result<(), CommandError> {
+    let config = state.config();
+    config.trash_folder(&PathBuf::from(path))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn update_ui_settings(
     state: State<'_, AppState>,
     ui: UiSettings,

@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import {
-  AlertTriangle,
-  Check,
-  FolderMinus,
-  Loader2,
-  Trash2,
-} from 'lucide-vue-next';
+import { AlertTriangle, Check, FolderMinus, Loader2, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
@@ -16,30 +10,34 @@ const store = useLibraryStore();
 
 const mode = ref<RootRemovalMode>('libraryOnly');
 const acknowledged = ref(false);
-const typedName = ref('');
 const localError = ref<string | null>(null);
 
 const target = computed(() => store.removeFolderTarget);
-const isDestructive = computed(() => mode.value === 'moveToTrash');
-const nameMatches = computed(
-  () => !!target.value && typedName.value.trim() === target.value.name,
-);
+const isRoot = computed(() => target.value?.kind === 'root');
+const isDestructive = computed(() => !isRoot.value || mode.value === 'moveToTrash');
 const canConfirm = computed(() => {
   if (!target.value || store.removingFolder) return false;
   if (!isDestructive.value) return true;
-  return acknowledged.value && nameMatches.value;
+  return acknowledged.value;
 });
 const error = computed(() => localError.value ?? store.removeFolderError);
-
-const confirmLabel = computed(() => {
-  if (isDestructive.value) return 'Move folder to Trash';
-  return 'Remove from library';
-});
+const title = computed(() => (isRoot.value ? 'Remove folder' : 'Delete folder'));
+const subtitle = computed(() =>
+  isRoot.value
+    ? 'Choose what happens to this folder and its contents.'
+    : 'This folder and everything inside it will be moved to the Trash.',
+);
+const confirmLabel = computed(() =>
+  isDestructive.value ? 'Move folder to Trash' : 'Remove from library',
+);
 
 async function confirm() {
   if (!target.value || !canConfirm.value) return;
   localError.value = null;
-  const ok = await store.removeRoot(target.value.id, mode.value);
+  const ok =
+    target.value.kind === 'root'
+      ? await store.removeRoot(target.value.rootId, mode.value)
+      : await store.removeSubfolder(target.value.path, target.value.rootId);
   if (!ok) {
     localError.value = store.removeFolderError ?? 'The folder could not be removed.';
   }
@@ -49,8 +47,8 @@ async function confirm() {
 <template>
   <AppDialog
     v-if="target"
-    title="Remove folder"
-    subtitle="Choose what happens to this folder and its contents."
+    :title="title"
+    :subtitle="subtitle"
     @close="store.closeRemoveFolder()"
   >
     <div class="space-y-4">
@@ -68,6 +66,7 @@ async function confirm() {
 
       <div class="space-y-2">
         <button
+          v-if="isRoot"
           type="button"
           class="flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition"
           :class="
@@ -137,7 +136,9 @@ async function confirm() {
             <span class="font-semibold text-danger">This moves the whole folder to the Trash.</span>
             All photos, subfolders and sidecar files inside
             <span class="font-mono text-2xs">{{ target.name }}</span> will leave their current
-            location. This cannot be undone from Lumio.
+            location.
+            <template v-if="isRoot">This cannot be undone from Lumio.</template>
+            <template v-else>The parent library folder stays in Lumio.</template>
           </p>
         </div>
 
@@ -150,27 +151,6 @@ async function confirm() {
             class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-danger"
           />
           <span>I understand this folder and everything in it will be moved to the Trash.</span>
-        </label>
-
-        <label class="block">
-          <span class="mb-1 block text-2xs text-muted">
-            Type <span class="font-semibold text-ink">{{ target.name }}</span> to confirm
-          </span>
-          <input
-            v-model="typedName"
-            type="text"
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-            class="h-8 w-full rounded-md border bg-panel px-2.5 text-xs text-ink outline-none transition placeholder:text-subtle focus:ring-2"
-            :class="
-              typedName && !nameMatches
-                ? 'border-danger/60 focus:border-danger/60 focus:ring-danger/20'
-                : 'border-line-strong focus:border-danger/60 focus:ring-danger/20'
-            "
-            :placeholder="target.name"
-            @keydown.enter.prevent="confirm"
-          />
         </label>
       </div>
 

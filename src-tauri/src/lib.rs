@@ -23,6 +23,7 @@ pub fn run() {
             commands::get_bootstrap,
             commands::add_root,
             commands::remove_root,
+            commands::trash_folder,
             commands::update_ui_settings,
             commands::list_subfolders,
             commands::count_folder_images,

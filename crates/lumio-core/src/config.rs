@@ -190,6 +190,15 @@ impl ConfigStore {
         Ok(true)
     }
 
+    /// Move a folder inside a registered library root to the system Trash.
+    /// The root itself stays registered, so this is only valid for subfolders.
+    pub fn trash_folder(&self, path: &Path) -> Result<()> {
+        resolve_trashable_subfolder(path, &self.config.roots)?;
+        // Move the path as given rather than its canonical target so a symlinked
+        // entry is removed as a link, leaving the folder it points at intact.
+        move_to_trash(path).map_err(|error| LumioError::Trash(error.to_string()))
+    }
+
     pub fn update_ui(&mut self, ui: UiSettings) -> Result<()> {
         self.config.ui = ui;
         self.save()
@@ -198,6 +207,30 @@ impl ConfigStore {
     pub fn save(&self) -> Result<()> {
         save_atomic(&self.path, &self.config)
     }
+}
+
+/// Resolve a folder against the registered roots. The folder must live strictly
+/// inside one root (not be the root itself) and pass the destructive-action
+/// guards before it may be moved to Trash.
+fn resolve_trashable_subfolder<'a>(
+    path: &Path,
+    roots: &'a [RootFolder],
+) -> Result<(&'a RootFolder, PathBuf)> {
+    let canonical = canonical_dir(path)?;
+    for root in roots {
+        let root_path = fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone());
+        if canonical == root_path {
+            return Err(LumioError::InvalidPath(format!(
+                "{} is a registered library folder; remove it from the library instead",
+                path.display()
+            )));
+        }
+        if canonical.starts_with(&root_path) {
+            ensure_safe_to_trash(&canonical, &root.id, roots)?;
+            return Ok((root, canonical));
+        }
+    }
+    Err(LumioError::OutsideRoots(path.to_path_buf()))
 }
 
 /// Reject destructive operations that are more likely to be catastrophic than
@@ -409,6 +442,30 @@ mod tests {
             added_at: 0,
         }];
         assert!(ensure_safe_to_trash(&parent, "root", &other_nested).is_err());
+    }
+
+    #[test]
+    fn subfolder_trash_resolution_respects_roots() {
+        let temp = tempfile::tempdir().unwrap();
+        let root_dir = temp.path().join("photos");
+        let child = root_dir.join("child");
+        let hidden = root_dir.join(".hidden");
+        let outside = temp.path().join("outside");
+        fs::create_dir_all(&child).unwrap();
+        fs::create_dir_all(&hidden).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+
+        let root_path = fs::canonicalize(&root_dir).unwrap();
+        let roots = vec![RootFolder {
+            id: "root".into(),
+            path: root_path.clone(),
+            added_at: 0,
+        }];
+
+        assert!(resolve_trashable_subfolder(&child, &roots).is_ok());
+        assert!(resolve_trashable_subfolder(&hidden, &roots).is_err());
+        assert!(resolve_trashable_subfolder(&root_path, &roots).is_err());
+        assert!(resolve_trashable_subfolder(&outside, &roots).is_err());
     }
 
     #[test]

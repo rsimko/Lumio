@@ -5,7 +5,18 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue';
 import { api, errorCode, errorMessage } from '@/api';
 import { resetThumbnails } from '@/composables/useThumbnails';
 import { basename, isPathInside, parentPath } from '@/lib/format';
+import {
+  clickSelection,
+  emptySelection,
+  navigateSelection,
+  reconcileSelection,
+  selectAllSelection,
+  singleSelection,
+  type SelectionState,
+} from '@/lib/selection';
 import type {
+  AssetRemovalMode,
+  ExcludedAsset,
   FolderImageCounts,
   FolderMenuTarget,
   FolderNode,
@@ -129,7 +140,11 @@ export const useLibraryStore = defineStore('library', () => {
   const scanRecursive = ref(false);
   const navRowSize = ref(1);
 
-  const selectionId = ref<string | null>(null);
+  const selectedIds = ref<ReadonlySet<string>>(new Set());
+  const primaryId = ref<string | null>(null);
+  const anchorId = ref<string | null>(null);
+  const selectionId = computed(() => primaryId.value);
+  const hiddenAssets = ref<ExcludedAsset[]>([]);
   const fullscreenOpen = ref(false);
   const settingsOpen = ref(false);
   const warningsOpen = ref(false);
@@ -140,6 +155,13 @@ export const useLibraryStore = defineStore('library', () => {
   const removeFolderTarget = ref<FolderRemovalTarget | null>(null);
   const removingFolder = ref(false);
   const removeFolderError = ref<string | null>(null);
+  const deleteAssetsOpen = ref(false);
+  const deleteAssetsTargets = ref<PhotoAsset[]>([]);
+  const removingAssets = ref(false);
+  const removeAssetsError = ref<string | null>(null);
+  const assetDragIds = ref<string[]>([]);
+  const dragOverFolder = ref<string | null>(null);
+  const movingAssets = ref(false);
   const folderMenuOpen = ref(false);
   const folderMenuTarget = ref<FolderMenuTarget | null>(null);
   const newFolderOpen = ref(false);
@@ -192,15 +214,44 @@ export const useLibraryStore = defineStore('library', () => {
     return index;
   });
 
+  const assetOrder = computed(() => assets.value.map((asset) => asset.id));
+  let focusIndexAfterScan: number | null = null;
+
   const selectedAsset = computed(() => {
-    if (!selectionId.value) return null;
-    return assetIndex.value.get(selectionId.value) ?? null;
+    if (!primaryId.value) return null;
+    return assetIndex.value.get(primaryId.value) ?? null;
   });
 
   const selectedIndex = computed(() => {
-    if (!selectionId.value) return -1;
-    return assets.value.findIndex((asset) => asset.id === selectionId.value);
+    if (!primaryId.value) return -1;
+    return assets.value.findIndex((asset) => asset.id === primaryId.value);
   });
+
+  const selectedCount = computed(() => selectedIds.value.size);
+
+  const selectedAssets = computed(() =>
+    assets.value.filter((asset) => selectedIds.value.has(asset.id)),
+  );
+
+  function isSelected(id: string): boolean {
+    return selectedIds.value.has(id);
+  }
+
+  function currentSelection(): SelectionState {
+    const ids = assets.value.filter((asset) => selectedIds.value.has(asset.id)).map((a) => a.id);
+    if (!ids.length) return emptySelection();
+    return {
+      ids,
+      primaryId: primaryId.value && selectedIds.value.has(primaryId.value) ? primaryId.value : ids[0],
+      anchorId: anchorId.value && selectedIds.value.has(anchorId.value) ? anchorId.value : ids[0],
+    };
+  }
+
+  function applySelection(next: SelectionState): void {
+    selectedIds.value = new Set(next.ids);
+    primaryId.value = next.primaryId;
+    anchorId.value = next.anchorId;
+  }
 
   const stats = computed<FolderStats>(() => {
     let raw = 0;
@@ -376,46 +427,49 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function select(id: string | null): void {
-    selectionId.value = id;
+    applySelection(id ? singleSelection(id) : emptySelection());
   }
 
-  function navigateBy(offset: number): void {
-    const list = assets.value;
-    if (!list.length) return;
-    const current = selectedIndex.value;
-    if (current < 0) {
-      selectionId.value = list[0].id;
-      return;
-    }
-    const next = Math.min(list.length - 1, Math.max(0, current + offset));
-    selectionId.value = list[next].id;
+  function selectWithModifiers(
+    id: string,
+    modifiers: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {},
+  ): void {
+    applySelection(clickSelection(assetOrder.value, currentSelection(), id, modifiers));
   }
 
-  function navigateHorizontal(delta: number): void {
-    navigateBy(delta);
+  function selectAll(): void {
+    applySelection(selectAllSelection(assetOrder.value));
   }
 
-  function navigateVertical(delta: number): void {
-    navigateBy(delta * Math.max(1, navRowSize.value));
+  function clearSelection(): void {
+    applySelection(emptySelection());
+  }
+
+  function navigateBy(offset: number, extend = false): void {
+    applySelection(navigateSelection(assetOrder.value, currentSelection(), offset, extend));
+  }
+
+  function navigateHorizontal(delta: number, extend = false): void {
+    navigateBy(delta, extend);
+  }
+
+  function navigateVertical(delta: number, extend = false): void {
+    navigateBy(delta * Math.max(1, navRowSize.value), extend);
   }
 
   function openInFilmstrip(id?: string): void {
-    if (id) selectionId.value = id;
-    if (!selectionId.value && assets.value.length) {
-      selectionId.value = assets.value[0]?.id ?? null;
-    }
-    if (!selectionId.value) return;
+    if (id) select(id);
+    if (!primaryId.value && assets.value.length) select(assets.value[0]?.id ?? null);
+    if (!primaryId.value) return;
     // Opening from any browsing layout switches to the filmstrip view and makes
     // sure its strip is visible so the selected photo has context.
     setViewMode('filmstrip');
   }
 
   function openFullscreen(id?: string): void {
-    if (id) selectionId.value = id;
-    if (!selectionId.value && assets.value.length) {
-      selectionId.value = assets.value[0]?.id ?? null;
-    }
-    if (!selectionId.value) return;
+    if (id) select(id);
+    if (!primaryId.value && assets.value.length) select(assets.value[0]?.id ?? null);
+    if (!primaryId.value) return;
     fullscreenOpen.value = true;
   }
 
@@ -513,17 +567,20 @@ export const useLibraryStore = defineStore('library', () => {
       warnings.value = result.warnings;
       scanElapsedMs.value = result.elapsedMs;
       scanState.value = 'ready';
-      const previous = selectionId.value;
-      if (previous && result.assets.some((asset) => asset.id === previous)) {
-        selectionId.value = previous;
-      } else {
-        selectionId.value = result.assets[0]?.id ?? null;
-      }
+      applySelection(
+        reconcileSelection(
+          result.assets.map((asset) => asset.id),
+          currentSelection(),
+          focusIndexAfterScan,
+        ),
+      );
+      focusIndexAfterScan = null;
     } catch (error) {
       if (token !== scanToken) return;
       assets.value = [];
       warnings.value = [];
-      selectionId.value = null;
+      applySelection(emptySelection());
+      focusIndexAfterScan = null;
       scanState.value = 'error';
       scanError.value = errorMessage(error);
       scanErrorCode.value = errorCode(error);
@@ -549,7 +606,7 @@ export const useLibraryStore = defineStore('library', () => {
     }
     selectedRootId.value = rootId;
     selectedFolder.value = path;
-    selectionId.value = null;
+    applySelection(emptySelection());
     assets.value = [];
     warnings.value = [];
     scanElapsedMs.value = 0;
@@ -808,7 +865,7 @@ export const useLibraryStore = defineStore('library', () => {
         scanToken += 1;
         selectedRootId.value = null;
         selectedFolder.value = null;
-        selectionId.value = null;
+        applySelection(emptySelection());
         assets.value = [];
         warnings.value = [];
         scanState.value = 'idle';
@@ -896,6 +953,145 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  function beginAssetDrag(id: string): string[] {
+    if (!selectedIds.value.has(id)) select(id);
+    const ids = assets.value
+      .filter((asset) => selectedIds.value.has(asset.id))
+      .map((asset) => asset.id);
+    assetDragIds.value = ids;
+    return ids;
+  }
+
+  function endAssetDrag(): void {
+    assetDragIds.value = [];
+    dragOverFolder.value = null;
+  }
+
+  function setDragOverFolder(path: string | null): void {
+    dragOverFolder.value = path;
+  }
+
+  /**
+   * Refresh everything an asset move/delete can invalidate: counts across all
+   * roots, any expanded folder listings, and the currently displayed scan.
+   */
+  async function refreshAfterAssetMutation(folders: string[]): Promise<void> {
+    for (const root of roots.value) {
+      for (const key of [...folderImageCounts.keys()]) {
+        if (isPathInside(key, root.path)) folderImageCounts.delete(key);
+      }
+    }
+    folderCountsEpoch.value += 1;
+    for (const folder of new Set(folders)) {
+      if (tree.has(folder)) await loadChildren(folder, true);
+    }
+    if (selectedFolder.value) await scanFolder();
+  }
+
+  async function moveAssetsToFolder(destination: string): Promise<boolean> {
+    if (movingAssets.value) return false;
+    const ids = new Set(
+      assetDragIds.value.length ? assetDragIds.value : [...selectedIds.value],
+    );
+    const targets = assets.value.filter((asset) => ids.has(asset.id));
+    if (!targets.length) return false;
+
+    movingAssets.value = true;
+    try {
+      const outcome = await api.moveAssets(targets, destination);
+      if (!outcome.movedAssets) {
+        addToast('Those photos are already in that folder.', 'info');
+        return false;
+      }
+      focusIndexAfterScan = selectedIndex.value;
+      const folders = new Set(targets.map((asset) => parentPath(asset.primaryPath)));
+      folders.add(destination);
+      await refreshAfterAssetMutation([...folders]);
+      addToast(
+        `Moved ${outcome.movedAssets} ${outcome.movedAssets === 1 ? 'photo' : 'photos'} to ${basename(destination)}.`,
+        'success',
+      );
+      return true;
+    } catch (error) {
+      addToast(errorMessage(error), 'error');
+      return false;
+    } finally {
+      movingAssets.value = false;
+      endAssetDrag();
+    }
+  }
+
+  function openDeleteAssets(): void {
+    const targets = selectedAssets.value;
+    if (!targets.length) return;
+    deleteAssetsTargets.value = targets;
+    removeAssetsError.value = null;
+    deleteAssetsOpen.value = true;
+  }
+
+  function closeDeleteAssets(): void {
+    if (removingAssets.value) return;
+    deleteAssetsOpen.value = false;
+    deleteAssetsTargets.value = [];
+    removeAssetsError.value = null;
+  }
+
+  async function removeSelectedAssets(mode: AssetRemovalMode): Promise<boolean> {
+    if (removingAssets.value) return false;
+    const targets = deleteAssetsTargets.value;
+    if (!targets.length) return false;
+
+    removingAssets.value = true;
+    removeAssetsError.value = null;
+    focusIndexAfterScan = selectedIndex.value;
+    try {
+      const outcome = await api.removeAssets(targets, mode);
+      hiddenAssets.value = outcome.hiddenAssets;
+      deleteAssetsOpen.value = false;
+      deleteAssetsTargets.value = [];
+      const folders = [...new Set(targets.map((asset) => parentPath(asset.primaryPath)))];
+      await refreshAfterAssetMutation(folders);
+      addToast(
+        mode === 'moveToTrash'
+          ? `Moved ${outcome.removedAssets} ${outcome.removedAssets === 1 ? 'photo' : 'photos'} to the Trash.`
+          : `Removed ${outcome.removedAssets} ${outcome.removedAssets === 1 ? 'photo' : 'photos'} from the library. Files are untouched; restore them in Settings → Hidden photos.`,
+        'success',
+        mode === 'moveToTrash' ? undefined : 8000,
+      );
+      return true;
+    } catch (error) {
+      removeAssetsError.value = errorMessage(error);
+      addToast(errorMessage(error), 'error');
+      return false;
+    } finally {
+      removingAssets.value = false;
+    }
+  }
+
+  async function restoreHiddenAssets(ids: string[]): Promise<boolean> {
+    if (!ids.length) return false;
+    try {
+      hiddenAssets.value = await api.restoreAssets(ids);
+      await refreshAfterAssetMutation([]);
+      addToast(
+        `Restored ${ids.length} ${ids.length === 1 ? 'photo' : 'photos'} to the library.`,
+        'success',
+      );
+      return true;
+    } catch (error) {
+      addToast(errorMessage(error), 'error');
+      return false;
+    }
+  }
+
+  async function refreshHiddenAssets(): Promise<void> {
+    try {
+      hiddenAssets.value = await api.getHiddenAssets();
+    } catch (error) {
+      console.error('Could not load hidden photos', error);
+    }
+  }
+
   async function refreshFolder(path?: string, rootId?: string): Promise<void> {
     const folder = path ?? selectedFolder.value;
     const root = roots.value.find(
@@ -946,6 +1142,7 @@ export const useLibraryStore = defineStore('library', () => {
       cacheDir.value = bootstrap.cacheDir;
       recoveryWarning.value = bootstrap.recoveryWarning;
       appVersion.value = bootstrap.appVersion;
+      hiddenAssets.value = bootstrap.hiddenAssets ?? [];
       try {
         localStorage.setItem('lumio.theme', settings.value.theme);
       } catch {
@@ -1060,12 +1257,37 @@ export const useLibraryStore = defineStore('library', () => {
     folderCountsEpoch,
     // selection
     selectionId,
+    selectedIds,
+    selectedCount,
+    selectedAssets,
     selectedAsset,
     selectedIndex,
+    isSelected,
     select,
+    selectWithModifiers,
+    selectAll,
+    clearSelection,
     navigateHorizontal,
     navigateVertical,
     navRowSize,
+    // asset operations & drag/drop
+    hiddenAssets,
+    deleteAssetsOpen,
+    deleteAssetsTargets,
+    removingAssets,
+    removeAssetsError,
+    openDeleteAssets,
+    closeDeleteAssets,
+    removeSelectedAssets,
+    restoreHiddenAssets,
+    refreshHiddenAssets,
+    assetDragIds,
+    dragOverFolder,
+    movingAssets,
+    beginAssetDrag,
+    endAssetDrag,
+    setDragOverFolder,
+    moveAssetsToFolder,
     // fullscreen & dialogs
     fullscreenOpen,
     openFullscreen,

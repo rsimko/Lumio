@@ -91,10 +91,10 @@ watch(
         >
           <PhotoListRow
             :asset="row.asset"
-            :selected="store.selectionId === row.asset.id"
+            :selected="store.isSelected(row.asset.id)"
             :show-folder="showFolder"
             :compact="compact"
-            @select="store.select(row.asset.id)"
+            @select="store.selectWithModifiers(row.asset.id, $event)"
             @open="store.openInFilmstrip(row.asset.id)"
           />
         </div>

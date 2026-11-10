@@ -3,7 +3,9 @@ import { computed, ref, watch } from 'vue';
 
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
+import { ASSET_DRAG_MIME } from '@/lib/assets';
 import { sourceLabel } from '@/lib/format';
+import { useLibraryStore } from '@/stores/library';
 import type { PhotoAsset } from '@/types';
 
 const props = withDefaults(
@@ -14,10 +16,23 @@ const props = withDefaults(
   { selected: false },
 );
 
-defineEmits<{
-  select: [];
+const emit = defineEmits<{
+  select: [event: MouseEvent];
   open: [];
 }>();
+
+const store = useLibraryStore();
+
+function onDragStart(event: DragEvent) {
+  if (!event.dataTransfer) return;
+  const ids = store.beginAssetDrag(props.asset.id);
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData(ASSET_DRAG_MIME, ids.join('\n'));
+  event.dataTransfer.setData(
+    'text/plain',
+    ids.length === 1 ? props.asset.fileName : `${ids.length} photos`,
+  );
+}
 
 const thumb = useThumbnail(
   () => props.asset,
@@ -47,8 +62,11 @@ const title = computed(() => {
     class="group relative h-full w-full overflow-hidden rounded bg-canvas ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
     :class="selected ? 'outline outline-2 outline-offset-2 outline-accent' : ''"
     :title="title"
-    @click="$emit('select')"
+    draggable="true"
+    @click="emit('select', $event)"
     @dblclick="$emit('open')"
+    @dragstart="onDragStart"
+    @dragend="store.endAssetDrag()"
   >
     <PhotoPlaceholder
       class="absolute inset-0"

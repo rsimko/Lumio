@@ -16,6 +16,28 @@ export type MonoFont = 'jetbrains' | 'system';
 
 export type RootRemovalMode = 'libraryOnly' | 'moveToTrash';
 
+export type AssetRemovalMode = 'libraryOnly' | 'moveToTrash';
+
+export interface ExcludedAsset {
+  id: string;
+  primaryPath: string;
+  name: string;
+  hiddenAt: number;
+  paths: string[];
+}
+
+export interface AssetRemovalOutcome {
+  removedAssets: number;
+  hiddenAssets: ExcludedAsset[];
+}
+
+export interface MoveAssetsOutcome {
+  destination: string;
+  movedAssets: number;
+  movedFiles: number;
+  skippedAssets: number;
+}
+
 export interface FolderRemovalTarget {
   kind: 'root' | 'folder';
   rootId: string;
@@ -130,6 +152,7 @@ export interface Bootstrap {
   cacheDir: string;
   recoveryWarning: string | null;
   appVersion: string;
+  hiddenAssets: ExcludedAsset[];
 }
 
 export interface CommandError {

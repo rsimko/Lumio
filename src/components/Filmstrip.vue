@@ -99,8 +99,8 @@ function openItem(id: string) {
         >
           <FilmstripItem
             :asset="item.asset"
-            :selected="store.selectionId === item.asset.id"
-            @select="store.select(item.asset.id)"
+            :selected="store.isSelected(item.asset.id)"
+            @select="store.selectWithModifiers(item.asset.id, $event)"
             @open="openItem(item.asset.id)"
           />
         </div>

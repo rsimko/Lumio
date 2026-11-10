@@ -8,6 +8,7 @@ import { useLibraryStore } from '@/stores/library';
 const store = useLibraryStore();
 
 const leftText = computed(() => {
+  if (store.selectedCount > 1) return `${store.selectedCount} photos selected`;
   if (store.selectedAsset) return store.selectedAsset.fileName;
   if (store.selectedFolder) return store.relativeFolderLabel;
   if (store.initializing) return 'Opening library…';
@@ -36,6 +37,9 @@ const statusDot = computed(() => {
     </div>
 
     <div class="flex shrink-0 items-center gap-3">
+      <span v-if="store.selectedCount > 1" class="font-medium text-accent">
+        {{ formatCount(store.selectedCount) }} selected
+      </span>
       <span v-if="store.selectedIndex >= 0" class="tabular-nums">
         {{ store.selectedIndex + 1 }} / {{ formatCount(store.stats.total) }}
       </span>

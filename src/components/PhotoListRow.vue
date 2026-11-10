@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import AssociationBadges from '@/components/AssociationBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
+import { ASSET_DRAG_MIME } from '@/lib/assets';
 import {
   formatBytes,
   formatDimensions,
@@ -11,6 +12,7 @@ import {
   kindLabel,
   sourceLabel,
 } from '@/lib/format';
+import { useLibraryStore } from '@/stores/library';
 import type { PhotoAsset } from '@/types';
 
 const props = withDefaults(
@@ -23,10 +25,23 @@ const props = withDefaults(
   { selected: false, showFolder: false, compact: false },
 );
 
-defineEmits<{
-  select: [];
+const emit = defineEmits<{
+  select: [event: MouseEvent];
   open: [];
 }>();
+
+const store = useLibraryStore();
+
+function onDragStart(event: DragEvent) {
+  if (!event.dataTransfer) return;
+  const ids = store.beginAssetDrag(props.asset.id);
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData(ASSET_DRAG_MIME, ids.join('\n'));
+  event.dataTransfer.setData(
+    'text/plain',
+    ids.length === 1 ? props.asset.fileName : `${ids.length} photos`,
+  );
+}
 
 const thumb = useThumbnail(
   () => props.asset,
@@ -56,8 +71,11 @@ const subline = computed(() => {
         ? 'grid-cols-[minmax(0,1fr)_54px_100px_72px]'
         : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_72px]',
     ]"
-    @click="$emit('select')"
+    @click="emit('select', $event)"
     @dblclick="$emit('open')"
+    draggable="true"
+    @dragstart="onDragStart"
+    @dragend="store.endAssetDrag()"
   >
     <span v-if="selected" class="absolute inset-y-0 left-0 w-0.5 bg-accent" />
 

@@ -9,6 +9,7 @@ import {
   Loader2,
   Maximize2,
   PanelRightClose,
+  Trash2,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -140,6 +141,18 @@ async function revealPrimary() {
           >
             <Maximize2 class="h-3.5 w-3.5" />
             Fullscreen
+          </button>
+          <button
+            class="btn mt-1.5 w-full text-danger hover:border-danger/40 hover:bg-danger/10"
+            :title="
+              store.selectedCount > 1
+                ? `Delete ${store.selectedCount} selected photos`
+                : 'Delete this photo'
+            "
+            @click="store.openDeleteAssets()"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            {{ store.selectedCount > 1 ? `Delete ${store.selectedCount} photos…` : 'Delete photo…' }}
           </button>
         </div>
 

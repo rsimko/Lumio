@@ -100,8 +100,8 @@ watch(
           :asset="item.asset"
           :width="item.width"
           :height="item.height"
-          :selected="store.selectionId === item.asset.id"
-          @select="store.select(item.asset.id)"
+          :selected="store.isSelected(item.asset.id)"
+          @select="store.selectWithModifiers(item.asset.id, $event)"
           @open="store.openInFilmstrip(item.asset.id)"
         />
       </div>

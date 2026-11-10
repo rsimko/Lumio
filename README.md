@@ -20,6 +20,14 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Browse a real nested folder tree, loaded lazily as you expand it.
 - Scan the current folder, or include every subfolder recursively.
 - View photos in five layouts: grid, masonry, justified, list and filmstrip.
+- Select one or many photos: click, ⌘/Ctrl-click to toggle, Shift-click for a range,
+  ⌘/Ctrl+A to select all, Shift+arrows to extend and Escape to clear.
+- Drag any selected photo — or a single unselected photo — onto a folder row to move the
+  whole group, including its companion JPEG, XMP sidecar and extra associations. Moves work
+  between registered library roots and refuse to overwrite existing files.
+- Delete photos from the library only or from disk. Disk deletion moves every associated file
+  to the system Trash after an explicit warning; library-only deletion hides the group and can
+  be reversed in Settings → Hidden photos.
 - Double-click any thumbnail to open it in filmstrip view.
 - See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.
@@ -42,10 +50,16 @@ Browsing is strictly read-only:
 - XMP sidecars are detected and associated, but never parsed or modified yet.
 - Removing a folder from Lumio only hides it in the app; files on disk are untouched. Hidden
   subfolders can be restored with Add Folder.
-- The optional Delete folder from disk action moves a root or any subfolder to the system Trash,
-  where it can still be restored. It requires acknowledging a warning, and Lumio refuses filesystem
-  roots, home folders, system folders, mount points, hidden/package folders and paths that overlap
-  another registered library folder.
+- Dragging photos between folders and deleting photos are explicit actions. Both expand the
+  photo into its primary file, companion JPEG, XMP sidecar and any extra associated files.
+  Moves refuse to overwrite an existing destination, and a failed batch is rolled back where
+  possible. Cross-volume moves fall back to copy-then-remove.
+- Delete from library only hides the photo group in Lumio. Every file stays on disk and the
+  group can be restored from Settings → Hidden photos.
+- The optional Delete from disk action moves a photo group, root or subfolder to the system
+  Trash, where it can still be restored. It requires acknowledging a warning, and Lumio refuses
+  filesystem roots, home folders, system folders, mount points, hidden/package folders and paths
+  that overlap another registered library folder.
 - New folders are created directly inside the right-clicked folder. Names that are empty, hidden,
   contain path separators, colons or control characters, or collide with an existing folder are
   rejected.
@@ -108,6 +122,7 @@ under the OS application cache directory.
 ```
 crates/lumio-core/      Domain logic, testable without Tauri
   src/config.rs         Atomic JSON settings and library roots
+  src/assets.rs         Asset file groups, safe moves, Trash and hidden groups
   src/scan.rs           Folder scanning, RAW/JPEG/XMP association, folder tree
   src/preview.rs        Camera-embedded preview extraction + orientation
   src/thumbnail.rs      Thumbnail cache keys, resizing, encoding
@@ -117,7 +132,7 @@ src/                    Vue 3 frontend
   components/           Shell, panels, dialogs, viewer
   views/                The five photo layouts
   stores/library.ts     Central application state
-  lib/                  Pure layout and formatting helpers (unit-tested)
+  lib/                  Pure layout, selection and formatting helpers (unit-tested)
 docs/adr/               Architecture decision records
 ```
 

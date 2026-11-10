@@ -8,6 +8,7 @@ import {
   Images,
   Loader2,
   RefreshCw,
+  Trash2,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -88,6 +89,24 @@ function removeSelectedRoot() {
         Recursive
       </span>
       <div class="ml-auto flex items-center gap-2.5 text-2xs text-subtle">
+        <template v-if="store.selectedCount > 0">
+          <span class="font-medium text-accent">{{ formatCount(store.selectedCount) }} selected</span>
+          <button
+            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition hover:bg-danger/10 hover:text-danger"
+            title="Delete selected photos (Delete)"
+            @click="store.openDeleteAssets()"
+          >
+            <Trash2 class="h-3 w-3" />
+            Delete
+          </button>
+          <button
+            class="rounded px-1.5 py-0.5 text-muted transition hover:bg-panel-2 hover:text-ink"
+            title="Clear selection (Esc)"
+            @click="store.clearSelection()"
+          >
+            Clear
+          </button>
+        </template>
         <span v-if="store.scanState === 'loading'" class="flex items-center gap-1.5">
           <Loader2 class="h-3 w-3 animate-spin" />
           Scanning…

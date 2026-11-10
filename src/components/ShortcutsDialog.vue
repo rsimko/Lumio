@@ -20,6 +20,12 @@ const groups: ShortcutGroup[] = [
     rows: [
       { keys: ['←', '→'], action: 'Move selection' },
       { keys: ['↑', '↓'], action: 'Move by row / item' },
+      { keys: ['⇧', '← → ↑ ↓'], action: 'Extend selection' },
+      { keys: ['⌘', 'Click'], action: 'Toggle a photo in the selection' },
+      { keys: ['⇧', 'Click'], action: 'Select a range of photos' },
+      { keys: ['⌘', 'A'], action: 'Select all photos' },
+      { keys: ['Delete'], action: 'Delete selected photos' },
+      { keys: ['Drag'], action: 'Move photos onto a folder row' },
       { keys: ['Space', 'Enter'], action: 'Open fullscreen viewer' },
       { keys: ['Double-click'], action: 'Open a thumbnail in filmstrip view' },
       { keys: ['Esc'], action: 'Close viewer, dialog or clear selection' },

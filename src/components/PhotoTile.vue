@@ -4,7 +4,9 @@ import { computed, ref, watch } from 'vue';
 
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
+import { ASSET_DRAG_MIME } from '@/lib/assets';
 import { formatDimensions, sourceLabel } from '@/lib/format';
+import { useLibraryStore } from '@/stores/library';
 import type { PhotoAsset } from '@/types';
 
 const props = withDefaults(
@@ -18,10 +20,23 @@ const props = withDefaults(
   { selected: false, showFooter: true },
 );
 
-defineEmits<{
-  select: [];
+const emit = defineEmits<{
+  select: [event: MouseEvent];
   open: [];
 }>();
+
+const store = useLibraryStore();
+
+function onDragStart(event: DragEvent) {
+  if (!event.dataTransfer) return;
+  const ids = store.beginAssetDrag(props.asset.id);
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData(ASSET_DRAG_MIME, ids.join('\n'));
+  event.dataTransfer.setData(
+    'text/plain',
+    ids.length === 1 ? props.asset.fileName : `${ids.length} photos`,
+  );
+}
 
 const thumb = useThumbnail(
   () => props.asset,
@@ -71,11 +86,14 @@ const footerSource = computed(() => {
 
 <template>
   <div
-    class="group relative h-full w-full overflow-hidden rounded-[5px] bg-canvas ring-1 ring-black/[0.06] transition-shadow dark:ring-white/[0.08]"
+    class="group relative h-full w-full cursor-default overflow-hidden rounded-[5px] bg-canvas ring-1 ring-black/[0.06] transition-shadow dark:ring-white/[0.08]"
     :class="selected ? 'z-10 outline outline-2 outline-offset-2 outline-accent' : ''"
     :title="asset.fileName"
-    @click="$emit('select')"
+    draggable="true"
+    @click="emit('select', $event)"
     @dblclick="$emit('open')"
+    @dragstart="onDragStart"
+    @dragend="store.endAssetDrag()"
   >
     <PhotoPlaceholder
       class="absolute inset-0"

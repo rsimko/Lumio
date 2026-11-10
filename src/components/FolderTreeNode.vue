@@ -36,6 +36,38 @@ const isSelected = computed(() => store.selectedFolder === props.node.path);
 const canExpand = computed(() => props.isRoot || props.node.hasChildren || children.value.length > 0);
 
 const imageCount = computed(() => store.imageCountFor(props.node.path));
+const isDropTarget = computed(
+  () => store.dragOverFolder === props.node.path && store.assetDragIds.length > 0,
+);
+
+// Only drags that started inside Lumio are accepted. The drag IDs are the
+// source of truth, so external file/text drags cannot move the current
+// selection by accident.
+function isAssetDrag(): boolean {
+  return store.assetDragIds.length > 0;
+}
+
+function onDragOver(event: DragEvent) {
+  if (!isAssetDrag()) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  store.setDragOverFolder(props.node.path);
+}
+
+function onDragLeave(event: DragEvent) {
+  const related = event.relatedTarget as Node | null;
+  if (related && (event.currentTarget as HTMLElement).contains(related)) return;
+  if (store.dragOverFolder === props.node.path) store.setDragOverFolder(null);
+}
+
+function onDrop(event: DragEvent) {
+  if (!isAssetDrag()) return;
+  event.preventDefault();
+  event.stopPropagation();
+  store.setDragOverFolder(null);
+  void store.moveAssetsToFolder(props.node.path);
+}
 const countTitle = computed(() => {
   const count = imageCount.value;
   if (count === null) return undefined;
@@ -86,11 +118,17 @@ function openMenu(event: MouseEvent) {
     <div
       class="group flex h-7 items-center gap-1 rounded pr-1.5 transition-colors"
       :class="
-        isSelected
-          ? 'bg-accent-soft text-ink'
-          : 'text-muted hover:bg-panel-2 hover:text-ink'
+        isDropTarget
+          ? 'bg-accent-soft text-ink ring-1 ring-inset ring-accent'
+          : isSelected
+            ? 'bg-accent-soft text-ink'
+            : 'text-muted hover:bg-panel-2 hover:text-ink'
       "
       @contextmenu.prevent.stop="openMenu"
+      @dragenter="onDragOver"
+      @dragover="onDragOver"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
     >
       <div class="flex w-4 shrink-0 items-center justify-center" :style="{ marginLeft: indent }">
         <button

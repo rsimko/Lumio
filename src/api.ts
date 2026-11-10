@@ -2,10 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 
 import type {
   AddFolderOutcome,
+  AssetRemovalMode,
+  AssetRemovalOutcome,
   Bootstrap,
   CommandError,
+  ExcludedAsset,
   FolderImageCounts,
   FolderNode,
+  MoveAssetsOutcome,
   PhotoAsset,
   RootInfo,
   RootRemovalMode,
@@ -29,6 +33,12 @@ export const api = {
     invoke<FolderImageCounts>('count_folder_images', { folder }),
   scanFolder: (folder: string, recursive: boolean) =>
     invoke<ScanResult>('scan_folder', { folder, recursive }),
+  moveAssets: (assets: PhotoAsset[], destination: string) =>
+    invoke<MoveAssetsOutcome>('move_assets', { assets, destination }),
+  removeAssets: (assets: PhotoAsset[], mode: AssetRemovalMode) =>
+    invoke<AssetRemovalOutcome>('remove_assets', { assets, mode }),
+  restoreAssets: (ids: string[]) => invoke<ExcludedAsset[]>('restore_assets', { ids }),
+  getHiddenAssets: () => invoke<ExcludedAsset[]>('get_hidden_assets'),
   thumbnail: (asset: PhotoAsset, edge: number, preferThumbnail = false) =>
     invoke<ThumbnailResult>('get_thumbnail', { asset, edge, preferThumbnail }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),

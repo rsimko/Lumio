@@ -283,7 +283,7 @@ fn assign_paths(plan: &mut IngestPlan) {
             let renamed_onto_existing = suffix > 1 && !existing.is_empty();
             if duplicate || keep_both_blocked || renamed_onto_existing {
                 suffix += 1;
-                stem = format!("{}_{}", entity.base_destination_stem, suffix);
+                stem = rules.renamed_stem(&entity.base_destination_stem, suffix);
                 if rename_reason.is_none() {
                     rename_reason = Some(if !existing.is_empty() {
                         "The destination already contains this name; keeping both.".to_string()
@@ -755,6 +755,7 @@ mod tests {
             counter_start: 1,
             counter_padding: 4,
             xmp_naming: XmpNaming::FilenameExt,
+            rename_postfix: "_#".into(),
             iptc: Default::default(),
         }
     }
@@ -844,6 +845,32 @@ mod tests {
         stems.sort();
         assert_eq!(stems, vec!["same", "same_2"]);
         assert!(plan.entities.iter().any(|entity| entity.renamed));
+    }
+
+    #[test]
+    fn auto_rename_uses_the_configured_postfix() {
+        let temp = tempfile::tempdir().unwrap();
+        let source_a = temp.path().join("a");
+        let source_b = temp.path().join("b");
+        let destination = temp.path().join("destination");
+        fs::create_dir_all(&source_a).unwrap();
+        fs::create_dir_all(&source_b).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(source_a.join("same.CR3"), b"raw").unwrap();
+        fs::write(source_b.join("same.CR3"), b"raw").unwrap();
+
+        let mut request = request(vec![source_a, source_b], &destination);
+        request.rules.filename_template = "{default_filename}".into();
+        request.rules.rename_postfix = "_v#".into();
+        let plan = plan_ingest(&request).unwrap();
+        assert_eq!(plan.entities.len(), 2);
+        let mut stems: Vec<String> = plan
+            .entities
+            .iter()
+            .map(|entity| entity.destination_stem.clone())
+            .collect();
+        stems.sort();
+        assert_eq!(stems, vec!["same", "same_v2"]);
     }
 
     #[test]

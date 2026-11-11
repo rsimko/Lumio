@@ -14,8 +14,10 @@ import {
   insertIngestToken,
   isIngestPlanStale,
   normalizeIngestSettings,
+  normalizeRenamePostfix,
   previewIngestDestination,
   previewSampleFromPath,
+  renamePostfixExample,
   validateIngestSettings,
   validateIngestTemplate,
   xmpNamingExample,
@@ -31,6 +33,22 @@ describe('ingest settings', () => {
     expect(DEFAULT_INGEST_SETTINGS.counterPadding).toBe(4);
     expect(DEFAULT_INGEST_SETTINGS.xmpNaming).toBe('filenameExt');
     expect(DEFAULT_INGEST_SETTINGS.addToLibrary).toBe(true);
+    expect(DEFAULT_INGEST_SETTINGS.defaultSource).toBeNull();
+    expect(DEFAULT_INGEST_SETTINGS.renamePostfix).toBe('_#');
+  });
+
+  it('normalizes the default source and rename postfix', () => {
+    const settings = normalizeIngestSettings({
+      defaultSource: '  /Volumes/Card/DCIM  ',
+      renamePostfix: ' /_v ',
+    });
+    expect(settings.defaultSource).toBe('/Volumes/Card/DCIM');
+    expect(settings.renamePostfix).toBe('_v#');
+
+    expect(normalizeIngestSettings({ defaultSource: '   ' }).defaultSource).toBeNull();
+    expect(normalizeRenamePostfix('')).toBe('_#');
+    expect(normalizeRenamePostfix('-#')).toBe('-#');
+    expect(renamePostfixExample('_v#')).toBe('IMG_0001_v2.JPG');
   });
 
   it('normalizes missing and invalid persisted values', () => {
@@ -57,6 +75,7 @@ describe('ingest settings', () => {
     rules.iptc.keywords.push('two');
     expect(settings.iptc.keywords).toEqual(['one']);
     expect(rules.folderTemplate).toBe(settings.folderTemplate);
+    expect(rules.renamePostfix).toBe('_#');
   });
 
   it('detects whether IPTC values were supplied', () => {
@@ -378,6 +397,7 @@ describe('report helpers', () => {
         counterStart: 1,
         counterPadding: 4,
         xmpNaming: 'filenameExt',
+        renamePostfix: '_#',
         iptc: {
           title: '{default_filename}',
           description: '',

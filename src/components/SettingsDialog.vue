@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   EyeOff,
+  FolderOpen,
   HardDrive,
   Keyboard,
   Loader2,
@@ -13,13 +14,15 @@ import {
   RotateCcw,
   Star,
   Trash2,
+  X,
 } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { open as openPathDialog } from '@tauri-apps/plugin-dialog';
+import { computed, onMounted, ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
 import { api, errorMessage } from '@/api';
 import { formatCount, pluralize } from '@/lib/format';
-import { xmpNamingLabel } from '@/lib/ingest';
+import { normalizeRenamePostfix, renamePostfixExample, xmpNamingLabel } from '@/lib/ingest';
 import { useLibraryStore } from '@/stores/library';
 import type { IngestSettings, IngestTools, MonoFont, ThemeSetting, UiFont } from '@/types';
 
@@ -42,6 +45,28 @@ const savingIngest = ref(false);
 const ingestMessage = ref<string | null>(null);
 const ingestError = ref<string | null>(null);
 
+const renamePreview = computed(() => renamePostfixExample(ingestDraft.value.renamePostfix));
+const renamePostfixHint = computed(() => {
+  const raw = ingestDraft.value.renamePostfix;
+  if (/[/\\:]/.test(raw)) return 'Characters /, \\ and : are removed when the settings are saved.';
+  if (!raw.includes('#')) return 'A # placeholder is appended automatically when saved.';
+  return null;
+});
+
+function normalizeIngestPostfix(): void {
+  ingestDraft.value.renamePostfix = normalizeRenamePostfix(ingestDraft.value.renamePostfix);
+}
+
+async function chooseDefaultIngestSource(): Promise<void> {
+  const picked = await openPathDialog({
+    directory: true,
+    multiple: false,
+    title: 'Choose the default ingest source',
+  });
+  if (!picked || Array.isArray(picked)) return;
+  ingestDraft.value.defaultSource = picked;
+}
+
 async function detectIngestTools(): Promise<void> {
   detectingIngestTools.value = true;
   try {
@@ -58,6 +83,8 @@ async function saveIngestSettings(): Promise<void> {
   ingestError.value = null;
   ingestMessage.value = null;
   try {
+    ingestDraft.value.defaultSource = ingestDraft.value.defaultSource?.trim() || null;
+    normalizeIngestPostfix();
     ingestDraft.value = cloneIngestSettings(await store.saveIngestSettings(ingestDraft.value));
     ingestMessage.value = 'Ingest settings saved.';
     await detectIngestTools();
@@ -449,6 +476,60 @@ function addEditor() {
             </div>
             <p v-if="ingestTools?.exiftool" class="mt-1 break-all font-mono text-3xs text-subtle">
               {{ ingestTools.exiftool.path }}
+            </p>
+          </div>
+
+          <div class="px-3 py-2.5">
+            <p class="text-xs font-medium text-ink">Default ingest source</p>
+            <p class="mt-0.5 text-2xs text-subtle">
+              Pre-filled when you open Ingest photos. You can still change or clear it in the
+              dialog.
+            </p>
+            <div class="mt-2 flex gap-1.5">
+              <input
+                v-model="ingestDraft.defaultSource"
+                class="h-7 min-w-0 flex-1 rounded border border-line bg-panel px-2 font-mono text-2xs text-ink outline-none focus:border-accent/70"
+                placeholder="No default source"
+                spellcheck="false"
+                aria-label="Default ingest source"
+              />
+              <button class="btn h-7 shrink-0 text-2xs" @click="chooseDefaultIngestSource()">
+                <FolderOpen class="h-3 w-3" />
+                Choose
+              </button>
+              <button
+                v-if="ingestDraft.defaultSource"
+                class="btn-icon-sm shrink-0"
+                title="Clear the default ingest source"
+                @click="ingestDraft.defaultSource = null"
+              >
+                <X class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div class="px-3 py-2.5">
+            <p class="text-xs font-medium text-ink">Conflict rename postfix</p>
+            <p class="mt-0.5 text-2xs text-subtle">
+              Appended when a destination name already exists or Keep both renames a photo.
+              <span class="font-mono">#</span> is replaced by the number.
+            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                v-model="ingestDraft.renamePostfix"
+                class="h-7 w-28 rounded border border-line bg-panel px-2 font-mono text-2xs text-ink outline-none focus:border-accent/70"
+                placeholder="_#"
+                spellcheck="false"
+                aria-label="Conflict rename postfix"
+                @blur="normalizeIngestPostfix"
+              />
+              <span class="text-2xs text-subtle">
+                Example
+                <span class="font-mono text-muted">{{ renamePreview }}</span>
+              </span>
+            </div>
+            <p v-if="renamePostfixHint" class="mt-1 text-2xs text-subtle">
+              {{ renamePostfixHint }}
             </p>
           </div>
 

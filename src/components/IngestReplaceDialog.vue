@@ -4,10 +4,12 @@ import { computed, ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
 import { formatCount, pluralize } from '@/lib/format';
+import { renamePostfixExample } from '@/lib/ingest';
 import type { IngestEntity } from '@/types';
 
 const props = defineProps<{
   entities: IngestEntity[];
+  renamePostfix?: string;
 }>();
 
 const emit = defineEmits<{
@@ -82,8 +84,11 @@ const targetName = computed(() => {
               <Check v-if="mode === 'keepBoth'" class="ml-auto h-3.5 w-3.5 shrink-0 text-accent" />
             </span>
             <span class="mt-1 block text-2xs leading-relaxed text-muted">
-              Appends _2, _3, … to the incoming photo group. Existing destination files stay
-              exactly as they are.
+              Appends the configured postfix to the incoming photo group, for example
+              <span class="font-mono text-muted">
+                {{ renamePostfixExample(props.renamePostfix ?? '_#') }}
+              </span>
+              for the second copy. Existing destination files stay exactly as they are.
             </span>
           </span>
         </button>

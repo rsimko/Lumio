@@ -869,10 +869,12 @@ mod tests {
 
         let mut store = ConfigStore::open(&config_path).unwrap();
         let mut ingest = store.ingest_settings().clone();
+        ingest.default_source = Some(std::path::PathBuf::from("/Volumes/Card/DCIM"));
         ingest.filename_template = "{job_code}_{counter}".into();
         ingest.job_code = "JOB-7".into();
         ingest.counter_start = 12;
         ingest.counter_padding = 5;
+        ingest.rename_postfix = "-#".into();
         ingest.xmp_naming = crate::ingest::XmpNaming::Filename;
         ingest.iptc.title = "{default_filename}".into();
         ingest.iptc.keywords.push("travel".into());

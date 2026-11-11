@@ -128,6 +128,10 @@ export const useIngestStore = defineStore('ingest', () => {
 
   const problems = computed(() => validateIngestSettings(draft.value));
   const problemMessages = computed(() => problems.value.map((problem) => problem.message));
+  const defaultSourcePath = computed(() => {
+    const path = draft.value.defaultSource;
+    return path && path.trim() ? path : null;
+  });
   const iptcRequested = computed(() => hasIptcValues(draft.value));
   const exiftoolMissing = computed(() => iptcRequested.value && !tools.value?.exiftool);
   const canDryRun = computed(
@@ -213,7 +217,7 @@ export const useIngestStore = defineStore('ingest', () => {
     resetPlan();
     draft.value = cloneSettings(library.ingestSettings);
     addToLibrary.value = draft.value.addToLibrary;
-    sources.value = [];
+    sources.value = defaultSourcePath.value ? [defaultSourcePath.value] : [];
     destination.value = null;
     templateName.value = '';
     templateError.value = null;
@@ -231,7 +235,7 @@ export const useIngestStore = defineStore('ingest', () => {
   function startNewIngest(): void {
     if (running.value) return;
     resetPlan();
-    sources.value = [];
+    sources.value = defaultSourcePath.value ? [defaultSourcePath.value] : [];
     destination.value = null;
     templateName.value = '';
     templateError.value = null;
@@ -277,6 +281,12 @@ export const useIngestStore = defineStore('ingest', () => {
 
   function clearSources(): void {
     setSources([]);
+  }
+
+  /** Re-apply the saved default source after it was cleared. */
+  function useDefaultSource(): void {
+    const path = defaultSourcePath.value;
+    if (path) setSources([path]);
   }
 
   async function chooseDestination(): Promise<void> {
@@ -614,6 +624,7 @@ export const useIngestStore = defineStore('ingest', () => {
     selectedTemplateId,
     problems,
     problemMessages,
+    defaultSourcePath,
     iptcRequested,
     exiftoolMissing,
     canDryRun,
@@ -631,6 +642,7 @@ export const useIngestStore = defineStore('ingest', () => {
     addSourceFiles,
     removeSource,
     clearSources,
+    useDefaultSource,
     chooseDestination,
     setDestination,
     detectTools,

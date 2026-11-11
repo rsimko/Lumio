@@ -475,6 +475,11 @@ pub fn update_ingest_settings(
     let mut ingest = ingest;
     ingest.counter_start = ingest.counter_start.min(1_000_000);
     ingest.counter_padding = ingest.counter_padding.min(12);
+    ingest.default_source = ingest.default_source.and_then(|path| {
+        let trimmed = path.to_string_lossy().trim().to_string();
+        (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
+    });
+    ingest.rename_postfix = lumio_core::ingest::normalize_rename_postfix(&ingest.rename_postfix);
     ingest.folder_template = ingest.folder_template.trim().to_string();
     ingest.filename_template = ingest.filename_template.trim().to_string();
     for template in &mut ingest.templates {

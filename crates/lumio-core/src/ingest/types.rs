@@ -51,10 +51,35 @@ impl IptcTemplates {
     }
 }
 
+/// Default pattern appended to a name when ingest has to avoid an existing
+/// destination file. `#` is replaced by the numeric suffix.
+pub const DEFAULT_RENAME_POSTFIX: &str = "_#";
+
+/// Keep rename patterns safe for a single path segment. A missing `#` is
+/// appended so the suffix can never repeat the exact same filename.
+pub fn normalize_rename_postfix(value: &str) -> String {
+    let cleaned: String = value
+        .chars()
+        .filter(|ch| !ch.is_control() && !matches!(ch, '/' | '\\' | ':'))
+        .collect();
+    let trimmed = cleaned.trim();
+    let mut postfix = if trimmed.is_empty() {
+        DEFAULT_RENAME_POSTFIX.to_string()
+    } else {
+        trimmed.chars().take(32).collect()
+    };
+    if !postfix.contains('#') {
+        postfix.push('#');
+    }
+    postfix
+}
+
 /// Persisted ingest preferences, including named templates.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct IngestSettings {
+    /// Pre-filled source folder for a new ingest run.
+    pub default_source: Option<PathBuf>,
     pub folder_template: String,
     pub filename_template: String,
     pub job_code: String,
@@ -62,15 +87,22 @@ pub struct IngestSettings {
     pub counter_start: u32,
     pub counter_padding: u32,
     pub xmp_naming: XmpNaming,
+    #[serde(default = "default_rename_postfix")]
+    pub rename_postfix: String,
     pub exiftool_path: Option<PathBuf>,
     pub add_to_library: bool,
     pub templates: Vec<IngestTemplate>,
     pub iptc: IptcTemplates,
 }
 
+fn default_rename_postfix() -> String {
+    DEFAULT_RENAME_POSTFIX.to_string()
+}
+
 impl Default for IngestSettings {
     fn default() -> Self {
         Self {
+            default_source: None,
             folder_template: "{YYYY}/{MM}".into(),
             filename_template: "{YYYY}{MM}{DD}_{default_filename}".into(),
             job_code: String::new(),
@@ -78,6 +110,7 @@ impl Default for IngestSettings {
             counter_start: 1,
             counter_padding: 4,
             xmp_naming: XmpNaming::FilenameExt,
+            rename_postfix: default_rename_postfix(),
             exiftool_path: None,
             add_to_library: true,
             templates: Vec::new(),
@@ -98,6 +131,8 @@ pub struct IngestRules {
     pub counter_start: u32,
     pub counter_padding: u32,
     pub xmp_naming: XmpNaming,
+    #[serde(default = "default_rename_postfix")]
+    pub rename_postfix: String,
     pub iptc: IptcTemplates,
 }
 
@@ -118,8 +153,15 @@ impl IngestRules {
             counter_start: settings.counter_start,
             counter_padding: settings.counter_padding,
             xmp_naming: settings.xmp_naming,
+            rename_postfix: normalize_rename_postfix(&settings.rename_postfix),
             iptc: settings.iptc.clone(),
         }
+    }
+
+    /// Build the stem used when `base` has to be renamed with `suffix`.
+    pub fn renamed_stem(&self, base: &str, suffix: u32) -> String {
+        let postfix = normalize_rename_postfix(&self.rename_postfix);
+        format!("{base}{}", postfix.replace('#', &suffix.to_string()))
     }
 }
 
@@ -455,6 +497,25 @@ pub enum IngestEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ingest_settings_default_to_the_expected_rename_postfix() {
+        let settings = IngestSettings::default();
+        assert_eq!(settings.rename_postfix, DEFAULT_RENAME_POSTFIX);
+        assert_eq!(settings.default_source, None);
+
+        let rules = IngestRules::from_settings(&settings);
+        assert_eq!(rules.renamed_stem("IMG_0001", 2), "IMG_0001_2");
+    }
+
+    #[test]
+    fn rename_postfix_is_normalized_to_a_safe_numbered_pattern() {
+        assert_eq!(normalize_rename_postfix(""), DEFAULT_RENAME_POSTFIX);
+        assert_eq!(normalize_rename_postfix("   "), DEFAULT_RENAME_POSTFIX);
+        assert_eq!(normalize_rename_postfix("_v"), "_v#");
+        assert_eq!(normalize_rename_postfix(" /bad\\:_# "), "bad_#");
+        assert_eq!(normalize_rename_postfix(" ## "), "##");
+    }
 
     #[test]
     fn ingest_events_use_camel_case_fields_for_the_frontend() {

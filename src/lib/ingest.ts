@@ -92,6 +92,7 @@ const CAMERA_TOKENS = new Set([
 ]);
 
 export const DEFAULT_INGEST_SETTINGS: IngestSettings = {
+  defaultSource: null,
   folderTemplate: '{YYYY}/{MM}',
   filenameTemplate: '{YYYY}{MM}{DD}_{default_filename}',
   jobCode: '',
@@ -99,6 +100,7 @@ export const DEFAULT_INGEST_SETTINGS: IngestSettings = {
   counterStart: 1,
   counterPadding: 4,
   xmpNaming: 'filenameExt',
+  renamePostfix: '_#',
   exiftoolPath: null,
   addToLibrary: true,
   templates: [],
@@ -111,10 +113,39 @@ export const DEFAULT_INGEST_SETTINGS: IngestSettings = {
   },
 };
 
+/**
+ * Rename patterns are appended to a filename stem. The `#` placeholder becomes
+ * the numeric suffix; a missing placeholder is appended automatically so a
+ * collision can always be resolved without repeating the same name.
+ */
+export function normalizeRenamePostfix(value: string | null | undefined): string {
+  const cleaned = (value ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[/\\:]/g, '')
+    .trim()
+    .slice(0, 32);
+  const postfix = cleaned || DEFAULT_INGEST_SETTINGS.renamePostfix;
+  return postfix.includes('#') ? postfix : `${postfix}#`;
+}
+
+/** Human-readable example of the rename postfix, for settings and dialogs. */
+export function renamePostfixExample(
+  postfix: string,
+  stem = 'IMG_0001',
+  extension = '.JPG',
+): string {
+  return `${stem}${normalizeRenamePostfix(postfix).replaceAll('#', '2')}${extension}`;
+}
+
 export function normalizeIngestSettings(settings: Partial<IngestSettings> | null): IngestSettings {
   const merged = { ...DEFAULT_INGEST_SETTINGS, ...(settings ?? {}) };
+  const defaultSource =
+    typeof merged.defaultSource === 'string' && merged.defaultSource.trim()
+      ? merged.defaultSource.trim()
+      : null;
   return {
     ...merged,
+    defaultSource,
     folderTemplate: merged.folderTemplate ?? DEFAULT_INGEST_SETTINGS.folderTemplate,
     filenameTemplate: merged.filenameTemplate ?? DEFAULT_INGEST_SETTINGS.filenameTemplate,
     jobCode: merged.jobCode ?? '',
@@ -126,6 +157,7 @@ export function normalizeIngestSettings(settings: Partial<IngestSettings> | null
       ? Math.min(12, Math.max(0, Math.round(merged.counterPadding)))
       : DEFAULT_INGEST_SETTINGS.counterPadding,
     xmpNaming: merged.xmpNaming === 'filename' ? 'filename' : 'filenameExt',
+    renamePostfix: normalizeRenamePostfix(merged.renamePostfix),
     exiftoolPath: merged.exiftoolPath ?? null,
     addToLibrary: Boolean(merged.addToLibrary),
     templates: Array.isArray(merged.templates) ? merged.templates : [],
@@ -148,6 +180,7 @@ export function ingestRulesFromSettings(settings: IngestSettings): IngestRules {
     counterStart: settings.counterStart,
     counterPadding: settings.counterPadding,
     xmpNaming: settings.xmpNaming,
+    renamePostfix: normalizeRenamePostfix(settings.renamePostfix),
     iptc: {
       title: settings.iptc.title,
       description: settings.iptc.description,

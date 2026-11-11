@@ -214,6 +214,7 @@ export interface IptcTemplates {
 }
 
 export interface IngestSettings {
+  defaultSource: string | null;
   folderTemplate: string;
   filenameTemplate: string;
   jobCode: string;
@@ -221,6 +222,7 @@ export interface IngestSettings {
   counterStart: number;
   counterPadding: number;
   xmpNaming: XmpNaming;
+  renamePostfix: string;
   exiftoolPath: string | null;
   addToLibrary: boolean;
   templates: IngestTemplate[];
@@ -235,6 +237,7 @@ export interface IngestRules {
   counterStart: number;
   counterPadding: number;
   xmpNaming: XmpNaming;
+  renamePostfix: string;
   iptc: IptcTemplates;
 }
 

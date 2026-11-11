@@ -596,6 +596,7 @@ mod tests {
             counter_start: 1,
             counter_padding: 4,
             xmp_naming: XmpNaming::FilenameExt,
+            rename_postfix: "_#".into(),
             iptc: Default::default(),
         }
     }

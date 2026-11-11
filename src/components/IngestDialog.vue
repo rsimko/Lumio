@@ -18,6 +18,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   ScrollText,
   Table2,
@@ -371,6 +372,15 @@ function chooseDestination(): void {
                 Folders are scanned recursively. A selected file brings its same-name RAW, JPEG and
                 XMP companions along.
               </p>
+              <button
+                v-if="store.defaultSourcePath"
+                class="btn mx-auto mt-2 h-7 max-w-full px-2 text-[10px]"
+                :title="store.defaultSourcePath"
+                @click="store.useDefaultSource()"
+              >
+                <RotateCcw class="h-3 w-3 shrink-0" />
+                <span class="truncate">Use default source</span>
+              </button>
             </div>
           </section>
 
@@ -1292,6 +1302,7 @@ function chooseDestination(): void {
   <IngestReplaceDialog
     v-if="replacePrompt"
     :entities="replacePrompt"
+    :rename-postfix="store.draft.renamePostfix"
     @close="replacePrompt = null"
     @resolve="resolveReplacePrompt"
   />

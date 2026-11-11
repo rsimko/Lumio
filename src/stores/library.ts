@@ -11,6 +11,7 @@ import {
   normalizeExternalEditors,
 } from '@/lib/editors';
 import { basename, isPathInside, parentPath } from '@/lib/format';
+import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
 import {
   DEFAULT_SHORTCUTS,
   canonicalBinding,
@@ -30,6 +31,7 @@ import {
   type SelectionState,
 } from '@/lib/selection';
 import type {
+  AddFolderOutcome,
   AssetRemovalMode,
   ExcludedAsset,
   ExternalEditor,
@@ -37,6 +39,7 @@ import type {
   FolderMenuTarget,
   FolderNode,
   FolderRemovalTarget,
+  IngestSettings,
   MonoFont,
   NewFolderTarget,
   PhotoAsset,
@@ -138,6 +141,11 @@ export const useLibraryStore = defineStore('library', () => {
 
   const roots = ref<RootInfo[]>([]);
   const settings = ref<UiSettings>({ ...DEFAULT_UI_SETTINGS });
+  const ingestSettings = ref<IngestSettings>({
+    ...DEFAULT_INGEST_SETTINGS,
+    templates: [],
+    iptc: { ...DEFAULT_INGEST_SETTINGS.iptc, keywords: [] },
+  });
   const cacheDir = ref('');
   const recoveryWarning = ref<string | null>(null);
   const recoveryWarningDismissed = ref(false);
@@ -793,6 +801,36 @@ export const useLibraryStore = defineStore('library', () => {
     await scanFolder();
   }
 
+  async function registerRoot(
+    path: string,
+    options: { select?: boolean; toast?: boolean } = {},
+  ): Promise<AddFolderOutcome> {
+    const outcome = await api.addRoot(path);
+    const info = outcome.root;
+    roots.value = roots.value.some((root) => root.id === info.id)
+      ? roots.value.map((root) => (root.id === info.id ? info : root))
+      : [...roots.value, info];
+    for (const key of [...folderImageCounts.keys()]) {
+      if (isPathInside(key, info.path)) folderImageCounts.delete(key);
+    }
+    folderCountsEpoch.value += 1;
+    expanded.add(info.path);
+    await loadChildren(info.path, true);
+    const target = isPathInside(outcome.folder, info.path) ? outcome.folder : info.path;
+    if (options.select) await selectFolder(target, info.id);
+    if (options.toast !== false) {
+      addToast(
+        outcome.alreadyInLibrary
+          ? `${basename(target)} is already in the library.`
+          : outcome.restored
+            ? `Restored ${basename(target)} to the library.`
+            : `Added ${info.name} to the library.`,
+        'success',
+      );
+    }
+    return outcome;
+  }
+
   async function addRoot(): Promise<void> {
     if (addingRoot.value) return;
     addingRoot.value = true;
@@ -803,30 +841,18 @@ export const useLibraryStore = defineStore('library', () => {
         title: 'Add a photo folder to Lumio',
       });
       if (!picked || Array.isArray(picked)) return;
-      const outcome = await api.addRoot(picked);
-      const info = outcome.root;
-      roots.value = roots.value.some((root) => root.id === info.id)
-        ? roots.value.map((root) => (root.id === info.id ? info : root))
-        : [...roots.value, info];
-      for (const key of [...folderImageCounts.keys()]) {
-        if (isPathInside(key, info.path)) folderImageCounts.delete(key);
-      }
-      folderCountsEpoch.value += 1;
-      expanded.add(info.path);
-      await loadChildren(info.path, true);
-      const target = isPathInside(outcome.folder, info.path) ? outcome.folder : info.path;
-      await selectFolder(target, info.id);
-      addToast(
-        outcome.restored
-          ? `Restored ${basename(target)} to the library.`
-          : `Added ${info.name} to the library.`,
-        'success',
-      );
+      await registerRoot(picked, { select: true });
     } catch (error) {
       addToast(errorMessage(error), 'error');
     } finally {
       addingRoot.value = false;
     }
+  }
+
+  async function saveIngestSettings(next: IngestSettings): Promise<IngestSettings> {
+    const saved = await api.updateIngestSettings(normalizeIngestSettings(next));
+    ingestSettings.value = normalizeIngestSettings(saved);
+    return ingestSettings.value;
   }
 
   function clearFolderCaches(pathPrefix: string): void {
@@ -1338,6 +1364,7 @@ export const useLibraryStore = defineStore('library', () => {
       const bootstrap = await api.bootstrap();
       roots.value = bootstrap.roots;
       settings.value = normalizeUiSettings(bootstrap.ui);
+      ingestSettings.value = normalizeIngestSettings(bootstrap.ingest);
       cacheDir.value = bootstrap.cacheDir;
       recoveryWarning.value = bootstrap.recoveryWarning;
       appVersion.value = bootstrap.appVersion;
@@ -1424,6 +1451,9 @@ export const useLibraryStore = defineStore('library', () => {
     refresh,
     refreshFolder,
     addRoot,
+    registerRoot,
+    ingestSettings,
+    saveIngestSettings,
     removeRoot,
     removeSubfolder,
     addingRoot,

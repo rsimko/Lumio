@@ -5,6 +5,7 @@ import {
   Film,
   FolderOpen,
   FolderPlus,
+  Import,
   LayoutGrid,
   List,
   Loader2,
@@ -18,9 +19,11 @@ import { computed, ref, watch } from 'vue';
 
 import LumioMark from '@/components/LumioMark.vue';
 import { isBrowseViewMode, nextBrowseViewMode, type BrowseViewMode } from '@/lib/views';
+import { useIngestStore } from '@/stores/ingest';
 import { useLibraryStore, type BreadcrumbItem } from '@/stores/library';
 
 const store = useLibraryStore();
+const ingest = useIngestStore();
 
 const browseViews = [
   { mode: 'grid', label: 'Grid', icon: LayoutGrid },
@@ -129,6 +132,14 @@ function onSizeInput(event: Event) {
         <Loader2 v-if="store.addingRoot" class="h-3.5 w-3.5 animate-spin" />
         <FolderPlus v-else class="h-3.5 w-3.5" />
         <span class="hidden lg:inline">Add folder</span>
+      </button>
+      <button
+        class="btn"
+        title="Ingest photos from a camera card or folder"
+        @click="void ingest.openDialog()"
+      >
+        <Import class="h-3.5 w-3.5" />
+        <span class="hidden lg:inline">Ingest</span>
       </button>
 
       <div class="mx-0.5 h-5 w-px bg-line" />

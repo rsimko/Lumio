@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ingest::IngestSettings;
+
 pub const CACHE_VERSION: u32 = 2;
 
 /// RAW extensions we recognise as primary assets. Preview support depends on
@@ -101,6 +103,10 @@ pub struct AddFolderOutcome {
     /// Canonical folder that was added, or the hidden subfolder that was restored.
     pub folder: PathBuf,
     pub restored: bool,
+    /// The folder was already covered by a registered root. Ingest uses this to
+    /// treat adding a destination folder as a successful no-op.
+    #[serde(default)]
+    pub already_in_library: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -294,6 +300,9 @@ pub struct AppConfig {
     #[serde(default)]
     pub excluded_assets: Vec<ExcludedAsset>,
     pub ui: UiSettings,
+    /// Ingest templates, conflict defaults and metadata-writing preferences.
+    #[serde(default)]
+    pub ingest: IngestSettings,
 }
 
 impl Default for AppConfig {
@@ -304,6 +313,7 @@ impl Default for AppConfig {
             excluded_folders: Vec::new(),
             excluded_assets: Vec::new(),
             ui: UiSettings::default(),
+            ingest: IngestSettings::default(),
         }
     }
 }

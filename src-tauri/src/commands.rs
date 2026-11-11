@@ -3,6 +3,10 @@ use std::sync::Arc;
 
 use lumio_core::Histogram;
 use lumio_core::LumioError;
+use lumio_core::ingest::{
+    IngestConflictResolution, IngestEvent, IngestOutcome, IngestPlan, IngestRequest,
+    IngestSettings, IngestTools,
+};
 use lumio_core::types::{
     AddFolderOutcome, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset, FolderImageCounts,
     FolderNode, MoveAssetsOutcome, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
@@ -10,7 +14,9 @@ use lumio_core::types::{
 };
 use serde::Serialize;
 use tauri::State;
+use tauri::ipc::Channel;
 
+use crate::ingest::IngestRuntime;
 use crate::state::{AppState, refresh_asset_metadata, validate_under_roots};
 
 #[derive(Debug, Serialize)]
@@ -49,6 +55,7 @@ impl From<tauri::Error> for CommandError {
 pub struct Bootstrap {
     pub roots: Vec<RootInfo>,
     pub ui: UiSettings,
+    pub ingest: IngestSettings,
     pub cache_dir: String,
     pub recovery_warning: Option<String>,
     pub app_version: String,
@@ -61,6 +68,7 @@ pub fn get_bootstrap(state: State<'_, AppState>) -> Bootstrap {
     Bootstrap {
         roots: config.root_infos(),
         ui: config.config().ui.clone(),
+        ingest: config.ingest_settings().clone(),
         cache_dir: state.thumbs.cache_dir().to_string_lossy().into_owned(),
         recovery_warning: state.recovery_warning.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -457,4 +465,124 @@ pub async fn reveal_asset(state: State<'_, AppState>, path: String) -> Result<()
         .await
         .map_err(|error| CommandError::new("internal", format!("Reveal task failed: {error}")))?
         .map_err(|error| CommandError::new("revealFailed", error.to_string()))
+}
+
+#[tauri::command]
+pub fn update_ingest_settings(
+    state: State<'_, AppState>,
+    ingest: IngestSettings,
+) -> Result<IngestSettings, CommandError> {
+    let mut ingest = ingest;
+    ingest.counter_start = ingest.counter_start.min(1_000_000);
+    ingest.counter_padding = ingest.counter_padding.min(12);
+    ingest.folder_template = ingest.folder_template.trim().to_string();
+    ingest.filename_template = ingest.filename_template.trim().to_string();
+    for template in &mut ingest.templates {
+        template.name = template.name.trim().to_string();
+        template.folder_template = template.folder_template.trim().to_string();
+        template.filename_template = template.filename_template.trim().to_string();
+    }
+    ingest
+        .templates
+        .retain(|template| !template.name.is_empty());
+    let mut config = state.config();
+    config.update_ingest(ingest.clone())?;
+    Ok(ingest)
+}
+
+#[tauri::command]
+pub fn detect_ingest_tools(exiftool_path: Option<String>) -> IngestTools {
+    lumio_core::ingest::detect_tools(exiftool_path.as_deref().map(PathBuf::from).as_deref())
+}
+
+#[tauri::command]
+pub async fn create_ingest_plan(
+    runtime: State<'_, IngestRuntime>,
+    request: IngestRequest,
+) -> Result<IngestPlan, CommandError> {
+    match tokio::task::spawn_blocking(move || lumio_core::ingest::plan_ingest(&request)).await {
+        Ok(result) => {
+            let plan = result?;
+            runtime.store(plan.clone());
+            Ok(plan)
+        }
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Ingest planning task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub fn set_ingest_resolution(
+    runtime: State<'_, IngestRuntime>,
+    plan_id: String,
+    entity_id: String,
+    resolution: IngestConflictResolution,
+) -> Result<IngestPlan, CommandError> {
+    let mut plan = runtime.get(&plan_id).ok_or_else(|| {
+        CommandError::new(
+            "ingestPlanMissing",
+            "The ingest preview is no longer available. Run Dry Run again.",
+        )
+    })?;
+    lumio_core::ingest::set_entity_resolution(&mut plan, &entity_id, resolution)?;
+    runtime.update(plan.clone());
+    Ok(plan)
+}
+
+#[tauri::command]
+pub async fn run_ingest(
+    runtime: State<'_, IngestRuntime>,
+    plan_id: String,
+    channel: Channel<IngestEvent>,
+) -> Result<IngestOutcome, CommandError> {
+    let Some(plan) = runtime.begin(&plan_id) else {
+        return Err(CommandError::new(
+            "ingestPlanMissing",
+            "The ingest preview is no longer available, or it is already running.",
+        ));
+    };
+    let Some(cancel) = runtime.cancel_token(&plan_id) else {
+        runtime.finish(&plan_id);
+        return Err(CommandError::new(
+            "internal",
+            "The ingest cancellation token was not created.",
+        ));
+    };
+    let task_id = plan.id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        lumio_core::ingest::execute_plan(&plan, &cancel, |event| {
+            let _ = channel.send(event);
+        })
+    })
+    .await;
+    runtime.finish(&task_id);
+    match result {
+        Ok(outcome) => Ok(outcome),
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Ingest task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub fn cancel_ingest(runtime: State<'_, IngestRuntime>, plan_id: String) -> bool {
+    runtime.cancel(&plan_id)
+}
+
+#[tauri::command]
+pub fn write_text_file(path: String, contents: String) -> Result<(), CommandError> {
+    let path = PathBuf::from(path);
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            return Err(CommandError::new(
+                "invalidPath",
+                format!("The report folder does not exist: {}", parent.display()),
+            ));
+        }
+    }
+    std::fs::write(&path, contents).map_err(|error| LumioError::io(&path, error))?;
+    Ok(())
 }

@@ -2457,6 +2457,7 @@ name = "lumio-core"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "chrono",
  "image",
  "imagesize",
  "kamadak-exif",

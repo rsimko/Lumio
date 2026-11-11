@@ -3,6 +3,7 @@ pub mod config;
 pub mod error;
 pub mod folders;
 pub mod histogram;
+pub mod ingest;
 pub mod path_utils;
 pub mod preview;
 pub mod scan;

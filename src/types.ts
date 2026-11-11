@@ -72,6 +72,7 @@ export interface AddFolderOutcome {
   root: RootInfo;
   folder: string;
   restored: boolean;
+  alreadyInLibrary: boolean;
 }
 
 export interface RootInfo {
@@ -181,6 +182,7 @@ export interface UiSettings {
 export interface Bootstrap {
   roots: RootInfo[];
   ui: UiSettings;
+  ingest: IngestSettings;
   cacheDir: string;
   recoveryWarning: string | null;
   appVersion: string;
@@ -191,3 +193,250 @@ export interface CommandError {
   code: string;
   message: string;
 }
+
+export type XmpNaming = 'filenameExt' | 'filename';
+
+export interface IngestTemplate {
+  id: string;
+  name: string;
+  folderTemplate: string;
+  filenameTemplate: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface IptcTemplates {
+  title: string;
+  description: string;
+  creator: string;
+  copyright: string;
+  keywords: string[];
+}
+
+export interface IngestSettings {
+  folderTemplate: string;
+  filenameTemplate: string;
+  jobCode: string;
+  customText: string;
+  counterStart: number;
+  counterPadding: number;
+  xmpNaming: XmpNaming;
+  exiftoolPath: string | null;
+  addToLibrary: boolean;
+  templates: IngestTemplate[];
+  iptc: IptcTemplates;
+}
+
+export interface IngestRules {
+  folderTemplate: string;
+  filenameTemplate: string;
+  jobCode: string;
+  customText: string;
+  counterStart: number;
+  counterPadding: number;
+  xmpNaming: XmpNaming;
+  iptc: IptcTemplates;
+}
+
+export interface IngestRequest {
+  sources: string[];
+  destination: string;
+  rules: IngestRules;
+  exiftoolPath: string | null;
+}
+
+export interface ExifToolInfo {
+  path: string;
+  version: string;
+}
+
+export interface IngestTools {
+  exiftool: ExifToolInfo | null;
+}
+
+export type IngestFileRole = 'raw' | 'jpeg' | 'xmp';
+
+export type CaptureSource = 'rawExif' | 'jpegExif' | 'xmp' | 'fileModified';
+
+export interface CaptureInfo {
+  display: string;
+  timestampMs: number;
+  source: CaptureSource;
+  warning: string | null;
+}
+
+export interface IngestSourceFile {
+  path: string;
+  role: IngestFileRole;
+  size: number;
+  modifiedMs: number;
+}
+
+export type IngestConflictResolution = 'skip' | 'keepBoth' | 'replace';
+
+export type IngestEntityStatus = 'ready' | 'conflict' | 'error';
+
+export type IngestMetadataTargetKind = 'xmpSidecar' | 'jpeg';
+
+export interface IngestMetadataTarget {
+  path: string;
+  kind: IngestMetadataTargetKind;
+}
+
+export interface IngestPlannedFile {
+  source: string | null;
+  destination: string;
+  role: IngestFileRole;
+  size: number;
+  primary: boolean;
+  generated: boolean;
+}
+
+export interface IngestConflict {
+  existing: string[];
+  message: string;
+}
+
+export interface IngestIptcValues {
+  title: string | null;
+  description: string | null;
+  creator: string | null;
+  copyright: string | null;
+  keywords: string[];
+}
+
+export interface IngestEntity {
+  id: string;
+  sourceDir: string;
+  stem: string;
+  displayName: string;
+  primaryPath: string;
+  primaryRole: IngestFileRole;
+  files: IngestSourceFile[];
+  capture: CaptureInfo;
+  baseDestinationDir: string;
+  baseDestinationStem: string;
+  destinationDir: string;
+  destinationStem: string;
+  plannedFiles: IngestPlannedFile[];
+  metadataTarget: IngestMetadataTarget | null;
+  status: IngestEntityStatus;
+  resolution: IngestConflictResolution;
+  conflict: IngestConflict | null;
+  renamed: boolean;
+  renameReason: string | null;
+  warnings: string[];
+  iptc: IngestIptcValues;
+}
+
+export interface IngestPlanSummary {
+  entities: number;
+  files: number;
+  bytes: number;
+  conflicts: number;
+  renamed: number;
+  warnings: number;
+  errors: number;
+}
+
+export interface IngestWarning {
+  path: string | null;
+  entityId: string | null;
+  message: string;
+}
+
+export type IngestLogLevel = 'info' | 'warning' | 'error';
+
+export interface IngestLogEntry {
+  at: string;
+  level: IngestLogLevel;
+  message: string;
+  path: string | null;
+  entityId: string | null;
+}
+
+export interface IngestPlan {
+  id: string;
+  createdAt: number;
+  sources: string[];
+  destination: string;
+  rules: IngestRules;
+  exiftoolPath: string | null;
+  tools: IngestTools;
+  entities: IngestEntity[];
+  warnings: IngestWarning[];
+  log: IngestLogEntry[];
+  summary: IngestPlanSummary;
+}
+
+export type IngestResultStatus = 'copied' | 'skipped' | 'failed' | 'cancelled';
+
+export interface IngestEntityResult {
+  entityId: string;
+  displayName: string;
+  status: IngestResultStatus;
+  files: number;
+  bytes: number;
+  destination: string | null;
+  message: string | null;
+}
+
+export interface IngestOutcome {
+  planId: string;
+  destination: string;
+  copiedEntities: number;
+  skippedEntities: number;
+  failedEntities: number;
+  copiedFiles: number;
+  copiedBytes: number;
+  cancelled: boolean;
+  elapsedMs: number;
+  results: IngestEntityResult[];
+  log: IngestLogEntry[];
+}
+
+export type IngestEvent =
+  | {
+      type: 'started';
+      totalEntities: number;
+      totalFiles: number;
+      totalBytes: number;
+    }
+  | {
+      type: 'entityStarted';
+      entityId: string;
+      displayName: string;
+      index: number;
+      total: number;
+    }
+  | {
+      type: 'fileCopied';
+      entityId: string;
+      source: string;
+      destination: string;
+      bytes: number;
+      index: number;
+      total: number;
+    }
+  | {
+      type: 'entityCompleted';
+      entityId: string;
+      displayName: string;
+      destination: string;
+      files: number;
+      bytes: number;
+    }
+  | {
+      type: 'entitySkipped';
+      entityId: string;
+      displayName: string;
+      reason: string;
+    }
+  | {
+      type: 'entityFailed';
+      entityId: string;
+      displayName: string;
+      message: string;
+    }
+  | { type: 'warning'; entityId: string | null; message: string }
+  | { type: 'log'; entry: IngestLogEntry };

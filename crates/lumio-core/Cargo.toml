@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 blake3 = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "webp"] }
 imagesize = "0.15"
 kamadak-exif = "0.6"

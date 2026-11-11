@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 
 import type {
   AddFolderOutcome,
@@ -10,6 +10,13 @@ import type {
   FolderImageCounts,
   FolderNode,
   HistogramData,
+  IngestConflictResolution,
+  IngestEvent,
+  IngestOutcome,
+  IngestPlan,
+  IngestRequest,
+  IngestSettings,
+  IngestTools,
   MoveAssetsOutcome,
   PhotoAsset,
   RootInfo,
@@ -49,6 +56,28 @@ export const api = {
   editAssets: (paths: string[], application: string) =>
     invoke<void>('edit_assets', { paths, application }),
   revealAsset: (path: string) => invoke<void>('reveal_asset', { path }),
+  updateIngestSettings: (ingest: IngestSettings) =>
+    invoke<IngestSettings>('update_ingest_settings', { ingest }),
+  detectIngestTools: (exiftoolPath: string | null) =>
+    invoke<IngestTools>('detect_ingest_tools', { exiftoolPath }),
+  createIngestPlan: (request: IngestRequest) =>
+    invoke<IngestPlan>('create_ingest_plan', { request }),
+  setIngestResolution: (
+    planId: string,
+    entityId: string,
+    resolution: IngestConflictResolution,
+  ) => invoke<IngestPlan>('set_ingest_resolution', { planId, entityId, resolution }),
+  async runIngest(
+    planId: string,
+    onEvent: (event: IngestEvent) => void,
+  ): Promise<IngestOutcome> {
+    const channel = new Channel<IngestEvent>();
+    channel.onmessage = onEvent;
+    return invoke<IngestOutcome>('run_ingest', { planId, channel });
+  },
+  cancelIngest: (planId: string) => invoke<boolean>('cancel_ingest', { planId }),
+  writeTextFile: (path: string, contents: string) =>
+    invoke<void>('write_text_file', { path, contents }),
 };
 
 export function errorMessage(error: unknown): string {

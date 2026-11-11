@@ -1,25 +1,77 @@
 <script setup lang="ts">
 import {
+  AlertTriangle,
   AppWindow,
   Check,
+  CheckCircle2,
   EyeOff,
+  HardDrive,
   Keyboard,
   Loader2,
   Plus,
+  RefreshCw,
   RotateCcw,
   Star,
   Trash2,
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
+import { api, errorMessage } from '@/api';
 import { formatCount, pluralize } from '@/lib/format';
+import { xmpNamingLabel } from '@/lib/ingest';
 import { useLibraryStore } from '@/stores/library';
-import type { MonoFont, ThemeSetting, UiFont } from '@/types';
+import type { IngestSettings, IngestTools, MonoFont, ThemeSetting, UiFont } from '@/types';
 
 const store = useLibraryStore();
 const confirmingClear = ref(false);
 const restoringId = ref<string | null>(null);
+
+function cloneIngestSettings(settings: IngestSettings): IngestSettings {
+  return {
+    ...settings,
+    templates: settings.templates.map((template) => ({ ...template })),
+    iptc: { ...settings.iptc, keywords: [...settings.iptc.keywords] },
+  };
+}
+
+const ingestDraft = ref<IngestSettings>(cloneIngestSettings(store.ingestSettings));
+const ingestTools = ref<IngestTools | null>(null);
+const detectingIngestTools = ref(false);
+const savingIngest = ref(false);
+const ingestMessage = ref<string | null>(null);
+const ingestError = ref<string | null>(null);
+
+async function detectIngestTools(): Promise<void> {
+  detectingIngestTools.value = true;
+  try {
+    ingestTools.value = await api.detectIngestTools(ingestDraft.value.exiftoolPath);
+  } catch (error) {
+    ingestError.value = errorMessage(error);
+  } finally {
+    detectingIngestTools.value = false;
+  }
+}
+
+async function saveIngestSettings(): Promise<void> {
+  savingIngest.value = true;
+  ingestError.value = null;
+  ingestMessage.value = null;
+  try {
+    ingestDraft.value = cloneIngestSettings(await store.saveIngestSettings(ingestDraft.value));
+    ingestMessage.value = 'Ingest settings saved.';
+    await detectIngestTools();
+  } catch (error) {
+    ingestError.value = errorMessage(error);
+  } finally {
+    savingIngest.value = false;
+  }
+}
+
+onMounted(() => {
+  void detectIngestTools();
+});
+
 
 async function restoreHidden(id: string) {
   if (restoringId.value) return;
@@ -349,6 +401,114 @@ function addEditor() {
       </section>
 
       <section>
+        <h3 class="panel-heading mb-2">Ingest</h3>
+        <div class="divide-y divide-line rounded-md border border-line bg-panel">
+          <div class="px-3 py-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="text-xs font-medium text-ink">ExifTool</p>
+                <p class="mt-0.5 text-2xs text-subtle">
+                  Reads capture dates and is required for IPTC and keyword writing.
+                </p>
+              </div>
+              <span
+                class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs"
+                :class="
+                  ingestTools?.exiftool
+                    ? 'border-success/30 bg-success/10 text-success'
+                    : 'border-warning/40 bg-warning/10 text-warning'
+                "
+              >
+                <CheckCircle2 v-if="ingestTools?.exiftool" class="h-3 w-3" />
+                <AlertTriangle v-else class="h-3 w-3" />
+                {{
+                  detectingIngestTools
+                    ? 'Checking…'
+                    : ingestTools?.exiftool
+                      ? `ExifTool ${ingestTools.exiftool.version}`
+                      : 'Not detected'
+                }}
+              </span>
+            </div>
+            <div class="mt-2 flex gap-1.5">
+              <input
+                v-model="ingestDraft.exiftoolPath"
+                class="h-7 min-w-0 flex-1 rounded border border-line bg-panel px-2 font-mono text-2xs text-ink outline-none focus:border-accent/70"
+                placeholder="Auto-detect from PATH and Homebrew folders"
+                spellcheck="false"
+              />
+              <button
+                class="btn h-7 text-2xs"
+                :disabled="detectingIngestTools"
+                @click="detectIngestTools()"
+              >
+                <Loader2 v-if="detectingIngestTools" class="h-3 w-3 animate-spin" />
+                <RefreshCw v-else class="h-3 w-3" />
+                Detect
+              </button>
+            </div>
+            <p v-if="ingestTools?.exiftool" class="mt-1 break-all font-mono text-3xs text-subtle">
+              {{ ingestTools.exiftool.path }}
+            </p>
+          </div>
+
+          <div class="px-3 py-2.5">
+            <p class="text-xs font-medium text-ink">XMP sidecar naming</p>
+            <p class="mt-0.5 text-2xs text-subtle">
+              Used when copying a RAW photo and its XMP sidecar.
+            </p>
+            <select
+              v-model="ingestDraft.xmpNaming"
+              class="mt-2 h-7 w-full rounded border border-line bg-panel px-2 font-mono text-2xs text-ink outline-none focus:border-accent/70"
+            >
+              <option value="filenameExt">{{ xmpNamingLabel('filenameExt') }}</option>
+              <option value="filename">{{ xmpNamingLabel('filename') }}</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+            <div>
+              <p class="text-xs font-medium text-ink">Add destination to library</p>
+              <p class="mt-0.5 text-2xs text-subtle">
+                Default for the checkbox in the ingest dialog.
+              </p>
+            </div>
+            <button
+              class="switch"
+              :class="ingestDraft.addToLibrary ? 'switch-on' : ''"
+              role="switch"
+              :aria-checked="ingestDraft.addToLibrary"
+              @click="ingestDraft.addToLibrary = !ingestDraft.addToLibrary"
+            >
+              <span class="switch-knob" />
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+            <div>
+              <p class="text-xs font-medium text-ink">Saved templates</p>
+              <p class="mt-0.5 text-2xs text-subtle">
+                {{ formatCount(ingestDraft.templates.length) }}
+                {{ pluralize(ingestDraft.templates.length, 'named template') }}. Manage them while
+                ingesting.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span v-if="ingestMessage" class="text-2xs text-success">{{ ingestMessage }}</span>
+              <span v-if="ingestError" class="max-w-[260px] text-2xs text-danger">
+                {{ ingestError }}
+              </span>
+              <button class="btn text-2xs" :disabled="savingIngest" @click="saveIngestSettings()">
+                <Loader2 v-if="savingIngest" class="h-3 w-3 animate-spin" />
+                <HardDrive v-else class="h-3 w-3" />
+                Save ingest settings
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <div class="mb-2 flex items-center justify-between gap-2">
           <h3 class="panel-heading">Hidden photos</h3>
           <button
@@ -437,9 +597,9 @@ function addEditor() {
             <span class="badge bg-panel-2 text-muted ring-1 ring-line">GPL-3.0-or-later</span>
           </div>
           <p class="mt-1.5 text-2xs leading-relaxed text-subtle">
-            Local-first RAW photo browser. No imports, no cloud, no modifications to originals.
-            Metadata is associated from existing XMP sidecars; writing metadata is planned for a
-            later milestone.
+            Local-first RAW photo browser. No cloud, no modifications to originals. Ingest copies
+            RAW, JPEG and XMP files into a structured destination and can write IPTC metadata and
+            keywords to the copies.
           </p>
           <p class="mt-2 text-2xs text-subtle">
             Supported: RAW (via rawler) · JPEG · PNG · TIFF · WebP. HEIC and AVIF are planned.

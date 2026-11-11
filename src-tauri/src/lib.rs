@@ -1,6 +1,8 @@
 mod commands;
+mod ingest;
 mod state;
 
+use ingest::IngestRuntime;
 use state::{AppPaths, AppState};
 use tauri::Manager;
 
@@ -17,6 +19,7 @@ pub fn run() {
             let paths = AppPaths::resolve(app.handle())?;
             let state = AppState::new(paths).map_err(std::io::Error::other)?;
             app.manage(state);
+            app.manage(IngestRuntime::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -39,6 +42,13 @@ pub fn run() {
             commands::edit_assets,
             commands::open_asset,
             commands::reveal_asset,
+            commands::update_ingest_settings,
+            commands::detect_ingest_tools,
+            commands::create_ingest_plan,
+            commands::set_ingest_resolution,
+            commands::run_ingest,
+            commands::cancel_ingest,
+            commands::write_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Lumio");

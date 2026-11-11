@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
 
-defineProps<{
+const props = defineProps<{
   title: string;
   subtitle?: string;
   wide?: boolean;
+  full?: boolean;
+  flush?: boolean;
 }>();
 
 defineEmits<{
@@ -16,12 +18,18 @@ defineEmits<{
   <Teleport to="body">
     <Transition name="dialog" appear>
       <div
-        class="fixed inset-0 z-40 flex items-center justify-center bg-black/45 p-6 backdrop-blur-[2px]"
+        class="fixed inset-0 z-40 flex items-center justify-center bg-black/45 backdrop-blur-[2px]"
+        :class="props.full ? 'p-3 sm:p-5' : 'p-6'"
         @pointerdown.self="$emit('close')"
       >
         <div
-          class="flex max-h-[86vh] w-full flex-col overflow-hidden rounded-xl border border-line bg-elevated shadow-float"
-          :class="wide ? 'max-w-2xl' : 'max-w-lg'"
+          class="flex w-full flex-col overflow-hidden rounded-xl border border-line bg-elevated shadow-float"
+          :class="[
+            props.full
+              ? 'h-[94vh] max-w-[min(1440px,96vw)]'
+              : 'max-h-[86vh]',
+            props.wide ? 'max-w-2xl' : 'max-w-lg',
+          ]"
           role="dialog"
           aria-modal="true"
           :aria-label="title"
@@ -35,7 +43,13 @@ defineEmits<{
               <X class="h-3.5 w-3.5" />
             </button>
           </header>
-          <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div
+            v-if="flush"
+            class="flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            <slot />
+          </div>
+          <div v-else class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <slot />
           </div>
           <footer

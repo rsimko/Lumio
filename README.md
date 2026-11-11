@@ -5,7 +5,8 @@ contain photos and it shows them in place — nothing is imported, moved, rename
 modified. It is built with Rust, Tauri 2, Vue 3 and TypeScript.
 
 This is **Milestone 1**: fast, correct folder-based browsing with honest preview-source
-labelling. Cataloguing, search, metadata editing and sidecar writing come later.
+labelling, plus a copy-only camera-card ingest. Cataloguing, search and in-place metadata
+editing come later.
 
 ![Lumio showing a folder of RAW photos in the grid layout](docs/screenshot.jpg)
 
@@ -27,6 +28,23 @@ labelling. Cataloguing, search, metadata editing and sidecar writing come later.
 - Drag any selected photo — or a single unselected photo — onto a folder row to move the
   whole group, including its companion JPEG, XMP sidecar and extra associations. Moves work
   between registered library roots and refuse to overwrite existing files.
+- Ingest a camera card or folder from the toolbar: choose source folders or individual files,
+  a destination and a folder/filename template, then review a Dry Run before copying.
+  RAW, JPEG and XMP files are grouped into one photo entity and copied together.
+- Ingest templates support `{YYYY}`, `{MM}`, `{DD}`, `{hh}`, `{mm}`, `{ss}`, `{job_code}`,
+  `{custom_text}`, `{default_filename}` and `{counter}`. `/` creates folder levels in folder
+  templates, and the counter starts and zero-padding are configurable. Camera make/model
+  tokens are deliberately excluded.
+- Save, update and delete named templates. Ingest settings persist between sessions.
+- Ingest detects existing files, duplicate output names and partial groups. Conflicts default
+  to Skip, with per-photo Keep both (auto-rename) and explicitly confirmed Replace. Nothing is
+  ever silently overwritten.
+- Ingest copies into a hidden staging folder, verifies every copy with BLAKE3 and commits with
+  atomic renames; a failed group rolls back, and a replaced file is restored on failure.
+- Optionally write IPTC title, description, creator, copyright and keywords while ingesting.
+  RAW photos get an XMP sidecar, standalone JPEGs get embedded XMP/IPTC, and every unrelated
+  XMP field is preserved. ExifTool is used for writing and the result is read back to verify.
+- Ingest can add the destination folder to the library at the end, or leave it unregistered.
 - Delete photos from the library only or from disk, from the toolbar, the info panel, the
   Delete key, or by right-clicking a photo. Disk deletion moves every associated file to the
   system Trash after an explicit warning; library-only deletion hides the group and can be
@@ -54,7 +72,8 @@ Browsing is strictly read-only:
 
 - No original file is ever copied, moved, renamed or written to while browsing.
 - Thumbnails are written to the application cache directory, never beside your photos.
-- XMP sidecars are detected and associated, but never parsed or modified yet.
+- XMP sidecars are parsed for capture dates and associations. Ingest writes IPTC values only to
+  destination copies; source sidecars and originals are never modified.
 - Removing a folder from Lumio only hides it in the app; files on disk are untouched. Hidden
   subfolders can be restored with Add Folder.
 - Dragging photos between folders and deleting photos are explicit actions. Both expand the
@@ -70,12 +89,17 @@ Browsing is strictly read-only:
 - New folders are created directly inside the right-clicked folder. Names that are empty, hidden,
   contain path separators, colons or control characters, or collide with an existing folder are
   rejected.
+- Ingest is copy-only. Sources are never renamed, moved or written to, and the operation refuses
+  unsafe destinations such as a folder inside a source.
 
 ## Requirements
 
 - macOS 12 or newer (primary), or a Linux desktop with WebKitGTK (secondary).
 - Rust 1.85+ (edition 2024).
 - Node.js 20.19+ or 22.12+, and pnpm.
+- ExifTool is optional for browsing and ingest scanning (Lumio falls back to `rawler`,
+  `kamadak-exif` and XMP parsing) but is required to write IPTC metadata. Set its path in
+  Settings → Ingest if it is not on `PATH`.
 
 Windows is not a target for Milestone 1.
 
@@ -131,6 +155,7 @@ crates/lumio-core/      Domain logic, testable without Tauri
   src/config.rs         Atomic JSON settings and library roots
   src/assets.rs         Asset file groups, safe moves, Trash and hidden groups
   src/scan.rs           Folder scanning, RAW/JPEG/XMP association, folder tree
+  src/ingest/           Source scanning, templates, planning, verified copy, IPTC
   src/preview.rs        Camera-embedded preview extraction + orientation
   src/thumbnail.rs      Thumbnail cache keys, resizing, encoding
   src/path_utils.rs     Canonicalisation and filesystem metadata helpers
@@ -139,6 +164,7 @@ src/                    Vue 3 frontend
   components/           Shell, panels, dialogs, viewer
   views/                The five photo layouts
   stores/library.ts     Central application state
+  stores/ingest.ts      Ingest dialog, plan, progress and template state
   lib/                  Pure layout, selection and formatting helpers (unit-tested)
 docs/adr/               Architecture decision records
 ```
@@ -150,10 +176,11 @@ webview against registered roots, and runs blocking work off the UI thread.
 ## Milestone 1 scope
 
 In scope: folder roots, nested tree, scanning, association, five views, fullscreen,
-preview-source indication, error handling, settings, tests and documentation.
+preview-source indication, copy-only ingest with templates and IPTC writing, error handling,
+settings, tests and documentation.
 
-Explicitly deferred: SQLite catalogue, search and filtering, ratings/labels/keywords,
-XMP parsing or writing, editing, importing, cloud sync, HEIC/AVIF, map and albums.
+Explicitly deferred: SQLite catalogue, search and filtering, ratings/labels/keywords in the
+browser, in-place metadata editing, cloud sync, HEIC/AVIF, map and albums.
 
 ## Configuration and data locations
 

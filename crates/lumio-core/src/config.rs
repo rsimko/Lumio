@@ -215,6 +215,7 @@ impl ConfigStore {
                 root: self.root_info_by_id(&existing.id),
                 folder: canonical,
                 restored: false,
+                already_in_library: true,
             });
         }
 
@@ -245,21 +246,24 @@ impl ConfigStore {
                     root: self.root_info_by_id(&root_id),
                     folder: canonical,
                     restored: true,
+                    already_in_library: false,
                 });
             }
         }
 
-        // Refuse to add a folder that is already covered by a registered root.
-        // The existing root already lets the user browse it.
+        // A folder already covered by a registered root is a successful no-op.
+        // Ingest uses the outcome to add a destination without creating a
+        // duplicate root.
         if let Some(existing) = self.config.roots.iter().find(|root| {
             let root_path = fs::canonicalize(&root.path).unwrap_or_else(|_| root.path.clone());
             canonical.starts_with(&root_path)
         }) {
-            return Err(LumioError::InvalidPath(format!(
-                "{} is already inside the added folder {}",
-                canonical.display(),
-                existing.path.display()
-            )));
+            return Ok(AddFolderOutcome {
+                root: self.root_info_by_id(&existing.id),
+                folder: canonical,
+                restored: false,
+                already_in_library: true,
+            });
         }
 
         let root = RootFolder {
@@ -280,6 +284,7 @@ impl ConfigStore {
             },
             folder: canonical,
             restored: false,
+            already_in_library: false,
         })
     }
 
@@ -361,6 +366,15 @@ impl ConfigStore {
     pub fn update_ui(&mut self, ui: UiSettings) -> Result<()> {
         self.config.ui = ui;
         self.save()
+    }
+
+    pub fn update_ingest(&mut self, ingest: crate::ingest::IngestSettings) -> Result<()> {
+        self.config.ingest = ingest;
+        self.save()
+    }
+
+    pub fn ingest_settings(&self) -> &crate::ingest::IngestSettings {
+        &self.config.ingest
     }
 
     pub fn save(&self) -> Result<()> {
@@ -537,8 +551,12 @@ mod tests {
         store.add_root(&photos).unwrap();
         assert_eq!(store.roots().len(), 1);
 
-        // Nested roots are rejected.
-        assert!(store.add_root(&photos.join("child")).is_err());
+        // A nested folder is reported as already covered instead of creating a
+        // second root.
+        let nested = store.add_root(&photos.join("child")).unwrap();
+        assert!(nested.already_in_library);
+        assert_eq!(nested.root.id, root.id);
+        assert_eq!(store.roots().len(), 1);
 
         let reopened = ConfigStore::open(&config_path).unwrap();
         assert_eq!(reopened.roots().len(), 1);
@@ -842,6 +860,61 @@ mod tests {
             crate::scan::scan_photos_excluding(&photos, false, &[], &store.excluded_asset_paths())
                 .unwrap();
         assert_eq!(restored.assets.len(), 2);
+    }
+
+    #[test]
+    fn ingest_settings_round_trip_and_legacy_defaults() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("settings.json");
+
+        let mut store = ConfigStore::open(&config_path).unwrap();
+        let mut ingest = store.ingest_settings().clone();
+        ingest.filename_template = "{job_code}_{counter}".into();
+        ingest.job_code = "JOB-7".into();
+        ingest.counter_start = 12;
+        ingest.counter_padding = 5;
+        ingest.xmp_naming = crate::ingest::XmpNaming::Filename;
+        ingest.iptc.title = "{default_filename}".into();
+        ingest.iptc.keywords.push("travel".into());
+        ingest.templates.push(crate::ingest::IngestTemplate {
+            id: "t1".into(),
+            name: "Client".into(),
+            folder_template: "{YYYY}".into(),
+            filename_template: "{job_code}_{counter}".into(),
+            created_at: 1,
+            updated_at: 2,
+        });
+        store.update_ingest(ingest.clone()).unwrap();
+
+        let reopened = ConfigStore::open(&config_path).unwrap();
+        assert_eq!(reopened.ingest_settings(), &ingest);
+
+        // Older settings files simply receive the ingest defaults.
+        let legacy = temp.path().join("legacy.json");
+        fs::write(
+            &legacy,
+            r#"{
+                "version": 1,
+                "roots": [],
+                "ui": {
+                    "theme": "dark",
+                    "viewMode": "list",
+                    "recursive": true,
+                    "thumbnailSize": 240,
+                    "libraryWidth": 300,
+                    "infoWidth": 360,
+                    "lastRootId": null,
+                    "lastFolder": null,
+                    "filmstripVisible": false
+                }
+            }"#,
+        )
+        .unwrap();
+        let legacy_store = ConfigStore::open(&legacy).unwrap();
+        assert_eq!(
+            legacy_store.ingest_settings(),
+            &crate::ingest::IngestSettings::default()
+        );
     }
 
     #[test]

@@ -46,6 +46,9 @@ pub enum LumioError {
 
     #[error("Could not move files to Trash: {0}")]
     TrashFiles(String),
+
+    #[error("Ingest error: {0}")]
+    Ingest(String),
 }
 
 impl LumioError {
@@ -74,6 +77,7 @@ impl LumioError {
             Self::Trash(_) => "trash",
             Self::Move(_) => "move",
             Self::TrashFiles(_) => "trash",
+            Self::Ingest(_) => "ingest",
         }
     }
 }

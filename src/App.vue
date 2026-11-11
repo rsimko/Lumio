@@ -6,6 +6,7 @@ import DeleteAssetsDialog from '@/components/DeleteAssetsDialog.vue';
 import FolderContextMenu from '@/components/FolderContextMenu.vue';
 import FullscreenViewer from '@/components/FullscreenViewer.vue';
 import InfoPanel from '@/components/InfoPanel.vue';
+import IngestDialog from '@/components/IngestDialog.vue';
 import LibraryPanel from '@/components/LibraryPanel.vue';
 import MainArea from '@/components/MainArea.vue';
 import NewFolderDialog from '@/components/NewFolderDialog.vue';
@@ -19,9 +20,11 @@ import ToastHost from '@/components/ToastHost.vue';
 import TopToolbar from '@/components/TopToolbar.vue';
 import WarningsDialog from '@/components/WarningsDialog.vue';
 import { useLibraryStore } from '@/stores/library';
+import { useIngestStore } from '@/stores/ingest';
 import type { ShortcutId } from '@/lib/shortcuts';
 
 const store = useLibraryStore();
+const ingest = useIngestStore();
 
 interface BrowseShortcut {
   id: ShortcutId;
@@ -137,6 +140,14 @@ function onKeydown(event: KeyboardEvent) {
     return;
   }
 
+  if (ingest.open) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      ingest.closeDialog();
+    }
+    return;
+  }
+
   if (event.key === 'Escape') {
     event.preventDefault();
     if (store.fullscreenOpen) store.closeFullscreen();
@@ -233,6 +244,7 @@ onBeforeUnmount(() => {
     <NewFolderDialog v-if="store.newFolderOpen" />
     <RemoveFolderDialog v-if="store.removeFolderOpen" />
     <DeleteAssetsDialog v-if="store.deleteAssetsOpen" />
+    <IngestDialog v-if="ingest.open" />
     <ToastHost />
   </div>
 </template>

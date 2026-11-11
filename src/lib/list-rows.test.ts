@@ -8,6 +8,7 @@ import {
   LIST_ROW_HEIGHT,
   listRowsHeight,
 } from '@/lib/list-rows';
+import { emptyMetadata } from '@/lib/metadata';
 import type { PhotoAsset } from '@/types';
 
 function asset(overrides: Partial<PhotoAsset> & Pick<PhotoAsset, 'id' | 'primaryPath'>): PhotoAsset {
@@ -27,6 +28,7 @@ function asset(overrides: Partial<PhotoAsset> & Pick<PhotoAsset, 'id' | 'primary
     width: null,
     height: null,
     relativeDir: '',
+    metadata: emptyMetadata(),
     ...overrides,
   };
 }

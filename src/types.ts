@@ -104,6 +104,68 @@ export interface ScanWarning {
   message: string;
 }
 
+export type ColorLabel = 'red' | 'yellow' | 'green' | 'blue' | 'purple';
+
+export type CullFlag = 'pick' | 'reject';
+
+export type MetadataSource = 'sidecar' | 'embedded' | 'none';
+
+export interface MetadataIssue {
+  code: string;
+  message: string;
+}
+
+export interface PhotoMetadata {
+  rating: number;
+  label: ColorLabel | null;
+  cull: CullFlag | null;
+  favorite: boolean;
+  keywords: string[];
+  hierarchicalKeywords: string[];
+  source: MetadataSource;
+  revision: string;
+  issues: MetadataIssue[];
+}
+
+export interface MetadataUpdate {
+  rating?: number;
+  label?: ColorLabel;
+  clearLabel?: boolean;
+  cull?: CullFlag;
+  clearCull?: boolean;
+  favorite?: boolean;
+  keywords?: string[];
+  hierarchicalKeywords?: string[];
+}
+
+export interface MetadataUpdateRequest {
+  asset: PhotoAsset;
+  expectedRevision: string;
+  update: MetadataUpdate;
+}
+
+export interface MetadataUpdateSuccess {
+  assetId: string;
+  metadata: PhotoMetadata;
+  target: string;
+  xmpSidecar: string | null;
+  createdSidecar: boolean;
+  fileSize: number;
+  modifiedMs: number;
+}
+
+export interface MetadataUpdateFailure {
+  assetId: string;
+  fileName: string;
+  code: string;
+  message: string;
+}
+
+export interface MetadataBatchOutcome {
+  updated: MetadataUpdateSuccess[];
+  failed: MetadataUpdateFailure[];
+}
+
 export interface PhotoAsset {
   id: string;
   primaryPath: string;
@@ -121,6 +183,7 @@ export interface PhotoAsset {
   width: number | null;
   height: number | null;
   relativeDir: string;
+  metadata: PhotoMetadata;
 }
 
 export interface ScanResult {

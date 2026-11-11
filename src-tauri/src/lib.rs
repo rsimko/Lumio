@@ -32,6 +32,7 @@ pub fn run() {
             commands::list_subfolders,
             commands::count_folder_images,
             commands::scan_folder,
+            commands::update_metadata,
             commands::get_hidden_assets,
             commands::move_assets,
             commands::remove_assets,

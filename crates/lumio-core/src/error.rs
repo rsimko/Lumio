@@ -49,6 +49,12 @@ pub enum LumioError {
 
     #[error("Ingest error: {0}")]
     Ingest(String),
+
+    #[error("Metadata error: {0}")]
+    Metadata(String),
+
+    #[error("Metadata conflict: {0}")]
+    MetadataConflict(String),
 }
 
 impl LumioError {
@@ -78,6 +84,8 @@ impl LumioError {
             Self::Move(_) => "move",
             Self::TrashFiles(_) => "trash",
             Self::Ingest(_) => "ingest",
+            Self::Metadata(_) => "metadata",
+            Self::MetadataConflict(_) => "metadataConflict",
         }
     }
 }

@@ -1,12 +1,13 @@
 # Lumio
 
 Lumio is a local-first browser for RAW photography. Point it at folders that already
-contain photos and it shows them in place — nothing is imported, moved, renamed, or
-modified. It is built with Rust, Tauri 2, Vue 3 and TypeScript.
+contain photos and it shows them in place — nothing is imported, moved or renamed. Photos are
+only written when you explicitly rate, label, flag or favorite them, and even then only the XMP
+properties Lumio owns are changed. It is built with Rust, Tauri 2, Vue 3 and TypeScript.
 
 This is **Milestone 1**: fast, correct folder-based browsing with honest preview-source
-labelling, plus a copy-only camera-card ingest. Cataloguing, search and in-place metadata
-editing come later.
+labelling, a copy-only camera-card ingest, and in-place ratings, labels, culling and favorites.
+Cataloguing, search and the keyword editor come later.
 
 ![Lumio showing a folder of RAW photos in the grid layout](docs/screenshot.jpg)
 
@@ -57,6 +58,17 @@ editing come later.
   connected rows beneath the RAW they belong to.
 - Open any photo in a distraction-free fullscreen viewer from the info panel, the filmstrip
   view, or with the keyboard.
+- Rate photos from 1–5 stars, apply one of five standard color labels, mark Pick/Reject/Unflag
+  and toggle favorites from the info panel, with `1`–`5`, `P`, `X`, `U` and `Shift+F` working in
+  both browse and fullscreen. Multi-selection shows mixed values and applies changes as one
+  batch; tiles, list rows, the filmstrip and the viewer show compact indicators.
+- Edits update the existing XMP rather than regenerating it. RAW, TIFF, PNG and WebP use a
+  sidecar; a standalone JPEG embeds XMP; a JPEG with a sidecar writes only that sidecar. Writes
+  are staged, read back field-by-field, and checked so unrelated XMP (Darktable history, masks,
+  private namespaces and unknown tags) survives. A revision fingerprint rejects stale edits.
+- Flat and hierarchical keywords are read from `dc:subject` and `lr:hierarchicalSubject` and
+  shown read-only in the info panel. The write path and tests already support both collections;
+  only the keyword editor UI is deferred.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted.
@@ -69,9 +81,12 @@ editing come later.
 
 ## Non-destructive by default
 
-Browsing is strictly read-only:
+Browsing is strictly read-only. The only writes that ever touch a photo or sidecar happen when
+you explicitly change metadata, and they are limited to the XMP target and fields described
+above:
 
-- No original file is ever copied, moved, renamed or written to while browsing.
+- No original file is written just by browsing or generating previews. A metadata edit touches
+  only the effective target: a sidecar when one exists, or embedded XMP in a standalone JPEG.
 - Thumbnails are written to the application cache directory, never beside your photos.
 - XMP sidecars are parsed for capture dates and associations. Ingest writes IPTC values only to
   destination copies; source sidecars and originals are never modified.
@@ -93,13 +108,30 @@ Browsing is strictly read-only:
 - Ingest is copy-only. Sources are never renamed, moved or written to, and the operation refuses
   unsafe destinations such as a folder inside a source.
 
+## Metadata mapping
+
+| Lumio field | XMP property | Notes |
+| --- | --- | --- |
+| Rating | `xmp:Rating` | 0–5 stars. Adobe's `-1` is read as zero stars plus Reject. |
+| Color label | `xmp:Label` | Red, Yellow, Green, Blue or Purple. |
+| Cull flag | `lumio:Cull` | `pick` or `reject`, independent of the star rating. |
+| Favorite | `lumio:Favorite` | Boolean. |
+| Keywords | `dc:subject` | Flat keyword bag. |
+| Hierarchical keywords | `lr:hierarchicalSubject` | `Parent\|Child` paths. |
+
+The private namespace is `https://lumio.app/ns/1.0/`. Lumio generates an ExifTool tag
+configuration at `exiftool-lumio.config` in the application cache on startup. Unknown labels
+or out-of-range ratings are surfaced as warnings but do not block edits to other fields;
+unreadable or malformed XMP does block the write.
+
 ## Requirements
 
 - macOS 12 or newer (primary), or a Linux desktop with WebKitGTK (secondary).
 - Rust 1.85+ (edition 2024).
 - Node.js 20.19+ or 22.12+, and pnpm.
 - ExifTool is optional for browsing and ingest scanning (Lumio falls back to `rawler`,
-  `kamadak-exif` and XMP parsing) but is required to write IPTC metadata. Set its path in
+  `kamadak-exif` and its native XMP parser) but is required to write IPTC metadata during
+  ingest and to edit photo ratings, labels, culling or favorites. Set its path in
   Settings → Ingest if it is not on `PATH`.
 
 Windows is not a target for Milestone 1.
@@ -156,6 +188,7 @@ crates/lumio-core/      Domain logic, testable without Tauri
   src/config.rs         Atomic JSON settings and library roots
   src/assets.rs         Asset file groups, safe moves, Trash and hidden groups
   src/scan.rs           Folder scanning, RAW/JPEG/XMP association, folder tree
+  src/metadata.rs       XMP read/write, preservation checks, JPEG segment handling
   src/ingest/           Source scanning, templates, planning, verified copy, IPTC
   src/preview.rs        Camera-embedded preview extraction + orientation
   src/thumbnail.rs      Thumbnail cache keys, resizing, encoding
@@ -177,11 +210,12 @@ webview against registered roots, and runs blocking work off the UI thread.
 ## Milestone 1 scope
 
 In scope: folder roots, nested tree, scanning, association, five views, fullscreen,
-preview-source indication, copy-only ingest with templates and IPTC writing, error handling,
-settings, tests and documentation.
+preview-source indication, copy-only ingest with templates and IPTC writing, in-place ratings,
+color labels, culling and favorites (including flat/hierarchical keyword read/write in the
+core), error handling, settings, tests and documentation.
 
-Explicitly deferred: SQLite catalogue, search and filtering, ratings/labels/keywords in the
-browser, in-place metadata editing, cloud sync, HEIC/AVIF, map and albums.
+Explicitly deferred: SQLite catalogue, search and filtering, keyword editing UI, cloud sync,
+HEIC/AVIF, map and albums.
 
 ## Configuration and data locations
 

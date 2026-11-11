@@ -619,6 +619,7 @@ fn make_asset(
     let id = blake3::hash(record.path.as_os_str().as_encoded_bytes())
         .to_hex()
         .to_string();
+    let metadata = crate::metadata::read_photo_metadata(&record.path, xmp_sidecar.as_deref());
     PhotoAsset {
         id,
         primary_path: record.path,
@@ -636,6 +637,7 @@ fn make_asset(
         width,
         height,
         relative_dir: relative_dir.to_string(),
+        metadata,
     }
 }
 
@@ -720,6 +722,85 @@ mod tests {
             .unwrap();
         assert_eq!(standalone.kind, AssetKind::Jpeg);
         assert!(standalone.xmp_sidecar.is_some());
+    }
+
+    #[test]
+    fn scan_populates_metadata_from_sidecars() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::write(root.join("IMG_0001.CR2"), b"raw").unwrap();
+        fs::write(
+            root.join("IMG_0001.CR2.xmp"),
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:lumio="https://lumio.app/ns/1.0/">
+   <xmp:Rating>4</xmp:Rating>
+   <xmp:Label>Blue</xmp:Label>
+   <lumio:Cull>pick</lumio:Cull>
+   <lumio:Favorite>true</lumio:Favorite>
+   <dc:subject><rdf:Bag><rdf:li>travel</rdf:li></rdf:Bag></dc:subject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>"#,
+        )
+        .unwrap();
+
+        let result = scan_photos(root, false, &[]).unwrap();
+        let asset = &result.assets[0];
+        assert_eq!(
+            asset.metadata.source,
+            crate::metadata::MetadataSource::Sidecar
+        );
+        assert_eq!(asset.metadata.rating, 4);
+        assert_eq!(
+            asset.metadata.label,
+            Some(crate::metadata::ColorLabel::Blue)
+        );
+        assert_eq!(asset.metadata.cull, Some(crate::metadata::CullFlag::Pick));
+        assert!(asset.metadata.favorite);
+        assert_eq!(asset.metadata.keywords, vec!["travel"]);
+        assert!(!asset.metadata.revision.is_empty());
+        assert!(asset.metadata.issues.is_empty());
+    }
+
+    #[test]
+    fn scan_populates_metadata_from_embedded_jpeg_xmp() {
+        let Some(exiftool) = crate::ingest::metadata::discover_exiftool(None) else {
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let jpeg = root.join("embedded.jpg");
+        write_jpeg(&jpeg);
+        let status = std::process::Command::new(&exiftool.path)
+            .args([
+                "-overwrite_original",
+                "-XMP:Rating=3",
+                "-XMP:Label=Green",
+                "-XMP-dc:Subject=one",
+                "-XMP-dc:Subject=two",
+                &jpeg.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let result = scan_photos(root, false, &[]).unwrap();
+        let asset = &result.assets[0];
+        assert_eq!(
+            asset.metadata.source,
+            crate::metadata::MetadataSource::Embedded
+        );
+        assert_eq!(asset.metadata.rating, 3);
+        assert_eq!(
+            asset.metadata.label,
+            Some(crate::metadata::ColorLabel::Green)
+        );
+        assert_eq!(asset.metadata.keywords, vec!["one", "two"]);
+        assert!(!asset.metadata.revision.is_empty());
     }
 
     #[test]

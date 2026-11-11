@@ -14,6 +14,14 @@ import { basename, isPathInside, parentPath } from '@/lib/format';
 import { pruneFolderRemovalTargets } from '@/lib/folders';
 import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
 import {
+  commonMetadataValue,
+  cullPatch,
+  favoritePatch,
+  labelPatch,
+  mergeMetadataResult,
+  ratingPatch,
+} from '@/lib/metadata';
+import {
   DEFAULT_SHORTCUTS,
   canonicalBinding,
   formatBindingLabel,
@@ -34,6 +42,8 @@ import {
 import type {
   AddFolderOutcome,
   AssetRemovalMode,
+  ColorLabel,
+  CullFlag,
   ExcludedAsset,
   ExternalEditor,
   FolderImageCounts,
@@ -41,6 +51,7 @@ import type {
   FolderNode,
   FolderRemovalTarget,
   IngestSettings,
+  MetadataUpdate,
   MonoFont,
   NewFolderTarget,
   PhotoAsset,
@@ -216,7 +227,13 @@ export const useLibraryStore = defineStore('library', () => {
   const creatingFolder = ref(false);
   const newFolderError = ref<string | null>(null);
   const clearingCache = ref(false);
+  const metadataBusy = ref(false);
+  const metadataError = ref<string | null>(null);
   const toasts = ref<Toast[]>([]);
+
+  watch(primaryId, () => {
+    metadataError.value = null;
+  });
 
   const systemDark = ref(readSystemDark());
   const resolvedTheme = computed<'light' | 'dark'>(() =>
@@ -665,6 +682,101 @@ export const useLibraryStore = defineStore('library', () => {
     }
     closePhotoMenu();
     void editSelectionWithApplication(editor.path);
+  }
+
+  async function applyMetadataPatch(
+    update: MetadataUpdate,
+    targets?: readonly PhotoAsset[],
+  ): Promise<void> {
+    const source = targets ?? selectedAssets.value;
+    const assetsToUpdate = source.filter((asset) => asset.primaryPath);
+    if (!assetsToUpdate.length) {
+      addToast('Select a photo to edit metadata.', 'info');
+      return;
+    }
+    if (metadataBusy.value) return;
+    metadataBusy.value = true;
+    metadataError.value = null;
+    try {
+      const outcome = await api.updateMetadata(
+        assetsToUpdate.map((asset) => ({
+          asset,
+          expectedRevision: asset.metadata?.revision ?? '',
+          update,
+        })),
+      );
+
+      if (outcome.updated.length) {
+        const byId = new Map(outcome.updated.map((result) => [result.assetId, result]));
+        assets.value = assets.value.map((asset) => {
+          const result = byId.get(asset.id);
+          if (!result) return asset;
+          return mergeMetadataResult(
+            asset,
+            result.metadata,
+            result.xmpSidecar,
+            result.fileSize,
+            result.modifiedMs,
+          );
+        });
+        addToast(
+          `Updated metadata for ${outcome.updated.length} ${
+            outcome.updated.length === 1 ? 'photo' : 'photos'
+          }.`,
+          'success',
+        );
+      }
+
+      if (outcome.failed.length) {
+        for (const failure of outcome.failed) {
+          addToast(`${failure.fileName}: ${failure.message}`, 'error');
+        }
+        metadataError.value =
+          outcome.failed.length === 1
+            ? outcome.failed[0].message
+            : `${outcome.failed.length} photos could not be updated.`;
+      }
+    } catch (error) {
+      const message = errorMessage(error);
+      metadataError.value = message;
+      addToast(message, 'error');
+    } finally {
+      metadataBusy.value = false;
+    }
+  }
+
+  function setRating(rating: number): void {
+    const current = commonMetadataValue(selectedAssets.value, (value) => value.rating, 0);
+    const next = Math.max(0, Math.min(5, Math.round(rating)));
+    void applyMetadataPatch(ratingPatch(current.value, current.mixed, next));
+  }
+
+  function setColorLabel(label: ColorLabel): void {
+    const current = commonMetadataValue(selectedAssets.value, (value) => value.label, null);
+    void applyMetadataPatch(labelPatch(current.value, current.mixed, label));
+  }
+
+  function setCull(cull: CullFlag): void {
+    const current = commonMetadataValue(selectedAssets.value, (value) => value.cull, null);
+    void applyMetadataPatch(cullPatch(current.value, current.mixed, cull));
+  }
+
+  function unflagSelection(): void {
+    if (!selectedAssets.value.length) {
+      addToast('Select a photo to edit metadata.', 'info');
+      return;
+    }
+    void applyMetadataPatch({ clearCull: true });
+  }
+
+  function toggleFavorite(): void {
+    const current = commonMetadataValue(
+      selectedAssets.value,
+      (value) => value.favorite,
+      false,
+    );
+    const allFavorite = !current.mixed && current.value === true;
+    void applyMetadataPatch(favoritePatch(allFavorite, current.mixed));
   }
 
   function toggleInfo(): void {
@@ -1721,6 +1833,15 @@ export const useLibraryStore = defineStore('library', () => {
     removeExternalEditor,
     editSelectionWithApplication,
     editSelectionWithDefault,
+    // metadata
+    metadataBusy,
+    metadataError,
+    applyMetadataPatch,
+    setRating,
+    setColorLabel,
+    setCull,
+    unflagSelection,
+    toggleFavorite,
     shortcutBinding,
     shortcutLabel,
     shortcutIsCustom,

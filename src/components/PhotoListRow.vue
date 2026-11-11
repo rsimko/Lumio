@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import AssociationBadges from '@/components/AssociationBadges.vue';
+import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
@@ -103,7 +104,10 @@ const subline = computed(() => {
         />
       </div>
       <div class="min-w-0">
-        <p class="truncate text-xs font-medium text-ink">{{ asset.fileName }}</p>
+        <div class="flex min-w-0 items-center gap-1.5">
+          <p class="truncate text-xs font-medium text-ink">{{ asset.fileName }}</p>
+          <MetadataBadges :asset="asset" variant="inline" class="shrink-0" />
+        </div>
         <p class="mt-0.5 truncate text-2xs text-subtle">
           {{ subline }}
         </p>

@@ -9,21 +9,21 @@ use tauri::Manager;
 pub struct AppPaths {
     pub config_file: PathBuf,
     pub cache_dir: PathBuf,
+    /// ExifTool user-defined tags for the `lumio` XMP namespace.
+    pub exiftool_config_file: PathBuf,
 }
 
 impl AppPaths {
     pub fn resolve(app: &tauri::AppHandle) -> std::io::Result<Self> {
         let config_dir = app.path().app_config_dir().map_err(std::io::Error::other)?;
-        let cache_dir = app
-            .path()
-            .app_cache_dir()
-            .map_err(std::io::Error::other)?
-            .join("thumbnails");
+        let app_cache = app.path().app_cache_dir().map_err(std::io::Error::other)?;
+        let cache_dir = app_cache.join("thumbnails");
         std::fs::create_dir_all(&config_dir)?;
         std::fs::create_dir_all(&cache_dir)?;
         Ok(Self {
             config_file: config_dir.join("settings.json"),
             cache_dir,
+            exiftool_config_file: app_cache.join("exiftool-lumio.config"),
         })
     }
 }
@@ -34,6 +34,9 @@ pub struct AppState {
     pub thumb_gate: Arc<tokio::sync::Semaphore>,
     pub inflight: Arc<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
     pub recovery_warning: Option<String>,
+    /// Serialises metadata writes so two commands cannot race on one file.
+    pub metadata_gate: tokio::sync::Mutex<()>,
+    pub exiftool_config_file: PathBuf,
 }
 
 impl AppState {
@@ -41,12 +44,16 @@ impl AppState {
         let config = ConfigStore::open(&paths.config_file).map_err(|error| error.to_string())?;
         let recovery_warning = config.recovery_warning().map(str::to_string);
         let thumbs = ThumbnailService::new(&paths.cache_dir).map_err(|error| error.to_string())?;
+        lumio_core::metadata::write_exiftool_config(&paths.exiftool_config_file)
+            .map_err(|error| error.to_string())?;
         Ok(Self {
             config: Mutex::new(config),
             thumbs: Arc::new(thumbs),
             thumb_gate: Arc::new(tokio::sync::Semaphore::new(4)),
             inflight: Arc::new(Mutex::new(HashMap::new())),
             recovery_warning,
+            metadata_gate: tokio::sync::Mutex::new(()),
+            exiftool_config_file: paths.exiftool_config_file,
         })
     }
 

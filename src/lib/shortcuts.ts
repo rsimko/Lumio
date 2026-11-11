@@ -9,7 +9,7 @@
 
 export type ShortcutContext = 'browse' | 'viewer';
 
-export type ShortcutGroup = 'Browsing' | 'Library' | 'Fullscreen';
+export type ShortcutGroup = 'Browsing' | 'Metadata' | 'Library' | 'Fullscreen';
 
 export type ShortcutId =
   | 'browse.fullscreen'
@@ -18,6 +18,15 @@ export type ShortcutId =
   | 'browse.thumbLarger'
   | 'browse.thumbSmaller'
   | 'browse.thumbReset'
+  | 'metadata.rating1'
+  | 'metadata.rating2'
+  | 'metadata.rating3'
+  | 'metadata.rating4'
+  | 'metadata.rating5'
+  | 'metadata.pick'
+  | 'metadata.reject'
+  | 'metadata.unflag'
+  | 'metadata.favorite'
   | 'view.grid'
   | 'view.masonry'
   | 'view.justified'
@@ -47,7 +56,12 @@ export interface ShortcutDefinition {
   aliases?: string[];
 }
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = ['Browsing', 'Library', 'Fullscreen'];
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  'Browsing',
+  'Metadata',
+  'Library',
+  'Fullscreen',
+];
 
 export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
   {
@@ -95,6 +109,69 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     group: 'Browsing',
     context: 'browse',
     binding: '0',
+  },
+  {
+    id: 'metadata.rating1',
+    label: 'Rate 1 star',
+    group: 'Metadata',
+    context: 'browse',
+    binding: '1',
+  },
+  {
+    id: 'metadata.rating2',
+    label: 'Rate 2 stars',
+    group: 'Metadata',
+    context: 'browse',
+    binding: '2',
+  },
+  {
+    id: 'metadata.rating3',
+    label: 'Rate 3 stars',
+    group: 'Metadata',
+    context: 'browse',
+    binding: '3',
+  },
+  {
+    id: 'metadata.rating4',
+    label: 'Rate 4 stars',
+    group: 'Metadata',
+    context: 'browse',
+    binding: '4',
+  },
+  {
+    id: 'metadata.rating5',
+    label: 'Rate 5 stars',
+    group: 'Metadata',
+    context: 'browse',
+    binding: '5',
+  },
+  {
+    id: 'metadata.pick',
+    label: 'Flag as picked',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'p',
+  },
+  {
+    id: 'metadata.reject',
+    label: 'Flag as rejected',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'x',
+  },
+  {
+    id: 'metadata.unflag',
+    label: 'Remove cull flag',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'u',
+  },
+  {
+    id: 'metadata.favorite',
+    label: 'Toggle favorite',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'shift+f',
   },
   { id: 'view.grid', label: 'Grid view', group: 'Browsing', context: 'browse', binding: 'g' },
   {

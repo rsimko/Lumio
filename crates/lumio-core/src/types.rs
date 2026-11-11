@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::ingest::IngestSettings;
+use crate::metadata::PhotoMetadata;
 
 pub const CACHE_VERSION: u32 = 2;
 
@@ -189,6 +190,9 @@ pub struct PhotoAsset {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub relative_dir: String,
+    /// Ratings, labels, culling, favorites and keywords read from XMP.
+    #[serde(default)]
+    pub metadata: PhotoMetadata,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

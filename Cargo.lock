@@ -2462,6 +2462,7 @@ dependencies = [
  "imagesize",
  "kamadak-exif",
  "natord",
+ "quick-xml",
  "rawler",
  "serde",
  "serde_json",

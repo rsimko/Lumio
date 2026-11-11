@@ -2,6 +2,7 @@
 import { FileText } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
+import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
@@ -129,6 +130,11 @@ const footerSource = computed(() => {
         <FileText class="h-2.5 w-2.5" />
       </span>
     </div>
+
+    <MetadataBadges
+      :asset="asset"
+      class="pointer-events-none absolute left-1.5 top-7"
+    />
 
     <span
       class="pointer-events-none absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ring-1 ring-black/25"

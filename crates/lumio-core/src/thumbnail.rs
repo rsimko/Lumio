@@ -298,6 +298,7 @@ mod tests {
             width: Some(2),
             height: Some(1),
             relative_dir: String::new(),
+            metadata: Default::default(),
         };
 
         let histogram = service.histogram(&asset, 256).unwrap();

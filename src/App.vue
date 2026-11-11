@@ -68,7 +68,36 @@ const browseShortcuts: BrowseShortcut[] = [
   { id: 'library.theme', run: () => store.toggleTheme() },
   { id: 'library.settings', run: () => store.openSettings() },
   { id: 'help.shortcuts', run: () => store.openShortcuts() },
+  {
+    id: 'metadata.rating1',
+    run: () => store.setRating(1),
+  },
+  {
+    id: 'metadata.rating2',
+    run: () => store.setRating(2),
+  },
+  {
+    id: 'metadata.rating3',
+    run: () => store.setRating(3),
+  },
+  {
+    id: 'metadata.rating4',
+    run: () => store.setRating(4),
+  },
+  {
+    id: 'metadata.rating5',
+    run: () => store.setRating(5),
+  },
+  { id: 'metadata.pick', run: () => store.setCull('pick') },
+  { id: 'metadata.reject', run: () => store.setCull('reject') },
+  { id: 'metadata.unflag', run: () => store.unflagSelection() },
+  { id: 'metadata.favorite', run: () => store.toggleFavorite() },
 ];
+
+/** Metadata keys work in both browse and the fullscreen viewer. */
+const metadataShortcuts: BrowseShortcut[] = browseShortcuts.filter((shortcut) =>
+  shortcut.id.startsWith('metadata.'),
+);
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -169,6 +198,13 @@ function onKeydown(event: KeyboardEvent) {
       event.preventDefault();
       store.closeFullscreen();
       store.openDeleteAssets();
+    } else {
+      for (const shortcut of metadataShortcuts) {
+        if (!store.shortcutMatches(event, shortcut.id)) continue;
+        event.preventDefault();
+        shortcut.run();
+        break;
+      }
     }
     return;
   }

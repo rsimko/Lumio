@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
+import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { formatCount, formatDimensions, sourceLabel } from '@/lib/format';
@@ -187,6 +188,11 @@ onBeforeUnmount(() => {
               {{ sourceText }}
             </span>
             <span class="tabular-nums">{{ dimensions }}</span>
+            <MetadataBadges
+              v-if="store.selectedAsset"
+              :asset="store.selectedAsset"
+              class="text-white/85"
+            />
             <span v-if="store.selectedAsset?.xmpSidecar" class="flex items-center gap-1">
               XMP sidecar
             </span>

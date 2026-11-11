@@ -17,6 +17,8 @@ import type {
   IngestRequest,
   IngestSettings,
   IngestTools,
+  MetadataBatchOutcome,
+  MetadataUpdateRequest,
   MoveAssetsOutcome,
   PhotoAsset,
   RootInfo,
@@ -41,6 +43,8 @@ export const api = {
     invoke<FolderImageCounts>('count_folder_images', { folder }),
   scanFolder: (folder: string, recursive: boolean) =>
     invoke<ScanResult>('scan_folder', { folder, recursive }),
+  updateMetadata: (requests: MetadataUpdateRequest[]) =>
+    invoke<MetadataBatchOutcome>('update_metadata', { requests }),
   moveAssets: (assets: PhotoAsset[], destination: string) =>
     invoke<MoveAssetsOutcome>('move_assets', { assets, destination }),
   removeAssets: (assets: PhotoAsset[], mode: AssetRemovalMode) =>

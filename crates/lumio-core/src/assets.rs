@@ -353,6 +353,7 @@ mod tests {
             width: None,
             height: None,
             relative_dir: String::new(),
+            metadata: Default::default(),
         }
     }
 

@@ -7,12 +7,13 @@ use lumio_core::ingest::{
     IngestConflictResolution, IngestEvent, IngestOutcome, IngestPlan, IngestRequest,
     IngestSettings, IngestTools,
 };
+use lumio_core::metadata::{MetadataSource, MetadataUpdate, MetadataWriteResult, PhotoMetadata};
 use lumio_core::types::{
     AddFolderOutcome, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset, FolderImageCounts,
     FolderNode, MoveAssetsOutcome, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
     ThumbnailResult, UiSettings,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::ipc::Channel;
 
@@ -210,6 +211,160 @@ pub async fn scan_folder(
             format!("Folder scan task failed: {error}"),
         )),
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataUpdateRequest {
+    pub asset: PhotoAsset,
+    pub expected_revision: String,
+    #[serde(default)]
+    pub update: MetadataUpdate,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataUpdateSuccess {
+    pub asset_id: String,
+    pub metadata: PhotoMetadata,
+    pub target: PathBuf,
+    pub xmp_sidecar: Option<PathBuf>,
+    pub created_sidecar: bool,
+    pub file_size: u64,
+    pub modified_ms: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataUpdateFailure {
+    pub asset_id: String,
+    pub file_name: String,
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataBatchOutcome {
+    pub updated: Vec<MetadataUpdateSuccess>,
+    pub failed: Vec<MetadataUpdateFailure>,
+}
+
+fn validate_sidecar_path(
+    state: &AppState,
+    primary: &std::path::Path,
+    sidecar: Option<&std::path::Path>,
+) -> Result<Option<PathBuf>, CommandError> {
+    let Some(sidecar) = sidecar else {
+        return Ok(None);
+    };
+    let Some(file_name) = sidecar.file_name() else {
+        return Err(CommandError::new(
+            "invalidPath",
+            "The XMP sidecar path has no file name.",
+        ));
+    };
+    let parent = sidecar.parent().ok_or_else(|| {
+        CommandError::new("invalidPath", "The XMP sidecar path has no parent folder.")
+    })?;
+    let parent = validate_under_roots(state, parent)?;
+    let primary_parent = primary.parent().unwrap_or(primary);
+    if parent != primary_parent {
+        return Err(CommandError::new(
+            "invalidPath",
+            "The XMP sidecar must live beside its photo.",
+        ));
+    }
+    let candidate = parent.join(file_name);
+    if candidate.exists() {
+        Ok(Some(validate_under_roots(state, &candidate)?))
+    } else {
+        Ok(Some(candidate))
+    }
+}
+
+#[tauri::command]
+pub async fn update_metadata(
+    state: State<'_, AppState>,
+    requests: Vec<MetadataUpdateRequest>,
+) -> Result<MetadataBatchOutcome, CommandError> {
+    if requests.is_empty() {
+        return Ok(MetadataBatchOutcome {
+            updated: Vec::new(),
+            failed: Vec::new(),
+        });
+    }
+
+    let ingest = state.config().ingest_settings().clone();
+    let Some(tool) = lumio_core::ingest::discover_exiftool(ingest.exiftool_path.as_deref()) else {
+        return Err(CommandError::new(
+            "exiftoolMissing",
+            "ExifTool is required to edit photo metadata. Install it or set its path in Settings → Ingest.",
+        ));
+    };
+
+    // Validate every path before writing anything so a bad entry cannot leave
+    // a batch partially applied for an avoidable reason.
+    let mut prepared = Vec::new();
+    for request in requests {
+        let primary = validate_under_roots(&state, &request.asset.primary_path)?;
+        let sidecar =
+            validate_sidecar_path(&state, &primary, request.asset.xmp_sidecar.as_deref())?;
+        prepared.push((request, primary, sidecar));
+    }
+
+    let config = state.exiftool_config_file.clone();
+    let gate = &state.metadata_gate;
+    let _guard = gate.lock().await;
+    let outcome = tokio::task::spawn_blocking(move || {
+        let result = |request: &MetadataUpdateRequest,
+                      primary: &std::path::Path,
+                      sidecar: Option<&std::path::Path>|
+         -> std::result::Result<MetadataWriteResult, LumioError> {
+            lumio_core::metadata::write_photo_metadata(
+                primary,
+                sidecar,
+                &request.update,
+                Some(request.expected_revision.as_str()),
+                &tool.path,
+                Some(&config),
+            )
+        };
+
+        let mut updated = Vec::new();
+        let mut failed = Vec::new();
+        for (request, primary, sidecar) in prepared {
+            match result(&request, &primary, sidecar.as_deref()) {
+                Ok(write) => {
+                    let xmp_sidecar = if write.metadata.source == MetadataSource::Sidecar {
+                        Some(write.target.clone())
+                    } else {
+                        None
+                    };
+                    updated.push(MetadataUpdateSuccess {
+                        asset_id: request.asset.id,
+                        metadata: write.metadata,
+                        target: write.target,
+                        xmp_sidecar,
+                        created_sidecar: write.created_sidecar,
+                        file_size: write.file_size,
+                        modified_ms: write.modified_ms,
+                    });
+                }
+                Err(error) => failed.push(MetadataUpdateFailure {
+                    asset_id: request.asset.id,
+                    file_name: request.asset.file_name,
+                    code: error.code().to_string(),
+                    message: error.to_string(),
+                }),
+            }
+        }
+        MetadataBatchOutcome { updated, failed }
+    })
+    .await
+    .map_err(|error| CommandError::new("internal", format!("Metadata task failed: {error}")))?;
+
+    Ok(outcome)
 }
 
 #[tauri::command]

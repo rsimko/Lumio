@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_BY_ID,
   bindingFromEvent,
   canonicalBinding,
   eventMatchesBinding,
@@ -108,5 +110,37 @@ describe('shortcut bindings', () => {
   it('canonicalises duplicate modifiers', () => {
     expect(canonicalBinding('shift+shift+g')).toBe('shift+g');
     expect(canonicalBinding('meta+g')).toBeNull();
+  });
+
+  it('defines non-conflicting metadata shortcuts in the Metadata group', () => {
+    const expected: Record<string, string> = {
+      'metadata.rating1': '1',
+      'metadata.rating2': '2',
+      'metadata.rating3': '3',
+      'metadata.rating4': '4',
+      'metadata.rating5': '5',
+      'metadata.pick': 'p',
+      'metadata.reject': 'x',
+      'metadata.unflag': 'u',
+      'metadata.favorite': 'shift+f',
+    };
+    for (const [id, binding] of Object.entries(expected)) {
+      const key = id as keyof typeof DEFAULT_SHORTCUTS;
+      expect(DEFAULT_SHORTCUTS[key]).toBe(binding);
+      expect(SHORTCUT_BY_ID[key].group).toBe('Metadata');
+    }
+
+    const metadataIds = new Set(Object.keys(expected));
+    for (const id of metadataIds) {
+      const definition = SHORTCUT_BY_ID[id as keyof typeof SHORTCUT_BY_ID];
+      const conflicts = Object.values(SHORTCUT_BY_ID).filter(
+        (candidate) =>
+          candidate.id !== definition.id &&
+          candidate.context === definition.context &&
+          !metadataIds.has(candidate.id) &&
+          candidate.binding === definition.binding,
+      );
+      expect(conflicts, `${definition.label} conflicts with another browse shortcut`).toEqual([]);
+    }
   });
 });

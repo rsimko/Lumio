@@ -6,6 +6,7 @@ import {
   collectAssetFilePaths,
   sharedAssociationPaths,
 } from '@/lib/assets';
+import { emptyMetadata } from '@/lib/metadata';
 import type { PhotoAsset } from '@/types';
 
 function asset(overrides: Partial<PhotoAsset> & Pick<PhotoAsset, 'id' | 'primaryPath'>): PhotoAsset {
@@ -24,6 +25,7 @@ function asset(overrides: Partial<PhotoAsset> & Pick<PhotoAsset, 'id' | 'primary
     width: null,
     height: null,
     relativeDir: '',
+    metadata: emptyMetadata(),
     ...overrides,
   };
 }

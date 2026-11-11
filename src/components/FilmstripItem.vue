@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
@@ -94,5 +95,9 @@ const title = computed(() => {
     >
       RAW
     </span>
+    <MetadataBadges
+      :asset="asset"
+      class="pointer-events-none absolute bottom-1 left-1"
+    />
   </div>
 </template>

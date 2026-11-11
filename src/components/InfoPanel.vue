@@ -16,6 +16,7 @@ import {
 import { computed, ref, watch } from 'vue';
 
 import AssociationBadges from '@/components/AssociationBadges.vue';
+import MetadataEditor from '@/components/MetadataEditor.vue';
 import PhotoHistogram from '@/components/PhotoHistogram.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
@@ -294,7 +295,9 @@ async function revealPrimary() {
           </button>
         </div>
 
-        <section class="mt-4 border-t border-line px-3 py-3">
+        <MetadataEditor />
+
+        <section class="border-t border-line px-3 py-3">
           <h4 class="panel-heading mb-1.5">File</h4>
           <div class="info-row">
             <span class="info-label">Type</span>

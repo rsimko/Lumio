@@ -32,7 +32,8 @@ const children = computed(() => store.tree.get(props.node.path) ?? []);
 const loading = computed(() => store.treeLoading.has(props.node.path));
 const error = computed(() => store.treeErrors.get(props.node.path) ?? null);
 const isExpanded = computed(() => store.expanded.has(props.node.path));
-const isSelected = computed(() => store.selectedFolder === props.node.path);
+const isSelected = computed(() => store.isFolderSelected(props.node.path));
+const isCurrent = computed(() => store.selectedFolder === props.node.path);
 const canExpand = computed(() => props.isRoot || props.node.hasChildren || children.value.length > 0);
 
 const imageCount = computed(() => store.imageCountFor(props.node.path));
@@ -90,13 +91,12 @@ function toggle() {
   void store.toggleExpanded(props.node.path);
 }
 
-function select() {
-  void store.selectFolder(props.node.path, props.rootId);
+function select(event: MouseEvent) {
+  store.selectFolderRow(props.node.path, props.rootId, event);
 }
 
 function removeFolder() {
-  if (props.isRoot) store.openRemoveFolder(props.rootId);
-  else store.openDeleteFolder(props.node.path, props.rootId);
+  store.removeFolderFromRow(props.node.path, props.rootId, props.isRoot);
 }
 
 function openMenu(event: MouseEvent) {
@@ -161,7 +161,7 @@ function openMenu(event: MouseEvent) {
 
       <button
         class="min-w-0 flex-1 truncate py-1 text-left text-xs"
-        :class="isSelected ? 'font-medium text-ink' : ''"
+        :class="isCurrent ? 'font-medium text-ink' : ''"
         :title="node.path"
         @click="select"
         @dblclick="toggle"
@@ -191,7 +191,9 @@ function openMenu(event: MouseEvent) {
       />
       <button
         class="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition hover:bg-danger/10 hover:text-danger group-hover:flex"
-        title="Remove folder…"
+        :title="
+          isSelected && store.selectedFolderCount > 1 ? 'Remove selected folders…' : 'Remove folder…'
+        "
         @click.stop="removeFolder"
       >
         <Trash2 class="h-3 w-3" />

@@ -170,11 +170,19 @@ export const useIngestStore = defineStore('ingest', () => {
   );
   const copiedDestination = computed(() => outcome.value?.destination ?? plan.value?.destination ?? null);
   const progressPercent = computed(() => {
-    if (!progress.value.totalEntities) return 0;
-    return Math.min(
-      100,
-      Math.round((progress.value.doneEntities / progress.value.totalEntities) * 100),
-    );
+    // Prefer bytes: a single large RAW can take a while, and this keeps the
+    // bar moving as files are staged instead of only when a photo completes.
+    if (progress.value.totalBytes > 0) {
+      const ratio = progress.value.doneBytes / progress.value.totalBytes;
+      return Math.min(100, Math.round(ratio * 100));
+    }
+    if (progress.value.totalEntities > 0) {
+      return Math.min(
+        100,
+        Math.round((progress.value.doneEntities / progress.value.totalEntities) * 100),
+      );
+    }
+    return 0;
   });
 
   function resetPlan(): void {

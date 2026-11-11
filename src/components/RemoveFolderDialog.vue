@@ -12,50 +12,88 @@ const mode = ref<RootRemovalMode>('libraryOnly');
 const acknowledged = ref(false);
 const localError = ref<string | null>(null);
 
-const target = computed(() => store.removeFolderTarget);
-const isRoot = computed(() => target.value?.kind === 'root');
+const targets = computed(() => store.removeFolderTargets);
+const count = computed(() => targets.value.length);
+const isMultiple = computed(() => count.value > 1);
+const hasRoots = computed(() => targets.value.some((target) => target.kind === 'root'));
 const isDestructive = computed(() => mode.value === 'moveToTrash');
 const canConfirm = computed(() => {
-  if (!target.value || store.removingFolder) return false;
+  if (!targets.value.length || store.removingFolder) return false;
   if (!isDestructive.value) return true;
   return acknowledged.value;
 });
 const error = computed(() => localError.value ?? store.removeFolderError);
-const confirmLabel = computed(() =>
-  isDestructive.value ? 'Move folder to Trash' : 'Remove from library',
-);
+const confirmLabel = computed(() => {
+  if (isDestructive.value) {
+    return isMultiple.value ? `Move ${count.value} folders to Trash` : 'Move folder to Trash';
+  }
+  return isMultiple.value ? `Remove ${count.value} folders` : 'Remove from library';
+});
 
 async function confirm() {
-  if (!target.value || !canConfirm.value) return;
+  if (!targets.value.length || !canConfirm.value) return;
   localError.value = null;
-  const ok =
-    target.value.kind === 'root'
-      ? await store.removeRoot(target.value.rootId, mode.value)
-      : await store.removeSubfolder(target.value.path, target.value.rootId, mode.value);
+  const ok = await store.removeFolders(targets.value, mode.value);
   if (!ok) {
-    localError.value = store.removeFolderError ?? 'The folder could not be removed.';
+    localError.value = store.removeFolderError ?? 'The folders could not be removed.';
   }
 }
 </script>
 
 <template>
   <AppDialog
-    v-if="target"
-    title="Remove folder"
-    subtitle="Choose what happens to this folder and its contents."
+    v-if="count"
+    :title="isMultiple ? 'Remove folders' : 'Remove folder'"
+    :subtitle="
+      isMultiple
+        ? 'Choose what happens to these folders and everything inside them.'
+        : 'Choose what happens to this folder and its contents.'
+    "
     @close="store.closeRemoveFolder()"
   >
     <div class="space-y-4">
-      <div class="flex items-start gap-3 rounded-lg border border-line bg-panel px-3 py-3">
-        <div class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-panel-2 text-muted">
-          <FolderMinus class="h-4 w-4" />
+      <div class="rounded-lg border border-line bg-panel px-3 py-3">
+        <div class="flex items-start gap-3">
+          <div class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-panel-2 text-muted">
+            <FolderMinus class="h-4 w-4" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="break-words text-xs font-semibold text-ink">
+              {{ isMultiple ? `${count} folders selected` : targets[0]?.name }}
+            </p>
+            <p v-if="!isMultiple" class="mt-0.5 break-all font-mono text-2xs text-subtle selectable">
+              {{ targets[0]?.path }}
+            </p>
+            <p v-else class="mt-0.5 text-2xs leading-relaxed text-subtle">
+              The whole selection is removed together. Nothing changes until you confirm.
+            </p>
+          </div>
         </div>
-        <div class="min-w-0">
-          <p class="break-words text-xs font-semibold text-ink">{{ target.name }}</p>
-          <p class="mt-0.5 break-all font-mono text-2xs text-subtle selectable">
-            {{ target.path }}
-          </p>
-        </div>
+
+        <ul
+          v-if="isMultiple"
+          class="mt-2 max-h-36 space-y-0.5 overflow-y-auto border-t border-line/70 pt-2"
+        >
+          <li
+            v-for="target in targets"
+            :key="target.path"
+            class="flex min-w-0 items-baseline gap-2 px-0.5 py-0.5"
+          >
+            <FolderMinus class="h-3 w-3 shrink-0 translate-y-0.5 text-subtle" />
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[11px] font-medium text-ink">{{ target.name }}</span>
+              <span class="block truncate font-mono text-[9px] text-subtle" :title="target.path">
+                {{ target.path }}
+              </span>
+            </span>
+            <span
+              v-if="target.kind === 'root'"
+              class="shrink-0 rounded border border-line px-1 text-[8px] uppercase text-muted"
+            >
+              library
+            </span>
+          </li>
+        </ul>
       </div>
 
       <div class="space-y-2">
@@ -83,9 +121,13 @@ async function confirm() {
               <Check v-if="!isDestructive" class="ml-auto h-3.5 w-3.5 shrink-0 text-accent" />
             </span>
             <span class="mt-1 block text-2xs leading-relaxed text-muted">
-              <template v-if="isRoot">
-                Lumio stops tracking this folder. Every photo and file stays exactly where it is
-                on disk.
+              <template v-if="isMultiple">
+                Lumio stops tracking selected library roots and hides selected subfolders. Every
+                photo and file stays exactly where it is on disk.
+              </template>
+              <template v-else-if="hasRoots">
+                Lumio stops tracking this folder. Every photo and file stays exactly where it is on
+                disk.
               </template>
               <template v-else>
                 Lumio hides this folder from the tree. Every photo and file stays exactly where it
@@ -114,12 +156,18 @@ async function confirm() {
           </span>
           <span class="min-w-0 flex-1">
             <span class="flex items-center gap-1.5 text-xs font-semibold text-ink">
-              Delete folder from disk
+              Delete folders from disk
               <Check v-if="isDestructive" class="ml-auto h-3.5 w-3.5 shrink-0 text-danger" />
             </span>
             <span class="mt-1 block text-2xs leading-relaxed text-muted">
-              Moves the entire folder to the system Trash. You can restore it from the Trash until
-              you empty it.
+              <template v-if="isMultiple">
+                Moves the selected folders and everything inside them to the system Trash. You can
+                restore them from the Trash until you empty it.
+              </template>
+              <template v-else>
+                Moves the entire folder to the system Trash. You can restore it from the Trash
+                until you empty it.
+              </template>
             </span>
           </span>
         </button>
@@ -132,12 +180,23 @@ async function confirm() {
         <div class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-danger" />
           <p class="text-xs leading-relaxed text-ink">
-            <span class="font-semibold text-danger">This moves the whole folder to the Trash.</span>
-            All photos, subfolders and sidecar files inside
-            <span class="font-mono text-2xs">{{ target.name }}</span> will leave their current
-            location.
-            <template v-if="isRoot">This cannot be undone from Lumio.</template>
-            <template v-else>The parent library folder stays in Lumio.</template>
+            <template v-if="isMultiple">
+              <span class="font-semibold text-danger">
+                This moves {{ count }} folders to the Trash.
+              </span>
+              All photos, subfolders and sidecar files inside them will leave their current
+              location. Library roots will be unregistered; parent library folders stay in Lumio.
+            </template>
+            <template v-else>
+              <span class="font-semibold text-danger">
+                This moves the whole folder to the Trash.
+              </span>
+              All photos, subfolders and sidecar files inside
+              <span class="font-mono text-2xs">{{ targets[0]?.name }}</span> will leave their
+              current location.
+              <template v-if="hasRoots">This cannot be undone from Lumio.</template>
+              <template v-else>The parent library folder stays in Lumio.</template>
+            </template>
           </p>
         </div>
 
@@ -149,13 +208,19 @@ async function confirm() {
             type="checkbox"
             class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-danger"
           />
-          <span>I understand this folder and everything in it will be moved to the Trash.</span>
+          <span>
+            {{
+              isMultiple
+                ? 'I understand these folders and everything in them will be moved to the Trash.'
+                : 'I understand this folder and everything in it will be moved to the Trash.'
+            }}
+          </span>
         </label>
       </div>
 
       <p
         v-if="error"
-        class="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs leading-relaxed text-danger"
+        class="max-h-28 overflow-y-auto whitespace-pre-line rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs leading-relaxed text-danger"
       >
         {{ error }}
       </p>

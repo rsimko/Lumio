@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FolderPlus, FolderTree, Loader2, RefreshCw, X } from 'lucide-vue-next';
+import { FolderPlus, FolderTree, Loader2, RefreshCw, Trash2, X } from 'lucide-vue-next';
 
 import FolderTreeNode from '@/components/FolderTreeNode.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
@@ -121,6 +121,30 @@ function commitResize(width: number) {
           :available="root.available"
         />
       </template>
+    </div>
+
+    <div
+      v-if="store.selectedFolderCount > 1"
+      class="mx-1.5 mb-1 flex shrink-0 items-center gap-1.5 rounded-md border border-accent/30 bg-accent-soft/60 px-2 py-1 text-2xs"
+    >
+      <span class="min-w-0 flex-1 truncate font-medium text-accent">
+        {{ store.selectedFolderCount }} folders selected
+      </span>
+      <button
+        class="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-danger transition hover:bg-danger/10"
+        title="Remove the selected folders from the library or move them to the Trash"
+        @click="store.openRemoveSelectedFolders()"
+      >
+        <Trash2 class="h-3 w-3" />
+        Remove…
+      </button>
+      <button
+        class="shrink-0 rounded px-1 py-0.5 text-muted transition hover:bg-panel-2 hover:text-ink"
+        title="Clear folder selection"
+        @click="store.clearFolderSelection()"
+      >
+        Clear
+      </button>
     </div>
 
     <div

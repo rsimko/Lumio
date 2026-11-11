@@ -401,7 +401,11 @@ pub struct IngestOutcome {
 
 /// Progress events streamed to the webview while a plan runs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum IngestEvent {
     Started {
         total_entities: u32,
@@ -446,4 +450,60 @@ pub enum IngestEvent {
     Log {
         entry: IngestLogEntry,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ingest_events_use_camel_case_fields_for_the_frontend() {
+        let event = IngestEvent::EntityStarted {
+            entity_id: "entity-1".into(),
+            display_name: "palawan-112.RAF".into(),
+            index: 0,
+            total: 3,
+        };
+        let value = serde_json::to_value(event).expect("event serializes");
+        assert_eq!(value["type"], "entityStarted");
+        assert_eq!(value["entityId"], "entity-1");
+        assert_eq!(value["displayName"], "palawan-112.RAF");
+
+        let started = serde_json::to_value(IngestEvent::Started {
+            total_entities: 3,
+            total_files: 6,
+            total_bytes: 12_345,
+        })
+        .expect("started event serializes");
+        assert_eq!(started["type"], "started");
+        assert_eq!(started["totalEntities"], 3);
+        assert_eq!(started["totalFiles"], 6);
+        assert_eq!(started["totalBytes"], 12_345);
+    }
+
+    #[test]
+    fn ingest_events_round_trip_through_camel_case_json() {
+        let value = serde_json::json!({
+            "type": "entityCompleted",
+            "entityId": "entity-1",
+            "displayName": "palawan-112.RAF",
+            "destination": "/photos/2026/11",
+            "files": 3,
+            "bytes": 4096
+        });
+        let event: IngestEvent = serde_json::from_value(value).expect("event deserializes");
+        match event {
+            IngestEvent::EntityCompleted {
+                entity_id,
+                display_name,
+                files,
+                ..
+            } => {
+                assert_eq!(entity_id, "entity-1");
+                assert_eq!(display_name, "palawan-112.RAF");
+                assert_eq!(files, 3);
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
 }

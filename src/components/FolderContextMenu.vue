@@ -10,6 +10,7 @@ const position = ref({ x: 0, y: 0 });
 const placed = ref(false);
 
 const target = computed(() => store.folderMenuTarget);
+const selectionCount = computed(() => store.selectedFolderCount);
 
 function placeMenu() {
   const element = menu.value;
@@ -98,6 +99,9 @@ onBeforeUnmount(() => {
         <p class="truncate text-2xs font-semibold uppercase tracking-wide text-subtle">
           {{ target.name }}
         </p>
+        <p v-if="selectionCount > 1" class="mt-0.5 text-2xs text-muted">
+          {{ selectionCount }} folders selected
+        </p>
       </div>
       <div class="my-1 h-px bg-line" />
 
@@ -127,7 +131,7 @@ onBeforeUnmount(() => {
         @click="store.removeFromFolderMenu()"
       >
         <Trash2 class="h-3.5 w-3.5" />
-        Remove Folder…
+        {{ selectionCount > 1 ? `Remove ${selectionCount} Folders…` : 'Remove Folder…' }}
       </button>
     </div>
   </Teleport>

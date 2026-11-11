@@ -11,6 +11,7 @@ import {
   normalizeExternalEditors,
 } from '@/lib/editors';
 import { basename, isPathInside, parentPath } from '@/lib/format';
+import { pruneFolderRemovalTargets } from '@/lib/folders';
 import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
 import {
   DEFAULT_SHORTCUTS,
@@ -73,6 +74,13 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
 };
 
 const BASE_FONT_SIZE = 13;
+
+interface FolderRow {
+  path: string;
+  name: string;
+  rootId: string;
+  isRoot: boolean;
+}
 
 const UI_FONT_STACKS: Record<UiFont, string> = {
   avenir:
@@ -164,6 +172,9 @@ export const useLibraryStore = defineStore('library', () => {
 
   const selectedRootId = ref<string | null>(null);
   const selectedFolder = ref<string | null>(null);
+  /** Folder rows highlighted for bulk actions; independent from the folder being browsed. */
+  const selectedFolderPaths = ref<ReadonlySet<string>>(new Set());
+  const folderSelectionAnchor = ref<string | null>(null);
   const assets = shallowRef<PhotoAsset[]>([]);
   const warnings = ref<ScanWarning[]>([]);
   const scanState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -186,7 +197,7 @@ export const useLibraryStore = defineStore('library', () => {
   const addingRoot = ref(false);
   const addingEditor = ref(false);
   const removeFolderOpen = ref(false);
-  const removeFolderTarget = ref<FolderRemovalTarget | null>(null);
+  const removeFolderTargets = ref<FolderRemovalTarget[]>([]);
   const removingFolder = ref(false);
   const removeFolderError = ref<string | null>(null);
   const deleteAssetsOpen = ref(false);
@@ -243,6 +254,91 @@ export const useLibraryStore = defineStore('library', () => {
   const selectedRoot = computed(
     () => roots.value.find((root) => root.id === selectedRootId.value) ?? null,
   );
+
+  /** Folder rows currently visible in the tree, in display order. */
+  const folderRows = computed<FolderRow[]>(() => {
+    const rows: FolderRow[] = [];
+    const seen = new Set<string>();
+    function walk(row: FolderRow): void {
+      if (seen.has(row.path)) return;
+      seen.add(row.path);
+      rows.push(row);
+      if (!expanded.has(row.path)) return;
+      for (const child of tree.get(row.path) ?? []) {
+        walk({ path: child.path, name: child.name, rootId: row.rootId, isRoot: false });
+      }
+    }
+    for (const root of roots.value) {
+      walk({ path: root.path, name: root.name, rootId: root.id, isRoot: true });
+    }
+    return rows;
+  });
+
+  const folderOrder = computed(() => folderRows.value.map((row) => row.path));
+
+  const selectedFolderTargets = computed<FolderRemovalTarget[]>(() => {
+    const byPath = new Map(folderRows.value.map((row) => [row.path, row]));
+    return [...selectedFolderPaths.value].flatMap((path) => {
+      const row = byPath.get(path);
+      if (!row) return [];
+      return [
+        {
+          kind: row.isRoot ? ('root' as const) : ('folder' as const),
+          rootId: row.rootId,
+          name: row.name,
+          path: row.path,
+        },
+      ];
+    });
+  });
+
+  const selectedFolderCount = computed(() => selectedFolderTargets.value.length);
+
+  function currentFolderSelection(): SelectionState {
+    return {
+      ids: [...selectedFolderPaths.value],
+      primaryId: selectedFolder.value,
+      anchorId: folderSelectionAnchor.value,
+    };
+  }
+
+  function applyFolderSelection(state: SelectionState): void {
+    selectedFolderPaths.value = new Set(state.ids);
+    folderSelectionAnchor.value = state.anchorId;
+  }
+
+  function isFolderSelected(path: string): boolean {
+    return selectedFolderPaths.value.has(path);
+  }
+
+  function selectFolderRow(
+    path: string,
+    rootId: string,
+    modifiers: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {},
+  ): void {
+    if (modifiers.shiftKey || modifiers.metaKey || modifiers.ctrlKey) {
+      applyFolderSelection(
+        clickSelection(folderOrder.value, currentFolderSelection(), path, modifiers),
+      );
+      return;
+    }
+    applyFolderSelection(singleSelection(path));
+    void selectFolder(path, rootId);
+  }
+
+  function clearFolderSelection(): void {
+    applyFolderSelection(emptySelection());
+  }
+
+  // Keep the highlight in sync when a folder is opened from outside the tree
+  // (startup restore, delete fallback, ingest, and so on).
+  watch(selectedFolder, (path) => {
+    if (!path) {
+      if (selectedFolderPaths.value.size) applyFolderSelection(emptySelection());
+      return;
+    }
+    if (!selectedFolderPaths.value.has(path)) applyFolderSelection(singleSelection(path));
+  });
 
   const assetIndex = computed(() => {
     const index = new Map<string, PhotoAsset>();
@@ -911,38 +1007,64 @@ export const useLibraryStore = defineStore('library', () => {
   function openRemoveFolder(id: string): void {
     const root = roots.value.find((candidate) => candidate.id === id);
     if (!root) return;
-    removeFolderTarget.value = {
-      kind: 'root',
-      rootId: root.id,
-      name: root.name,
-      path: root.path,
-    };
-    removeFolderOpen.value = true;
-    removeFolderError.value = null;
+    openRemoveFolders([
+      {
+        kind: 'root',
+        rootId: root.id,
+        name: root.name,
+        path: root.path,
+      },
+    ]);
   }
 
   function openDeleteFolder(path: string, rootId: string): void {
     const root = roots.value.find((candidate) => candidate.id === rootId);
     if (!root || !isPathInside(path, root.path) || path === root.path) return;
-    removeFolderTarget.value = {
-      kind: 'folder',
-      rootId,
-      name: basename(path),
-      path,
-    };
+    openRemoveFolders([
+      {
+        kind: 'folder',
+        rootId,
+        name: basename(path),
+        path,
+      },
+    ]);
+  }
+
+  function openRemoveFolders(targets: readonly FolderRemovalTarget[]): void {
+    const pending = pruneFolderRemovalTargets(targets);
+    if (!pending.length) return;
+    removeFolderTargets.value = pending;
     removeFolderOpen.value = true;
     removeFolderError.value = null;
+  }
+
+  function openRemoveSelectedFolders(): void {
+    openRemoveFolders(selectedFolderTargets.value);
+  }
+
+  function removeFolderFromRow(path: string, rootId: string, isRoot: boolean): void {
+    if (selectedFolderPaths.value.has(path) && selectedFolderTargets.value.length > 1) {
+      openRemoveSelectedFolders();
+      return;
+    }
+    if (isRoot) openRemoveFolder(rootId);
+    else openDeleteFolder(path, rootId);
   }
 
   function closeRemoveFolder(): void {
     if (removingFolder.value) return;
     removeFolderOpen.value = false;
-    removeFolderTarget.value = null;
+    removeFolderTargets.value = [];
     removeFolderError.value = null;
   }
 
   function openFolderMenu(target: Omit<FolderMenuTarget, 'x' | 'y'>, x: number, y: number): void {
     closePhotoMenu();
+    // Right-clicking outside the current folder selection replaces it with the
+    // clicked row; right-clicking inside it keeps the whole selection.
+    if (!selectedFolderPaths.value.has(target.path)) {
+      applyFolderSelection(singleSelection(target.path));
+    }
     folderMenuTarget.value = { ...target, x, y };
     folderMenuOpen.value = true;
   }
@@ -983,6 +1105,11 @@ export const useLibraryStore = defineStore('library', () => {
     const target = folderMenuTarget.value;
     if (!target) return;
     closeFolderMenu();
+    const selected = selectedFolderTargets.value;
+    if (selected.length > 1) {
+      openRemoveFolders(selected);
+      return;
+    }
     if (target.isRoot) openRemoveFolder(target.rootId);
     else openDeleteFolder(target.path, target.rootId);
   }
@@ -1062,32 +1189,70 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  async function removeRoot(id: string, mode: RootRemovalMode): Promise<boolean> {
+  function fallbackFolderAfterRemoval(
+    path: string,
+    removedPaths: readonly string[],
+  ): { path: string; rootId: string } | null {
+    let candidate = parentPath(path);
+    while (candidate && candidate !== path) {
+      const covered = removedPaths.some((removed) => isPathInside(candidate, removed));
+      if (!covered) {
+        const root = roots.value.find((item) => isPathInside(candidate, item.path));
+        if (root) return { path: candidate, rootId: root.id };
+      }
+      const next = parentPath(candidate);
+      if (next === candidate) break;
+      candidate = next;
+    }
+    const root = roots.value[0];
+    return root ? { path: root.path, rootId: root.id } : null;
+  }
+
+  async function removeFolders(
+    targets: readonly FolderRemovalTarget[],
+    mode: RootRemovalMode,
+  ): Promise<boolean> {
     if (removingFolder.value) return false;
-    const index = roots.value.findIndex((candidate) => candidate.id === id);
-    const root = roots.value[index];
-    if (!root) return false;
+    const pending = pruneFolderRemovalTargets(targets);
+    if (!pending.length) return false;
 
     removingFolder.value = true;
     removeFolderError.value = null;
-    try {
-      // The backend moves a folder to Trash before forgetting it, so the
-      // library entry survives if the filesystem operation fails.
-      const updated = await api.removeRoot(id, mode);
-      roots.value = updated;
-      forgetRootState(root.path);
+    const removedPaths: string[] = [];
+    const failures: { target: FolderRemovalTarget; message: string }[] = [];
+    const wasSelectedPath = selectedFolder.value;
 
-      if (settings.value.lastRootId === id) {
-        settings.value = { ...settings.value, lastRootId: null, lastFolder: null };
-        queuePersist();
+    try {
+      for (const target of pending) {
+        try {
+          if (target.kind === 'root') {
+            // The backend moves the folder to Trash before forgetting it, so
+            // the library entry survives if the filesystem operation fails.
+            roots.value = await api.removeRoot(target.rootId, mode);
+            forgetRootState(target.path);
+            if (settings.value.lastRootId === target.rootId) {
+              settings.value = { ...settings.value, lastRootId: null, lastFolder: null };
+              queuePersist();
+            }
+          } else {
+            await api.removeSubfolder(target.path, mode);
+            forgetSubfolderState(target.path, target.rootId);
+          }
+          removedPaths.push(target.path);
+        } catch (error) {
+          failures.push({ target, message: errorMessage(error) });
+        }
       }
 
-      const wasSelected = selectedRootId.value === id;
-      if (wasSelected) {
-        // Cancel in-flight scans and clear rows that belonged to the root.
+      const removedSelected =
+        !!wasSelectedPath &&
+        removedPaths.some((removed) => isPathInside(wasSelectedPath, removed));
+      if (removedSelected) {
+        // Cancel in-flight scans and clear rows that belonged to removed folders.
         scanToken += 1;
         selectedRootId.value = null;
         selectedFolder.value = null;
+        applyFolderSelection(emptySelection());
         applySelection(emptySelection());
         assets.value = [];
         warnings.value = [];
@@ -1095,82 +1260,66 @@ export const useLibraryStore = defineStore('library', () => {
         scanError.value = null;
         scanErrorCode.value = null;
         scanElapsedMs.value = 0;
+      } else {
+        // Keep the multiselection, minus any removed rows.
+        const remaining = currentFolderSelection().ids.filter(
+          (path) => !removedPaths.some((removed) => isPathInside(path, removed)),
+        );
+        const primaryId =
+          selectedFolder.value && remaining.includes(selectedFolder.value)
+            ? selectedFolder.value
+            : (remaining[0] ?? null);
+        const anchorId =
+          folderSelectionAnchor.value && remaining.includes(folderSelectionAnchor.value)
+            ? folderSelectionAnchor.value
+            : primaryId;
+        applyFolderSelection({ ids: remaining, primaryId, anchorId });
       }
 
-      // Close the confirmation first so it cannot be submitted twice.
-      removeFolderOpen.value = false;
-      removeFolderTarget.value = null;
-      removingFolder.value = false;
+      if (failures.length) {
+        removeFolderTargets.value = failures.map((failure) => failure.target);
+        removeFolderError.value = failures
+          .map((failure) => `${failure.target.name}: ${failure.message}`)
+          .join('\n');
+        addToast(
+          failures.length === 1
+            ? 'One folder could not be removed.'
+            : `${failures.length} folders could not be removed.`,
+          'error',
+        );
+      } else {
+        removeFolderOpen.value = false;
+        removeFolderTargets.value = [];
+      }
 
-      addToast(
-        mode === 'moveToTrash'
-          ? `Moved ${root.name} to the Trash.`
-          : `Removed ${root.name} from the library.`,
-        'success',
-      );
+      if (removedPaths.length) {
+        const label = removedPaths.length === 1 ? 'folder' : 'folders';
+        addToast(
+          mode === 'moveToTrash'
+            ? `Moved ${removedPaths.length} ${label} to the Trash.`
+            : `Removed ${removedPaths.length} ${label} from the library.`,
+          'success',
+          mode === 'moveToTrash' ? undefined : 7000,
+        );
+      }
 
-      if (wasSelected) {
-        const next = updated[Math.min(index, updated.length - 1)] ?? updated[0];
-        if (next) {
-          if (next.available) {
-            await selectFolder(next.path, next.id, { force: true });
-          } else {
-            selectedRootId.value = next.id;
-            selectedFolder.value = next.path;
+      if (removedSelected) {
+        const fallback = fallbackFolderAfterRemoval(wasSelectedPath, removedPaths);
+        if (fallback) {
+          const root = roots.value.find((candidate) => candidate.id === fallback.rootId);
+          if (root?.available) {
+            await selectFolder(fallback.path, root.id, { force: true });
+          } else if (root) {
+            selectedRootId.value = root.id;
+            selectedFolder.value = fallback.path;
             scanState.value = 'error';
-            scanError.value = `This folder is unavailable. ${next.error ?? ''}`.trim();
+            scanError.value = `This folder is unavailable. ${root.error ?? ''}`.trim();
             scanErrorCode.value = 'notFound';
           }
         }
       }
 
-      return true;
-    } catch (error) {
-      removeFolderError.value = errorMessage(error);
-      addToast(errorMessage(error), 'error');
-      return false;
-    } finally {
-      removingFolder.value = false;
-    }
-  }
-
-  async function removeSubfolder(
-    path: string,
-    rootId: string,
-    mode: RootRemovalMode,
-  ): Promise<boolean> {
-    if (removingFolder.value) return false;
-    const root = roots.value.find((candidate) => candidate.id === rootId);
-    if (!root || !isPathInside(path, root.path) || path === root.path) return false;
-
-    removingFolder.value = true;
-    removeFolderError.value = null;
-    try {
-      await api.removeSubfolder(path, mode);
-      forgetSubfolderState(path, rootId);
-
-      // Close the confirmation before selecting the fallback folder.
-      removeFolderOpen.value = false;
-      removeFolderTarget.value = null;
-      removingFolder.value = false;
-
-      const wasSelected = !!selectedFolder.value && isPathInside(selectedFolder.value, path);
-      if (wasSelected) {
-        await selectFolder(parentPath(path), rootId, { force: true });
-      }
-
-      addToast(
-        mode === 'moveToTrash'
-          ? `Moved ${basename(path)} to the Trash.`
-          : `Removed ${basename(path)} from the library. Files are untouched; add it again to restore it.`,
-        'success',
-        mode === 'moveToTrash' ? undefined : 7000,
-      );
-      return true;
-    } catch (error) {
-      removeFolderError.value = errorMessage(error);
-      addToast(errorMessage(error), 'error');
-      return false;
+      return failures.length === 0;
     } finally {
       removingFolder.value = false;
     }
@@ -1454,15 +1603,17 @@ export const useLibraryStore = defineStore('library', () => {
     registerRoot,
     ingestSettings,
     saveIngestSettings,
-    removeRoot,
-    removeSubfolder,
+    removeFolders,
     addingRoot,
     removeFolderOpen,
-    removeFolderTarget,
+    removeFolderTargets,
     removingFolder,
     removeFolderError,
     openRemoveFolder,
     openDeleteFolder,
+    openRemoveFolders,
+    openRemoveSelectedFolders,
+    removeFolderFromRow,
     closeRemoveFolder,
     folderMenuOpen,
     folderMenuTarget,
@@ -1489,7 +1640,16 @@ export const useLibraryStore = defineStore('library', () => {
     imageCountFor,
     ensureFolderImageCount,
     folderCountsEpoch,
-    // selection
+    // folder selection
+    folderRows,
+    folderOrder,
+    selectedFolderPaths,
+    selectedFolderCount,
+    selectedFolderTargets,
+    isFolderSelected,
+    selectFolderRow,
+    clearFolderSelection,
+    // photo selection
     selectionId,
     selectedIds,
     selectedCount,

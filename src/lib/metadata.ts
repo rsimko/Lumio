@@ -87,6 +87,22 @@ export function ratingPatch(current: number, mixed: boolean, next: number): Meta
   return { rating: next };
 }
 
+/** Applies a metadata patch locally so controls respond before the write finishes. */
+export function applyMetadataUpdate(
+  metadata: PhotoMetadata,
+  update: MetadataUpdate,
+): PhotoMetadata {
+  return {
+    ...metadata,
+    rating: update.rating ?? metadata.rating,
+    label: update.clearLabel ? null : (update.label ?? metadata.label),
+    cull: update.clearCull ? null : (update.cull ?? metadata.cull),
+    favorite: update.favorite ?? metadata.favorite,
+    keywords: update.keywords ?? metadata.keywords,
+    hierarchicalKeywords: update.hierarchicalKeywords ?? metadata.hierarchicalKeywords,
+  };
+}
+
 /**
  * Clicking the active label clears it; another label replaces the selection.
  * Passing null clears the label for every selected photo.

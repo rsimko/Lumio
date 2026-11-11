@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyMetadataUpdate,
   commonMetadataValue,
   cullPatch,
   favoritePatch,
@@ -92,6 +93,21 @@ describe('metadata patches', () => {
     expect(cullPatch(null, false, 'pick')).toEqual({ cull: 'pick' });
     expect(cullPatch('pick', false, 'pick')).toEqual({ clearCull: true });
     expect(cullPatch('reject', false, 'pick')).toEqual({ cull: 'pick' });
+  });
+
+  it('applies patches optimistically without changing the revision', () => {
+    const current = metadata({ rating: 2, label: 'red', cull: 'pick', favorite: true });
+    expect(applyMetadataUpdate(current, { rating: 4 })).toMatchObject({
+      rating: 4,
+      label: 'red',
+      cull: 'pick',
+      favorite: true,
+      revision: current.revision,
+    });
+    expect(
+      applyMetadataUpdate(current, { clearLabel: true, clearCull: true, favorite: false }),
+    ).toMatchObject({ label: null, cull: null, favorite: false });
+    expect(applyMetadataUpdate(current, { label: 'blue' }).label).toBe('blue');
   });
 
   it('toggles favorites for a mixed selection by setting all', () => {

@@ -74,6 +74,10 @@ Cataloguing, search and the keyword editor come later.
   RAW preview, or a placeholder when none can be extracted.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
   the same cached preview; both tabs share one tile and the histogram opens by default.
+- Collapse info-panel sections such as Metadata, Camera and lens, File, Preview source and
+  Associations to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO and
+  focal length are read from embedded EXIF; RAW files also try the rawler decoder and their
+  companion JPEG. Reading this information does not require ExifTool.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
   keyboard shortcuts.
 - Settings for the Avenir interface font, bundled JetBrains Mono, and text size.

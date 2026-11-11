@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   basename,
+  formatAperture,
   formatBytes,
   formatDimensions,
   formatDuration,
+  formatFocalLength,
+  formatShutterSpeed,
   isPathInside,
   kindLabel,
   parentPath,
@@ -34,6 +37,19 @@ describe('format helpers', () => {
     expect(formatDuration(420)).toBe('420 ms');
     expect(formatDuration(2500)).toBe('2.5 s');
     expect(formatDuration(12_400)).toBe('12 s');
+  });
+
+  it('formats camera exposure values', () => {
+    expect(formatShutterSpeed(1 / 250)).toBe('1/250 s');
+    expect(formatShutterSpeed(2)).toBe('2 s');
+    expect(formatShutterSpeed(1.5)).toBe('1.5 s');
+    expect(formatShutterSpeed(0.8)).toBe('0.8 s');
+    expect(formatShutterSpeed(0)).toBe('—');
+    expect(formatAperture(2.8)).toBe('f/2.8');
+    expect(formatAperture(null)).toBe('—');
+    expect(formatFocalLength(35)).toBe('35 mm');
+    expect(formatFocalLength(35.5)).toBe('35.5 mm');
+    expect(formatFocalLength(0)).toBe('—');
   });
 
   it('labels asset kinds and preview sources', () => {

@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod camera;
 pub mod config;
 pub mod error;
 pub mod folders;
@@ -12,6 +13,7 @@ pub mod thumbnail;
 pub mod types;
 
 pub use assets::{AssetFileGroup, asset_group_paths, group_assets, move_assets, trash_assets};
+pub use camera::{CameraInfo, read_camera_info};
 pub use config::ConfigStore;
 pub use error::{LumioError, Result};
 pub use folders::create_folder;

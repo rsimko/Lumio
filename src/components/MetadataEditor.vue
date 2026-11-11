@@ -10,6 +10,7 @@ import {
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
+import InfoSection from '@/components/InfoSection.vue';
 import {
   COLOR_LABELS,
   COLOR_LABEL_NAMES,
@@ -86,9 +87,8 @@ function toggleFavorite(): void {
 </script>
 
 <template>
-  <section class="border-t border-line px-3 py-3" aria-label="Photo metadata">
-    <div class="mb-2 flex min-h-4 items-center justify-between gap-2">
-      <h4 class="panel-heading">Metadata</h4>
+  <InfoSection title="Metadata">
+    <template #actions>
       <span class="flex items-center gap-1.5 text-2xs text-subtle">
         <Loader2 v-if="busy" class="h-3 w-3 animate-spin text-accent" />
         <span v-if="count > 1">
@@ -96,7 +96,7 @@ function toggleFavorite(): void {
         </span>
         <span v-else>{{ source }}</span>
       </span>
-    </div>
+    </template>
 
     <div class="space-y-2.5">
       <div class="flex min-h-7 items-center gap-2">
@@ -106,7 +106,7 @@ function toggleFavorite(): void {
             <button
               v-for="value in [1, 2, 3, 4, 5]"
               :key="value"
-              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2 disabled:opacity-50"
+              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2"
               :class="starFilled(value) ? 'text-amber-400' : 'text-subtle/60'"
               :title="
                 !rating.mixed && rating.value === value
@@ -115,7 +115,6 @@ function toggleFavorite(): void {
               "
               :aria-label="`Rate ${value} ${value === 1 ? 'star' : 'stars'}`"
               :aria-pressed="starFilled(value)"
-              :disabled="busy"
               @click="setRating(value)"
             >
               <Star
@@ -134,7 +133,7 @@ function toggleFavorite(): void {
                   ? `Clear ${rating.value}-star rating`
                   : 'No rating'
             "
-            :disabled="busy || (!rating.mixed && rating.value === 0)"
+            :disabled="!rating.mixed && rating.value === 0"
             aria-label="Clear rating"
             @click="clearRating"
           >
@@ -150,7 +149,7 @@ function toggleFavorite(): void {
             <button
               v-for="color in COLOR_LABELS"
               :key="color"
-              class="h-5 w-5 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110 disabled:opacity-50"
+              class="h-5 w-5 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110"
               :class="[
                 COLOR_LABEL_SWATCHES[color],
                 labelActive(color)
@@ -168,7 +167,6 @@ function toggleFavorite(): void {
                   : `Set ${COLOR_LABEL_NAMES[color]} label`
               "
               :aria-pressed="labelActive(color)"
-              :disabled="busy"
               @click="setLabel(color)"
             />
           </div>
@@ -181,7 +179,7 @@ function toggleFavorite(): void {
                   ? `Clear ${COLOR_LABEL_NAMES[label.value].toLowerCase()} label`
                   : 'No label'
             "
-            :disabled="busy || (!label.mixed && !label.value)"
+            :disabled="!label.mixed && !label.value"
             aria-label="Clear color label"
             @click="clearLabel"
           >
@@ -194,7 +192,7 @@ function toggleFavorite(): void {
         <span class="w-12 shrink-0 text-2xs text-subtle">Culling</span>
         <div class="flex items-center gap-1" role="group" aria-label="Culling flag">
           <button
-            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition disabled:opacity-50"
+            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition"
             :class="
               cullActive('pick')
                 ? 'border-success/40 bg-success/15 text-success'
@@ -202,14 +200,13 @@ function toggleFavorite(): void {
             "
             title="Pick"
             :aria-pressed="cullActive('pick')"
-            :disabled="busy"
             @click="setCull('pick')"
           >
             <Flag class="h-3 w-3" :fill="cullActive('pick') ? 'currentColor' : 'none'" />
             Pick
           </button>
           <button
-            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition disabled:opacity-50"
+            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition"
             :class="
               cullActive('reject')
                 ? 'border-danger/40 bg-danger/15 text-danger'
@@ -217,16 +214,14 @@ function toggleFavorite(): void {
             "
             title="Reject"
             :aria-pressed="cullActive('reject')"
-            :disabled="busy"
             @click="setCull('reject')"
           >
             <X class="h-3 w-3" />
             Reject
           </button>
           <button
-            class="grid h-7 w-7 place-items-center rounded-md border border-line bg-panel text-subtle transition hover:bg-panel-2 hover:text-ink disabled:opacity-50"
+            class="grid h-7 w-7 place-items-center rounded-md border border-line bg-panel text-subtle transition hover:bg-panel-2 hover:text-ink"
             title="Remove cull flag"
-            :disabled="busy"
             @click="unflag"
           >
             <CircleSlash class="h-3 w-3" />
@@ -237,7 +232,7 @@ function toggleFavorite(): void {
       <div class="flex items-center justify-between gap-2">
         <span class="w-12 shrink-0 text-2xs text-subtle">Favorite</span>
         <button
-          class="flex h-7 items-center gap-1.5 rounded-md border px-2 text-2xs font-medium transition disabled:opacity-50"
+          class="flex h-7 items-center gap-1.5 rounded-md border px-2 text-2xs font-medium transition"
           :class="
             !favorite.mixed && favorite.value
               ? 'border-rose-400/40 bg-rose-400/15 text-rose-400'
@@ -249,7 +244,6 @@ function toggleFavorite(): void {
               : `Mark as favorite (${store.shortcutLabel('metadata.favorite')})`
           "
           :aria-pressed="!favorite.mixed && favorite.value"
-          :disabled="busy"
           @click="toggleFavorite"
         >
           <Heart
@@ -322,5 +316,5 @@ function toggleFavorite(): void {
         </span>
       </div>
     </div>
-  </section>
+  </InfoSection>
 </template>

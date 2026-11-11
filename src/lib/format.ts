@@ -63,6 +63,29 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`;
 }
 
+function trimNumber(value: number): string {
+  const rounded = Number(value.toFixed(1));
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+export function formatShutterSpeed(seconds: number | null | undefined): string {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
+  if (seconds >= 1) return `${trimNumber(seconds)} s`;
+  const denominator = Math.round(1 / seconds);
+  if (denominator <= 1) return `${trimNumber(seconds)} s`;
+  return `1/${denominator} s`;
+}
+
+export function formatAperture(value: number | null | undefined): string {
+  if (!value || !Number.isFinite(value) || value <= 0) return '—';
+  return `f/${trimNumber(value)}`;
+}
+
+export function formatFocalLength(value: number | null | undefined): string {
+  if (!value || !Number.isFinite(value) || value <= 0) return '—';
+  return `${trimNumber(value)} mm`;
+}
+
 export function kindLabel(kind: AssetKind, extension?: string): string {
   if (kind === 'raw') return 'RAW';
   if (kind === 'jpeg') return 'JPEG';

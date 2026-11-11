@@ -14,6 +14,7 @@ import {
 import { computed, ref, watch } from 'vue';
 
 import AssociationBadges from '@/components/AssociationBadges.vue';
+import InfoSection from '@/components/InfoSection.vue';
 import MetadataEditor from '@/components/MetadataEditor.vue';
 import PhotoHistogram from '@/components/PhotoHistogram.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
@@ -23,16 +24,19 @@ import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/us
 import { api, errorMessage } from '@/api';
 import {
   basename,
+  formatAperture,
   formatBytes,
   formatCount,
   formatDate,
   formatDimensions,
   formatDuration,
+  formatFocalLength,
+  formatShutterSpeed,
   kindLabel,
   sourceDescription,
 } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
-import type { HistogramData } from '@/types';
+import type { CameraInfo, HistogramData } from '@/types';
 
 const store = useLibraryStore();
 
@@ -119,6 +123,76 @@ watch(
   },
   { immediate: true },
 );
+
+const cameraInfo = ref<CameraInfo | null>(null);
+const cameraStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
+const cameraError = ref<string | null>(null);
+const cameraCache = new Map<string, CameraInfo>();
+let cameraRequest = 0;
+
+function rememberCameraInfo(key: string, data: CameraInfo): void {
+  if (cameraCache.size >= 128) {
+    const oldest = cameraCache.keys().next().value;
+    if (oldest) cameraCache.delete(oldest);
+  }
+  cameraCache.set(key, data);
+}
+
+async function loadCameraInfo(): Promise<void> {
+  const current = asset.value;
+  const request = ++cameraRequest;
+  if (!current) {
+    cameraInfo.value = null;
+    cameraStatus.value = 'idle';
+    cameraError.value = null;
+    return;
+  }
+
+  const cached = cameraCache.get(current.id);
+  if (cached) {
+    cameraInfo.value = cached;
+    cameraStatus.value = 'ready';
+    cameraError.value = null;
+    return;
+  }
+
+  cameraInfo.value = null;
+  cameraStatus.value = 'loading';
+  cameraError.value = null;
+  try {
+    const data = await api.cameraInfo(current);
+    if (request !== cameraRequest) return;
+    rememberCameraInfo(current.id, data);
+    cameraInfo.value = data;
+    cameraStatus.value = 'ready';
+  } catch (error) {
+    if (request !== cameraRequest) return;
+    cameraError.value = errorMessage(error);
+    cameraStatus.value = 'error';
+  }
+}
+
+watch(
+  () => asset.value?.id ?? null,
+  () => {
+    void loadCameraInfo();
+  },
+  { immediate: true },
+);
+
+const hasCameraInfo = computed(() => {
+  const info = cameraInfo.value;
+  return Boolean(
+    info &&
+      (info.make ||
+        info.model ||
+        info.lens ||
+        info.shutterSpeed != null ||
+        info.aperture != null ||
+        info.iso != null ||
+        info.focalLength != null),
+  );
+});
 
 const dimensions = computed(() => {
   if (!asset.value) return '—';
@@ -281,8 +355,56 @@ async function revealPrimary() {
 
         <MetadataEditor />
 
-        <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">File</h4>
+        <InfoSection title="Camera and lens">
+          <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">
+            Reading camera metadata…
+          </div>
+          <div
+            v-else-if="cameraStatus === 'error'"
+            class="py-0.5 text-2xs leading-relaxed text-danger"
+          >
+            {{ cameraError }}
+          </div>
+          <template v-else-if="hasCameraInfo">
+            <div v-if="cameraInfo?.make" class="info-row">
+              <span class="info-label">Camera make</span>
+              <span class="info-value">{{ cameraInfo.make }}</span>
+            </div>
+            <div v-if="cameraInfo?.model" class="info-row">
+              <span class="info-label">Camera model</span>
+              <span class="info-value">{{ cameraInfo.model }}</span>
+            </div>
+            <div v-if="cameraInfo?.lens" class="info-row">
+              <span class="info-label">Lens</span>
+              <span class="info-value">{{ cameraInfo.lens }}</span>
+            </div>
+            <div v-if="cameraInfo?.shutterSpeed != null" class="info-row">
+              <span class="info-label">Shutter</span>
+              <span class="info-value tabular-nums">
+                {{ formatShutterSpeed(cameraInfo.shutterSpeed) }}
+              </span>
+            </div>
+            <div v-if="cameraInfo?.aperture != null" class="info-row">
+              <span class="info-label">Aperture</span>
+              <span class="info-value tabular-nums">
+                {{ formatAperture(cameraInfo.aperture) }}
+              </span>
+            </div>
+            <div v-if="cameraInfo?.iso != null" class="info-row">
+              <span class="info-label">ISO</span>
+              <span class="info-value tabular-nums">{{ cameraInfo.iso }}</span>
+            </div>
+            <div v-if="cameraInfo?.focalLength != null" class="info-row">
+              <span class="info-label">Focal length</span>
+              <span class="info-value tabular-nums">
+                {{ formatFocalLength(cameraInfo.focalLength) }}
+              </span>
+            </div>
+          </template>
+          <p v-else class="py-0.5 text-2xs text-subtle">No camera metadata found.</p>
+        </InfoSection>
+
+        <InfoSection title="File">
           <div class="info-row">
             <span class="info-label">Type</span>
             <span class="info-value">
@@ -308,10 +430,9 @@ async function revealPrimary() {
               {{ asset.relativeDir || 'Library root' }}
             </span>
           </div>
-        </section>
+        </InfoSection>
 
-        <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">Preview source</h4>
+        <InfoSection title="Preview source">
           <div class="flex items-center gap-2">
             <SourceBadge :source="source" />
             <span v-if="thumb?.edge" class="text-2xs tabular-nums text-subtle">
@@ -324,18 +445,17 @@ async function revealPrimary() {
           <p v-if="thumb?.error" class="mt-1.5 text-2xs leading-relaxed text-danger">
             {{ thumb.error }}
           </p>
-        </section>
+        </InfoSection>
 
-        <section class="border-t border-line px-3 py-3">
-          <div class="mb-1.5 flex min-h-4 items-center justify-between gap-2">
-            <h4 class="panel-heading">Associations</h4>
+        <InfoSection title="Associations">
+          <template #actions>
             <span
               v-if="asset.companionJpeg || asset.xmpSidecar"
               class="flex shrink-0 items-center gap-1"
             >
               <AssociationBadges :asset="asset" />
             </span>
-          </div>
+          </template>
 
           <div class="info-row">
             <span class="info-label">Companion JPEG</span>
@@ -384,7 +504,7 @@ async function revealPrimary() {
               </span>
             </div>
           </template>
-        </section>
+        </InfoSection>
       </template>
 
       <template v-else-if="store.selectedFolder">
@@ -400,8 +520,7 @@ async function revealPrimary() {
           </p>
         </div>
 
-        <section class="mt-2 border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-2">Contents</h4>
+        <InfoSection title="Contents">
           <div class="grid grid-cols-2 gap-1.5">
             <div class="rounded-md border border-line bg-elevated px-2.5 py-2">
               <p class="text-base font-semibold tabular-nums leading-tight text-ink">
@@ -428,10 +547,9 @@ async function revealPrimary() {
               <p class="text-2xs text-subtle">Other images</p>
             </div>
           </div>
-        </section>
+        </InfoSection>
 
-        <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">Associations</h4>
+        <InfoSection title="Associations">
           <div class="info-row">
             <span class="info-label">With XMP sidecar</span>
             <span class="info-value tabular-nums">{{ formatCount(store.stats.withXmp) }}</span>
@@ -440,10 +558,9 @@ async function revealPrimary() {
             <span class="info-label">RAW + JPEG pairs</span>
             <span class="info-value tabular-nums">{{ formatCount(store.stats.withCompanion) }}</span>
           </div>
-        </section>
+        </InfoSection>
 
-        <section class="border-t border-line px-3 py-3">
-          <h4 class="panel-heading mb-1.5">Scan</h4>
+        <InfoSection title="Scan">
           <div class="info-row">
             <span class="info-label">Subfolders</span>
             <span class="info-value">{{ store.settings.recursive ? 'Included' : 'Not included' }}</span>
@@ -464,7 +581,7 @@ async function revealPrimary() {
             </button>
             <span v-else class="info-value text-subtle">None</span>
           </div>
-        </section>
+        </InfoSection>
 
         <p class="mx-3 my-3 rounded-md border border-dashed border-line px-2.5 py-2 text-2xs leading-relaxed text-subtle">
           Select a photo to inspect its files and preview source.

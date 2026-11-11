@@ -547,6 +547,25 @@ pub async fn get_histogram(
 }
 
 #[tauri::command]
+pub async fn get_camera_info(
+    state: State<'_, AppState>,
+    asset: PhotoAsset,
+) -> Result<lumio_core::CameraInfo, CommandError> {
+    let asset = prepare_asset(&state, asset)?;
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::read_camera_info(&asset.primary_path, asset.companion_jpeg.as_deref())
+    })
+    .await
+    {
+        Ok(info) => Ok(info),
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Camera metadata task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
 pub fn clear_thumbnail_cache(state: State<'_, AppState>) -> Result<(), CommandError> {
     state.thumbs.clear()?;
     Ok(())

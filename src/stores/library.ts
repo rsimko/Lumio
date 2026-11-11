@@ -14,6 +14,7 @@ import { basename, isPathInside, parentPath } from '@/lib/format';
 import { pruneFolderRemovalTargets } from '@/lib/folders';
 import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
 import {
+  applyMetadataUpdate,
   commonMetadataValue,
   cullPatch,
   favoritePatch,
@@ -56,6 +57,7 @@ import type {
   NewFolderTarget,
   PhotoAsset,
   PhotoMenuTarget,
+  PhotoMetadata,
   RootInfo,
   RootRemovalMode,
   ScanWarning,
@@ -697,6 +699,18 @@ export const useLibraryStore = defineStore('library', () => {
     if (metadataBusy.value) return;
     metadataBusy.value = true;
     metadataError.value = null;
+
+    // Update the controls immediately so clicks feel instant. The revision is
+    // deliberately left untouched: the backend still receives the revision the
+    // metadata had before this edit.
+    const targetIds = new Set(assetsToUpdate.map((asset) => asset.id));
+    const snapshots = new Map<string, PhotoMetadata>();
+    assets.value = assets.value.map((asset) => {
+      if (!targetIds.has(asset.id)) return asset;
+      snapshots.set(asset.id, asset.metadata);
+      return { ...asset, metadata: applyMetadataUpdate(asset.metadata, update) };
+    });
+
     try {
       const outcome = await api.updateMetadata(
         assetsToUpdate.map((asset) => ({
@@ -728,6 +742,12 @@ export const useLibraryStore = defineStore('library', () => {
       }
 
       if (outcome.failed.length) {
+        const failedIds = new Set(outcome.failed.map((failure) => failure.assetId));
+        assets.value = assets.value.map((asset) => {
+          const snapshot = snapshots.get(asset.id);
+          if (!snapshot || !failedIds.has(asset.id)) return asset;
+          return { ...asset, metadata: snapshot };
+        });
         for (const failure of outcome.failed) {
           addToast(`${failure.fileName}: ${failure.message}`, 'error');
         }
@@ -737,6 +757,11 @@ export const useLibraryStore = defineStore('library', () => {
             : `${outcome.failed.length} photos could not be updated.`;
       }
     } catch (error) {
+      // Restore the optimistic values when the request fails as a whole.
+      assets.value = assets.value.map((asset) => {
+        const snapshot = snapshots.get(asset.id);
+        return snapshot ? { ...asset, metadata: snapshot } : asset;
+      });
       const message = errorMessage(error);
       metadataError.value = message;
       addToast(message, 'error');

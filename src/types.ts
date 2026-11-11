@@ -203,6 +203,19 @@ export interface ThumbnailResult {
   error: string | null;
 }
 
+export interface CameraInfo {
+  make: string | null;
+  model: string | null;
+  lens: string | null;
+  /** Exposure time in seconds. */
+  shutterSpeed: number | null;
+  /** Aperture f-number. */
+  aperture: number | null;
+  iso: number | null;
+  /** Focal length in millimetres. */
+  focalLength: number | null;
+}
+
 export interface HistogramData {
   /** 256 counts, one per 8-bit red value. */
   red: number[];

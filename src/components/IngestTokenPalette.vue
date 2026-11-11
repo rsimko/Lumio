@@ -36,11 +36,11 @@ function onDragStart(event: DragEvent, token: string): void {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-start gap-x-3 gap-y-1.5">
+  <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
     <div
       v-for="group in INGEST_TOKEN_GROUPS"
       :key="group.label"
-      class="flex flex-wrap items-center gap-1"
+      class="flex flex-wrap items-center gap-1.5"
     >
       <span class="mr-0.5 text-[9px] font-medium uppercase tracking-wide text-subtle">
         {{ group.label }}

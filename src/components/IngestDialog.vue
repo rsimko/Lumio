@@ -29,6 +29,7 @@ import { computed, ref } from 'vue';
 
 import AppDialog from '@/components/AppDialog.vue';
 import IngestKeywordEditor from '@/components/IngestKeywordEditor.vue';
+import IngestReplaceDialog from '@/components/IngestReplaceDialog.vue';
 import IngestTemplateEditor from '@/components/IngestTemplateEditor.vue';
 import IngestTokenPalette from '@/components/IngestTokenPalette.vue';
 import { basename, formatBytes, formatCount } from '@/lib/format';
@@ -47,6 +48,7 @@ import type { IngestConflictResolution, IngestEntity } from '@/types';
 const store = useIngestStore();
 
 const selectedEntityId = ref<string | null>(null);
+const replacePrompt = ref<IngestEntity[] | null>(null);
 const templatePicker = ref('');
 const iptcOpen = ref(false);
 const logFilter = ref<'all' | 'warning' | 'error'>('all');
@@ -202,14 +204,22 @@ function relativeDestination(entity: IngestEntity): string {
 
 function statusLabel(entity: IngestEntity): string {
   if (entity.status === 'error') return 'Error';
-  if (entity.status === 'conflict') return 'Conflict';
+  if (entity.conflict) {
+    if (entity.resolution === 'replace') return 'Conflict · replace';
+    if (entity.resolution === 'keepBoth') return 'Conflict · rename';
+    return 'Conflict · skip';
+  }
   if (entity.renamed) return 'Ready, renamed';
   return 'Ready';
 }
 
 function statusClass(entity: IngestEntity): string {
   if (entity.status === 'error') return 'border-danger/30 bg-danger/10 text-danger';
-  if (entity.status === 'conflict') return 'border-warning/30 bg-warning/10 text-warning';
+  if (entity.conflict) {
+    return entity.resolution === 'replace'
+      ? 'border-danger/30 bg-danger/10 text-danger'
+      : 'border-warning/30 bg-warning/10 text-warning';
+  }
   if (entity.renamed) return 'border-warning/30 bg-warning/10 text-warning';
   return 'border-success/30 bg-success/10 text-success';
 }
@@ -246,12 +256,8 @@ function deleteSelectedTemplate(): void {
 
 function resolution(entity: IngestEntity, value: IngestConflictResolution): void {
   if (value === 'replace') {
-    const confirmed = window.confirm(
-      `Replace the existing destination files for ${entity.displayName}?\n\n${entity.conflict?.existing.join(
-        '\n',
-      )}\n\nExisting files are backed up while the copy is committed.`,
-    );
-    if (!confirmed) return;
+    replacePrompt.value = [entity];
+    return;
   }
   void store.setResolution(entity.id, value);
 }
@@ -260,12 +266,18 @@ function applyResolutionToAll(value: IngestConflictResolution): void {
   const entities = store.conflictEntities;
   if (!entities.length) return;
   if (value === 'replace') {
-    const confirmed = window.confirm(
-      `Replace existing destination files for ${entities.length} photo(s)?\n\nExisting files are backed up while each copy is committed.`,
-    );
-    if (!confirmed) return;
+    replacePrompt.value = [...entities];
+    return;
   }
   for (const entity of entities) void store.setResolution(entity.id, value);
+}
+
+async function resolveReplacePrompt(value: 'keepBoth' | 'replace'): Promise<void> {
+  const entities = replacePrompt.value ?? [];
+  replacePrompt.value = null;
+  for (const entity of entities) {
+    await store.setResolution(entity.id, value);
+  }
 }
 
 function chooseSourceFolders(): void {
@@ -370,48 +382,51 @@ function chooseDestination(): void {
                 Choose folder
               </button>
             </div>
-            <button
-              class="flex w-full items-center gap-2 rounded border px-2.5 py-2 text-left transition"
-              :class="
-                store.destination
-                  ? 'border-line bg-elevated hover:border-line-strong'
-                  : 'border-dashed border-line text-subtle hover:border-line-strong hover:text-muted'
-              "
-              @click="chooseDestination"
-            >
-              <HardDrive class="h-3.5 w-3.5 shrink-0" />
-              <span v-if="store.destination" class="min-w-0 flex-1">
-                <span class="block truncate text-[11px] font-medium text-ink">
-                  {{ sourceName(store.destination) }}
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                class="flex min-w-0 flex-1 basis-[220px] items-center gap-2 rounded border px-2.5 py-2 text-left transition"
+                :class="
+                  store.destination
+                    ? 'border-line bg-elevated hover:border-line-strong'
+                    : 'border-dashed border-line text-subtle hover:border-line-strong hover:text-muted'
+                "
+                @click="chooseDestination"
+              >
+                <HardDrive class="h-3.5 w-3.5 shrink-0" />
+                <span v-if="store.destination" class="min-w-0 flex-1">
+                  <span class="block truncate text-[11px] font-medium text-ink">
+                    {{ sourceName(store.destination) }}
+                  </span>
+                  <span class="block truncate font-mono text-[9px] text-subtle">
+                    {{ store.destination }}
+                  </span>
                 </span>
-                <span class="block truncate font-mono text-[9px] text-subtle">
-                  {{ store.destination }}
-                </span>
-              </span>
-              <span v-else class="text-[11px]">No destination selected</span>
-              <ArrowRight class="h-3 w-3 shrink-0 text-subtle" />
-            </button>
-
-            <div class="mt-2 flex items-center gap-2 rounded border border-line/70 bg-elevated px-2.5 py-1.5">
-              <input
-                id="ingest-add-library"
-                type="checkbox"
-                class="h-3.5 w-3.5 accent-[rgb(var(--c-accent))]"
-                :checked="store.addToLibrary"
-                @change="store.setAddToLibrary(($event.target as HTMLInputElement).checked)"
-              />
-              <label for="ingest-add-library" class="text-[11px] text-ink">
-                Add destination folder to library after ingest
+                <span v-else class="text-[11px]">No destination selected</span>
+                <ArrowRight class="h-3 w-3 shrink-0 text-subtle" />
+              </button>
+              <label
+                for="ingest-add-library"
+                class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[10px] text-ink"
+                title="Add the destination folder to the library after ingest"
+              >
+                <input
+                  id="ingest-add-library"
+                  type="checkbox"
+                  class="h-3.5 w-3.5 accent-[rgb(var(--c-accent))]"
+                  :checked="store.addToLibrary"
+                  @change="store.setAddToLibrary(($event.target as HTMLInputElement).checked)"
+                />
+                Add to library after ingest
               </label>
             </div>
           </section>
         </div>
 
         <section class="mt-3 rounded-lg border border-line bg-panel/60 p-3">
-          <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div class="flex flex-wrap items-end gap-2">
               <label class="block">
-                <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
+                <span class="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-subtle">
                   Load saved template
                 </span>
                 <select
@@ -433,7 +448,7 @@ function chooseDestination(): void {
                 </select>
               </label>
               <label class="block">
-                <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
+                <span class="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-subtle">
                   Template name
                 </span>
                 <div class="flex gap-1">
@@ -474,9 +489,9 @@ function chooseDestination(): void {
             </p>
           </div>
 
-          <div class="grid gap-3 lg:grid-cols-2">
+          <div class="grid gap-x-4 gap-y-4 lg:grid-cols-2">
             <div class="min-w-0">
-              <h3 class="mb-1 text-xs font-semibold text-ink">Destination folder</h3>
+              <h3 class="mb-1.5 text-xs font-semibold text-ink">Destination folder</h3>
               <IngestTemplateEditor
                 ref="folderEditor"
                 v-model="store.draft.folderTemplate"
@@ -489,7 +504,7 @@ function chooseDestination(): void {
               />
             </div>
             <div class="min-w-0">
-              <h3 class="mb-1 text-xs font-semibold text-ink">Filename template</h3>
+              <h3 class="mb-1.5 text-xs font-semibold text-ink">Filename template</h3>
               <IngestTemplateEditor
                 ref="filenameEditor"
                 v-model="store.draft.filenameTemplate"
@@ -503,7 +518,7 @@ function chooseDestination(): void {
             </div>
           </div>
 
-          <div class="mt-2 border-t border-line/70 pt-2">
+          <div class="mt-4 border-t border-line/70 pt-3">
             <IngestTokenPalette
               :disabled-tokens="blockedTemplateTokens"
               @insert="insertTemplateToken"
@@ -511,7 +526,7 @@ function chooseDestination(): void {
           </div>
 
           <div
-            class="mt-2 flex min-w-0 items-center gap-2 rounded border border-line/70 bg-elevated px-2 py-1.5"
+            class="mt-4 flex min-w-0 items-center gap-2 rounded border border-line/70 px-2.5 py-2"
           >
             <Eye class="h-3 w-3 shrink-0 text-subtle" />
             <span class="shrink-0 text-[10px] font-medium text-muted">Preview</span>
@@ -787,7 +802,7 @@ function chooseDestination(): void {
 
                 <div v-if="previewView === 'table'" class="overflow-x-auto rounded border border-line">
                   <div
-                    class="grid min-w-[660px] grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
+                    class="grid min-w-[690px] grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_140px] gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
                   >
                     <span>Photo</span>
                     <span>Capture</span>
@@ -797,7 +812,7 @@ function chooseDestination(): void {
                   <button
                     v-for="entity in plan.entities"
                     :key="entity.id"
-                    class="grid min-w-[660px] w-full grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] items-start gap-2 border-b border-line/60 px-2 py-1.5 text-left text-[10px] transition last:border-b-0 hover:bg-panel-2"
+                    class="grid min-w-[690px] w-full grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_140px] items-start gap-2 border-b border-line/60 px-2 py-1.5 text-left text-[10px] transition last:border-b-0 hover:bg-panel-2"
                     :class="selectedEntityId === entity.id ? 'bg-panel-2' : ''"
                     @click="selectedEntityId = selectedEntityId === entity.id ? null : entity.id"
                   >
@@ -827,7 +842,7 @@ function chooseDestination(): void {
                     </span>
                     <span>
                       <span
-                        class="inline-flex rounded border px-1 py-0.5 text-[9px] font-medium"
+                        class="inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[9px] font-medium"
                         :class="statusClass(entity)"
                       >
                         {{ statusLabel(entity) }}
@@ -873,7 +888,7 @@ function chooseDestination(): void {
                         {{ row.name }}
                       </span>
                       <span
-                        class="shrink-0 rounded border px-1 py-0.5 text-[8px] font-medium"
+                        class="shrink-0 whitespace-nowrap rounded border px-1 py-0.5 text-[8px] font-medium"
                         :class="statusClass(row.entity)"
                       >
                         {{ statusLabel(row.entity) }}
@@ -1221,6 +1236,16 @@ function chooseDestination(): void {
               <XCircle class="h-3.5 w-3.5" />
               {{ store.cancelRequested ? 'Cancelling…' : 'Cancel ingest' }}
             </button>
+            <template v-else-if="store.outcome">
+              <button
+                class="btn-primary"
+                title="Clear this run and start another ingest"
+                @click="store.startNewIngest()"
+              >
+                <Plus class="h-3.5 w-3.5" />
+                New ingest
+              </button>
+            </template>
             <template v-else>
               <button
                 class="btn"
@@ -1263,4 +1288,11 @@ function chooseDestination(): void {
       </footer>
     </div>
   </AppDialog>
+
+  <IngestReplaceDialog
+    v-if="replacePrompt"
+    :entities="replacePrompt"
+    @close="replacePrompt = null"
+    @resolve="resolveReplacePrompt"
+  />
 </template>

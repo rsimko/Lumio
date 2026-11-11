@@ -21,12 +21,12 @@
   --c-ink: 27 29 34;
   --c-muted: 89 105 108;
   --c-subtle: 99 118 121;
-  --c-accent: 70 114 123;
+  --c-accent: 67 116 126;
   --c-accent-soft: 228 237 238;
   --c-accent-ink: 255 255 255;
-  --c-danger: 169 79 69;
-  --c-warning: 138 106 47;
-  --c-success: 63 122 98;
+  --c-danger: 174 75 64;
+  --c-warning: 143 107 42;
+  --c-success: 60 125 99;
 }
 
 .dark {
@@ -41,12 +41,12 @@
   --c-ink: 204 219 220;
   --c-muted: 150 167 169;
   --c-subtle: 123 139 143;
-  --c-accent: 119 160 169;
+  --c-accent: 117 162 171;
   --c-accent-soft: 37 58 64;
   --c-accent-ink: 15 22 24;
-  --c-danger: 208 138 128;
-  --c-warning: 216 183 122;
-  --c-success: 143 192 174;
+  --c-danger: 212 135 124;
+  --c-warning: 221 184 117;
+  --c-success: 141 194 175;
 }
 
 @layer base {

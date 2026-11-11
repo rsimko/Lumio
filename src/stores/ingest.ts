@@ -219,6 +219,18 @@ export const useIngestStore = defineStore('ingest', () => {
     open.value = false;
   }
 
+  /** Clear the completed run and begin a fresh ingest with the same settings. */
+  function startNewIngest(): void {
+    if (running.value) return;
+    resetPlan();
+    sources.value = [];
+    destination.value = null;
+    templateName.value = '';
+    templateError.value = null;
+    selectedTemplateId.value = null;
+    addToLibrary.value = draft.value.addToLibrary;
+  }
+
   function setTab(next: IngestTab): void {
     tab.value = next;
   }
@@ -604,6 +616,7 @@ export const useIngestStore = defineStore('ingest', () => {
     copiedDestination,
     openDialog,
     closeDialog,
+    startNewIngest,
     setTab,
     setSources,
     addSourceFolders,

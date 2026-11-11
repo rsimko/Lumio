@@ -15,6 +15,8 @@ export interface IngestToken {
   token: string;
   label: string;
   description: string;
+  /** Literal characters are inserted as-is instead of being wrapped in braces. */
+  literal?: boolean;
 }
 
 export interface IngestTokenGroup {
@@ -51,11 +53,26 @@ export const INGEST_TOKEN_GROUPS: IngestTokenGroup[] = [
       { token: 'counter', label: 'Counter', description: 'Per-photo counter' },
     ],
   },
+  {
+    label: 'Separators',
+    tokens: [
+      { token: '-', label: 'Hyphen', description: 'Insert a literal hyphen', literal: true },
+      { token: '_', label: 'Underscore', description: 'Insert a literal underscore', literal: true },
+      {
+        token: '/',
+        label: 'Slash',
+        description: 'Insert a folder separator (folder template only)',
+        literal: true,
+      },
+    ],
+  },
 ];
 
 export const INGEST_TOKENS: IngestToken[] = INGEST_TOKEN_GROUPS.flatMap((group) => group.tokens);
 
-const TOKEN_SET = new Set(INGEST_TOKENS.map((token) => token.token));
+const TOKEN_SET = new Set(
+  INGEST_TOKENS.filter((token) => !token.literal).map((token) => token.token),
+);
 
 const CAMERA_TOKENS = new Set([
   'make',
@@ -301,12 +318,13 @@ export function validateIngestSettings(settings: IngestSettings): TemplateProble
   };
   check(settings.folderTemplate, 'folder');
   check(settings.filenameTemplate, 'filename');
-  check(settings.iptc.title, 'text');
-  check(settings.iptc.description, 'text');
-  check(settings.iptc.creator, 'text');
-  check(settings.iptc.copyright, 'text');
-  for (const keyword of settings.iptc.keywords) check(keyword, 'text');
   return problems;
+}
+
+/** The exact text a token pill inserts into a template field. */
+export function ingestTokenSnippet(token: string): string {
+  const known = INGEST_TOKENS.find((entry) => entry.token === token);
+  return known?.literal ? token : `{${token}}`;
 }
 
 /** Insert a token at the caret, replacing any selected text. */
@@ -318,10 +336,81 @@ export function insertIngestToken(
 ): { value: string; caret: number } {
   const start = Math.max(0, Math.min(selectionStart, value.length));
   const end = Math.max(start, Math.min(selectionEnd, value.length));
-  const snippet = `{${token}}`;
+  const snippet = ingestTokenSnippet(token);
   return {
     value: value.slice(0, start) + snippet + value.slice(end),
     caret: start + snippet.length,
+  };
+}
+
+export const PREVIEW_SAMPLE_STEM = 'IMG_1234';
+export const PREVIEW_SAMPLE_EXTENSION = 'RAF';
+
+function padPreviewNumber(value: number, padding = 2): string {
+  const safePadding = Number.isFinite(padding)
+    ? Math.max(0, Math.min(12, Math.round(padding)))
+    : 2;
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  return String(safeValue).padStart(safePadding, '0');
+}
+
+function renderPreviewTemplate(
+  template: string,
+  settings: Pick<
+    IngestSettings,
+    'jobCode' | 'customText' | 'counterStart' | 'counterPadding'
+  >,
+  now: Date,
+): string {
+  const values: Record<string, string> = {
+    YYYY: String(now.getFullYear()),
+    MM: padPreviewNumber(now.getMonth() + 1),
+    DD: padPreviewNumber(now.getDate()),
+    hh: padPreviewNumber(now.getHours()),
+    mm: padPreviewNumber(now.getMinutes()),
+    ss: padPreviewNumber(now.getSeconds()),
+    job_code: settings.jobCode.trim(),
+    custom_text: settings.customText.trim(),
+    default_filename: PREVIEW_SAMPLE_STEM,
+    counter: padPreviewNumber(settings.counterStart, settings.counterPadding),
+  };
+  return template.replace(/\{([^{}]*)\}/g, (match, token: string) => values[token] ?? match);
+}
+
+export interface IngestDestinationPreview {
+  folder: string;
+  filename: string;
+  relativePath: string;
+}
+
+/**
+ * Best-effort rendering of the current folder and filename templates for the
+ * live preview. It deliberately uses a sample photo and never validates paths;
+ * the Dry Run remains the authoritative check.
+ */
+export function previewIngestDestination(
+  settings: Pick<
+    IngestSettings,
+    | 'folderTemplate'
+    | 'filenameTemplate'
+    | 'jobCode'
+    | 'customText'
+    | 'counterStart'
+    | 'counterPadding'
+  >,
+  now = new Date(),
+): IngestDestinationPreview {
+  const folder = renderPreviewTemplate(settings.folderTemplate, settings, now)
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join('/');
+  const stem = renderPreviewTemplate(settings.filenameTemplate, settings, now).trim();
+  const filename = stem ? `${stem}.${PREVIEW_SAMPLE_EXTENSION}` : '';
+  return {
+    folder,
+    filename,
+    relativePath: [folder, filename].filter(Boolean).join('/'),
   };
 }
 
@@ -395,7 +484,7 @@ export function buildIngestReport(plan: IngestPlan, outcome?: IngestOutcome | nu
     !plan.rules.iptc.keywords.some((keyword) => keyword.trim())) {
     lines.push('IPTC: none');
   } else {
-    lines.push('IPTC templates');
+    lines.push('IPTC values');
     lines.push(`  Title: ${plan.rules.iptc.title || '(empty)'}`);
     lines.push(`  Description: ${plan.rules.iptc.description || '(empty)'}`);
     lines.push(`  Creator: ${plan.rules.iptc.creator || '(empty)'}`);

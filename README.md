@@ -42,8 +42,9 @@ editing come later.
 - Ingest copies into a hidden staging folder, verifies every copy with BLAKE3 and commits with
   atomic renames; a failed group rolls back, and a replaced file is restored on failure.
 - Optionally write IPTC title, description, creator, copyright and keywords while ingesting.
-  RAW photos get an XMP sidecar, standalone JPEGs get embedded XMP/IPTC, and every unrelated
-  XMP field is preserved. ExifTool is used for writing and the result is read back to verify.
+  IPTC fields are literal text, not templates. RAW photos get an XMP sidecar, standalone JPEGs
+  get embedded XMP/IPTC, and every unrelated XMP field is preserved. ExifTool is used for writing
+  and the result is read back to verify.
 - Ingest can add the destination folder to the library at the end, or leave it unregistered.
 - Delete photos from the library only or from disk, from the toolbar, the info panel, the
   Delete key, or by right-clicking a photo. Disk deletion moves every associated file to the

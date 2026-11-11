@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_INGEST_SETTINGS,
+  INGEST_TOKEN_GROUPS,
   buildIngestReport,
   captureSourceLabel,
   defaultReportName,
   hasIptcValues,
   ingestRulesFromSettings,
+  ingestTokenSnippet,
   insertIngestToken,
   normalizeIngestSettings,
+  previewIngestDestination,
   validateIngestSettings,
   validateIngestTemplate,
   xmpNamingExample,
@@ -150,16 +153,30 @@ describe('ingest templates', () => {
     );
     expect(problems.map((problem) => problem.kind)).toContain('folder');
     expect(problems.map((problem) => problem.kind)).toContain('filename');
-    expect(problems.map((problem) => problem.kind)).toContain('text');
+    // IPTC values are literal text and are never parsed as templates.
+    expect(problems.map((problem) => problem.kind)).not.toContain('text');
   });
 });
 
 describe('token insertion', () => {
+  it('exposes separator tokens as literal snippets', () => {
+    const separators = INGEST_TOKEN_GROUPS.find((group) => group.label === 'Separators');
+    expect(separators?.tokens.map((token) => token.token)).toEqual(['-', '_', '/']);
+    expect(ingestTokenSnippet('YYYY')).toBe('{YYYY}');
+    expect(ingestTokenSnippet('-')).toBe('-');
+    expect(ingestTokenSnippet('/')).toBe('/');
+  });
+
   it('inserts at the caret and moves the caret after the token', () => {
     expect(insertIngestToken('AB', 'YYYY', 1, 1)).toEqual({
       value: 'A{YYYY}B',
       caret: 7,
     });
+  });
+
+  it('inserts separators without braces', () => {
+    expect(insertIngestToken('AB', '-', 1, 1)).toEqual({ value: 'A-B', caret: 2 });
+    expect(insertIngestToken('AB', '/', 1, 1)).toEqual({ value: 'A/B', caret: 2 });
   });
 
   it('replaces selected text', () => {
@@ -172,6 +189,50 @@ describe('token insertion', () => {
   it('clamps invalid selections', () => {
     expect(insertIngestToken('AB', 'MM', 99, 99)).toEqual({ value: 'AB{MM}', caret: 6 });
     expect(insertIngestToken('AB', 'MM', -2, 0)).toEqual({ value: '{MM}AB', caret: 4 });
+  });
+});
+
+describe('destination preview', () => {
+  it('renders the folder path, filename and sample extension', () => {
+    const preview = previewIngestDestination(
+      normalizeIngestSettings({
+        folderTemplate: '{YYYY}/{MM}',
+        filenameTemplate: '{YYYY}{MM}{DD}_{default_filename}_{counter}',
+        counterStart: 7,
+        counterPadding: 3,
+      }),
+      new Date(2026, 10, 11, 14, 5, 9),
+    );
+    expect(preview).toEqual({
+      folder: '2026/11',
+      filename: '20261111_IMG_1234_007.RAF',
+      relativePath: '2026/11/20261111_IMG_1234_007.RAF',
+    });
+  });
+
+  it('uses job code and custom text and leaves unknown tokens alone', () => {
+    const preview = previewIngestDestination(
+      normalizeIngestSettings({
+        folderTemplate: 'Job_{job_code}/{custom_text}',
+        filenameTemplate: '{job_code}_{nope}_{default_filename}',
+        jobCode: 'JOB-1',
+        customText: 'Palawan',
+      }),
+      new Date(2026, 0, 2, 3, 4, 5),
+    );
+    expect(preview.folder).toBe('Job_JOB-1/Palawan');
+    expect(preview.filename).toBe('JOB-1_{nope}_IMG_1234.RAF');
+    expect(preview.relativePath).toBe('Job_JOB-1/Palawan/JOB-1_{nope}_IMG_1234.RAF');
+  });
+
+  it('trims empty segments and handles an empty filename template', () => {
+    const preview = previewIngestDestination(
+      normalizeIngestSettings({ folderTemplate: '/{YYYY}//{MM}/', filenameTemplate: ' ' }),
+      new Date(2026, 10, 11),
+    );
+    expect(preview.folder).toBe('2026/11');
+    expect(preview.filename).toBe('');
+    expect(preview.relativePath).toBe('2026/11');
   });
 });
 

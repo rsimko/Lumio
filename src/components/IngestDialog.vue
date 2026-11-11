@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   CircleSlash,
   Download,
+  Eye,
+  FileImage,
   FileText,
   FolderOpen,
   FolderPlus,
@@ -26,8 +28,9 @@ import { computed, ref } from 'vue';
 import AppDialog from '@/components/AppDialog.vue';
 import IngestKeywordEditor from '@/components/IngestKeywordEditor.vue';
 import IngestTemplateEditor from '@/components/IngestTemplateEditor.vue';
+import IngestTokenPalette from '@/components/IngestTokenPalette.vue';
 import { basename, formatBytes, formatCount } from '@/lib/format';
-import { captureSourceLabel, xmpNamingLabel } from '@/lib/ingest';
+import { captureSourceLabel, previewIngestDestination } from '@/lib/ingest';
 import { useIngestStore, type IngestTab } from '@/stores/ingest';
 import type { IngestConflictResolution, IngestEntity } from '@/types';
 
@@ -37,6 +40,35 @@ const selectedEntityId = ref<string | null>(null);
 const templatePicker = ref('');
 const iptcOpen = ref(false);
 const logFilter = ref<'all' | 'warning' | 'error'>('all');
+type TemplateField = 'folder' | 'filename';
+const activeTemplate = ref<TemplateField>('folder');
+const folderEditor = ref<{ insert: (token: string) => void } | null>(null);
+const filenameEditor = ref<{ insert: (token: string) => void } | null>(null);
+
+const SOURCE_FILE_EXTENSIONS = new Set([
+  'cr2',
+  'cr3',
+  'nef',
+  'arw',
+  'raf',
+  'orf',
+  'rw2',
+  'dng',
+  'jpg',
+  'jpeg',
+  'xmp',
+]);
+
+const templatePreview = computed(() => previewIngestDestination(store.draft));
+const previewPath = computed(() => {
+  const destination = store.destination?.replace(/\/+$/, '') ?? '';
+  const relative = templatePreview.value.relativePath;
+  if (!relative) return destination || '—';
+  return destination ? `${destination}/${relative}` : relative;
+});
+const blockedTemplateTokens = computed(() =>
+  activeTemplate.value === 'filename' ? ['/'] : [],
+);
 
 const tabs = computed<{ id: IngestTab; label: string; count?: number }[]>(() => [
   { id: 'preview', label: 'Preview', count: store.plan?.summary.entities },
@@ -63,6 +95,17 @@ function sourceName(path: string): string {
   return basename(path);
 }
 
+function isFileSource(path: string): boolean {
+  const name = basename(path).toLowerCase();
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && SOURCE_FILE_EXTENSIONS.has(name.slice(dot + 1));
+}
+
+function insertTemplateToken(token: string): void {
+  const editor = activeTemplate.value === 'filename' ? filenameEditor.value : folderEditor.value;
+  editor?.insert(token);
+}
+
 function relativeDestination(entity: IngestEntity): string {
   if (!plan.value) return entity.destinationStem;
   const root = plan.value.destination.replace(/\/+$/, '');
@@ -80,10 +123,10 @@ function statusLabel(entity: IngestEntity): string {
 }
 
 function statusClass(entity: IngestEntity): string {
-  if (entity.status === 'error') return 'border-danger/40 bg-danger/10 text-danger';
-  if (entity.status === 'conflict') return 'border-warning/40 bg-warning/10 text-warning';
-  if (entity.renamed) return 'border-accent/40 bg-accent-soft text-accent';
-  return 'border-success/40 bg-success/10 text-success';
+  if (entity.status === 'error') return 'border-danger/30 bg-danger/10 text-danger';
+  if (entity.status === 'conflict') return 'border-warning/30 bg-warning/10 text-warning';
+  if (entity.renamed) return 'border-warning/30 bg-warning/10 text-warning';
+  return 'border-success/30 bg-success/10 text-success';
 }
 
 function roleLabel(role: string): string {
@@ -197,10 +240,6 @@ function chooseDestination(): void {
                 </button>
               </div>
             </div>
-            <p class="mb-2 text-[11px] leading-relaxed text-subtle">
-              Folders are scanned recursively. A selected file brings its same-name RAW, JPEG and
-              XMP companions along.
-            </p>
             <ul
               v-if="store.sources.length"
               class="max-h-36 space-y-1 overflow-y-auto pr-1"
@@ -210,12 +249,13 @@ function chooseDestination(): void {
                 :key="source"
                 class="flex items-center gap-2 rounded border border-line/70 bg-elevated px-2 py-1"
               >
-                <FolderOpen class="h-3 w-3 shrink-0 text-subtle" />
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-[11px] font-medium text-ink">
-                    {{ sourceName(source) }}
-                  </span>
-                  <span class="block truncate font-mono text-[9px] text-subtle">{{ source }}</span>
+                <FileImage v-if="isFileSource(source)" class="h-3 w-3 shrink-0 text-subtle" />
+                <FolderOpen v-else class="h-3 w-3 shrink-0 text-subtle" />
+                <span
+                  class="min-w-0 flex-1 truncate font-mono text-[10px] text-muted"
+                  :title="source"
+                >
+                  {{ source }}
                 </span>
                 <button
                   class="text-subtle transition hover:text-danger"
@@ -228,9 +268,13 @@ function chooseDestination(): void {
             </ul>
             <div
               v-else
-              class="rounded border border-dashed border-line px-3 py-5 text-center text-[11px] text-subtle"
+              class="rounded border border-dashed border-line px-3 py-4 text-center text-[11px] leading-relaxed text-subtle"
             >
-              Choose source folders or individual photos to begin.
+              <p class="font-medium text-muted">Choose source folders and individual photos to begin.</p>
+              <p class="mt-1 text-[10px]">
+                Folders are scanned recursively. A selected file brings its same-name RAW, JPEG and
+                XMP companions along.
+              </p>
             </div>
           </section>
 
@@ -276,15 +320,19 @@ function chooseDestination(): void {
                 Add destination folder to library after ingest
               </label>
             </div>
+          </section>
+        </div>
 
-            <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+        <section class="mt-3 rounded-lg border border-line bg-panel/60 p-3">
+          <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div class="flex flex-wrap items-end gap-2">
               <label class="block">
                 <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
                   Load saved template
                 </span>
                 <select
                   v-model="templatePicker"
-                  class="h-7 w-full rounded border border-line bg-panel px-1.5 text-[11px] text-ink outline-none focus:border-accent/70"
+                  class="h-7 w-44 rounded border border-line bg-panel px-1.5 text-[11px] text-ink outline-none focus:border-accent/70"
                   :disabled="!store.draft.templates.length"
                   @change="chooseTemplate"
                 >
@@ -307,7 +355,7 @@ function chooseDestination(): void {
                 <div class="flex gap-1">
                   <input
                     v-model="store.templateName"
-                    class="h-7 min-w-0 flex-1 rounded border border-line bg-panel px-1.5 text-[11px] text-ink outline-none focus:border-accent/70"
+                    class="h-7 w-40 rounded border border-line bg-panel px-1.5 text-[11px] text-ink outline-none focus:border-accent/70"
                     placeholder="Client or shoot"
                     @keydown.enter.prevent="saveAsTemplate"
                   />
@@ -334,37 +382,62 @@ function chooseDestination(): void {
                 </div>
               </label>
             </div>
-            <p v-if="store.templateError" class="mt-1 text-[10px] text-danger">
-              {{ store.templateError }}
-            </p>
-          </section>
-        </div>
+            <p class="text-[10px] text-subtle">Templates store the folder and filename pattern.</p>
+          </div>
 
-        <section class="mt-3 grid gap-3 lg:grid-cols-2">
-          <div class="rounded-lg border border-line bg-panel/60 p-3">
-            <h3 class="mb-2 text-xs font-semibold text-ink">Folder template</h3>
-            <IngestTemplateEditor
-              v-model="store.draft.folderTemplate"
-              label="Destination folder"
-              hint="'/' creates folder levels"
-              kind="folder"
-              :job-code="store.draft.jobCode"
-              :custom-text="store.draft.customText"
-              placeholder="{YYYY}/{MM}"
+          <div class="grid gap-3 lg:grid-cols-2">
+            <div class="min-w-0">
+              <h3 class="mb-1 text-xs font-semibold text-ink">Destination folder</h3>
+              <IngestTemplateEditor
+                ref="folderEditor"
+                v-model="store.draft.folderTemplate"
+                kind="folder"
+                aria-label="Destination folder template"
+                :job-code="store.draft.jobCode"
+                :custom-text="store.draft.customText"
+                placeholder="{YYYY}/{MM}"
+                @focus="activeTemplate = 'folder'"
+              />
+            </div>
+            <div class="min-w-0">
+              <h3 class="mb-1 text-xs font-semibold text-ink">Filename template</h3>
+              <IngestTemplateEditor
+                ref="filenameEditor"
+                v-model="store.draft.filenameTemplate"
+                kind="filename"
+                aria-label="Filename template"
+                :job-code="store.draft.jobCode"
+                :custom-text="store.draft.customText"
+                placeholder="{YYYY}{MM}{DD}_{default_filename}"
+                @focus="activeTemplate = 'filename'"
+              />
+            </div>
+          </div>
+
+          <div class="mt-2 border-t border-line/70 pt-2">
+            <IngestTokenPalette
+              :disabled-tokens="blockedTemplateTokens"
+              @insert="insertTemplateToken"
             />
           </div>
-          <div class="rounded-lg border border-line bg-panel/60 p-3">
-            <h3 class="mb-2 text-xs font-semibold text-ink">Filename template</h3>
-            <IngestTemplateEditor
-              v-model="store.draft.filenameTemplate"
-              label="File name (extension is preserved)"
-              hint="'/' is not allowed here"
-              kind="filename"
-              :job-code="store.draft.jobCode"
-              :custom-text="store.draft.customText"
-              placeholder="{YYYY}{MM}{DD}_{default_filename}"
-            />
+
+          <div
+            class="mt-2 flex min-w-0 items-center gap-2 rounded border border-line/70 bg-elevated px-2 py-1.5"
+          >
+            <Eye class="h-3 w-3 shrink-0 text-subtle" />
+            <span class="shrink-0 text-[10px] font-medium text-muted">Preview</span>
+            <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-ink" :title="previewPath">
+              {{ previewPath }}
+            </span>
+            <span
+              class="shrink-0 rounded bg-line px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide text-subtle"
+            >
+              sample
+            </span>
           </div>
+          <p v-if="store.templateError" class="mt-1 text-[10px] text-danger">
+            {{ store.templateError }}
+          </p>
         </section>
 
         <section class="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
@@ -415,16 +488,6 @@ function chooseDestination(): void {
                 />
               </label>
             </div>
-            <label class="mt-1.5 block text-[10px] text-subtle">
-              XMP sidecar
-              <select
-                v-model="store.draft.xmpNaming"
-                class="mt-0.5 h-7 w-full rounded border border-line bg-panel px-1.5 font-mono text-[10px] text-ink outline-none focus:border-accent/70"
-              >
-                <option value="filenameExt">{{ xmpNamingLabel('filenameExt') }}</option>
-                <option value="filename">{{ xmpNamingLabel('filename') }}</option>
-              </select>
-            </label>
           </div>
         </section>
 
@@ -454,7 +517,7 @@ function chooseDestination(): void {
                 :class="
                   store.tools?.exiftool
                     ? 'border-success/30 bg-success/10 text-success'
-                    : 'border-warning/40 bg-warning/10 text-warning'
+                    : 'border-warning/30 bg-warning/10 text-warning'
                 "
               >
                 <CheckCircle2 v-if="store.tools?.exiftool" class="h-2.5 w-2.5" />
@@ -467,63 +530,50 @@ function chooseDestination(): void {
               </span>
               <span
                 >Metadata is written to XMP sidecars for RAW photos and into standalone JPEGs.
-                Unrelated XMP fields are preserved.</span
+                Unrelated XMP fields are preserved. ExifTool is configured in Lumio settings.</span
               >
             </div>
-            <div class="mb-2 flex flex-wrap items-end gap-2">
-              <label class="min-w-[240px] flex-1">
+            <div class="grid gap-3 lg:grid-cols-2">
+              <label class="block">
                 <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
-                  ExifTool path (optional)
+                  Title
                 </span>
                 <input
-                  v-model="store.draft.exiftoolPath"
-                  class="h-7 w-full rounded border border-line bg-panel px-2 font-mono text-[10px] text-ink outline-none focus:border-accent/70"
-                  placeholder="Auto-detect from PATH and Homebrew"
+                  v-model="store.draft.iptc.title"
+                  class="w-full rounded-md border border-line bg-panel px-2 py-1.5 text-xs text-ink outline-none focus:border-accent/70"
+                  placeholder="Optional title"
                 />
               </label>
-              <button class="btn h-7 px-2 text-[10px]" :disabled="store.detectingTools" @click="store.detectTools()">
-                <Loader2 v-if="store.detectingTools" class="h-3 w-3 animate-spin" />
-                <RefreshCw v-else class="h-3 w-3" />
-                Detect
-              </button>
-            </div>
-            <div class="grid gap-3 lg:grid-cols-2">
-              <IngestTemplateEditor
-                v-model="store.draft.iptc.title"
-                label="Title"
-                kind="text"
-                :job-code="store.draft.jobCode"
-                :custom-text="store.draft.customText"
-                :mono="false"
-                placeholder="Optional title template"
-              />
-              <IngestTemplateEditor
-                v-model="store.draft.iptc.description"
-                label="Description"
-                kind="text"
-                :job-code="store.draft.jobCode"
-                :custom-text="store.draft.customText"
-                :mono="false"
-                placeholder="Optional description template"
-              />
-              <IngestTemplateEditor
-                v-model="store.draft.iptc.creator"
-                label="Creator"
-                kind="text"
-                :job-code="store.draft.jobCode"
-                :custom-text="store.draft.customText"
-                :mono="false"
-                placeholder="Photographer name"
-              />
-              <IngestTemplateEditor
-                v-model="store.draft.iptc.copyright"
-                label="Copyright"
-                kind="text"
-                :job-code="store.draft.jobCode"
-                :custom-text="store.draft.customText"
-                :mono="false"
-                placeholder="© 2026 Name"
-              />
+              <label class="block">
+                <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
+                  Description
+                </span>
+                <input
+                  v-model="store.draft.iptc.description"
+                  class="w-full rounded-md border border-line bg-panel px-2 py-1.5 text-xs text-ink outline-none focus:border-accent/70"
+                  placeholder="Optional description"
+                />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
+                  Creator
+                </span>
+                <input
+                  v-model="store.draft.iptc.creator"
+                  class="w-full rounded-md border border-line bg-panel px-2 py-1.5 text-xs text-ink outline-none focus:border-accent/70"
+                  placeholder="Photographer name"
+                />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
+                  Copyright
+                </span>
+                <input
+                  v-model="store.draft.iptc.copyright"
+                  class="w-full rounded-md border border-line bg-panel px-2 py-1.5 text-xs text-ink outline-none focus:border-accent/70"
+                  placeholder="© 2026 Name"
+                />
+              </label>
             </div>
             <div class="mt-3">
               <div class="mb-1 text-2xs font-medium text-ink">Keywords</div>
@@ -534,8 +584,8 @@ function chooseDestination(): void {
               class="mt-2 flex items-start gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1.5 text-[10px] leading-relaxed text-warning"
             >
               <AlertTriangle class="mt-px h-3 w-3 shrink-0" />
-              IPTC and keyword writing requires ExifTool. Install it, set its path here, or clear the
-              IPTC fields to continue.
+              IPTC and keyword writing requires ExifTool. Install it or set its path in Settings, or
+              clear the IPTC fields to continue.
             </p>
           </div>
         </section>
@@ -606,7 +656,7 @@ function chooseDestination(): void {
                   </span>
                   <span
                     v-if="plan.summary.renamed"
-                    class="rounded border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-accent"
+                    class="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-warning"
                   >
                     {{ plan.summary.renamed }} auto-renamed
                   </span>
@@ -709,7 +759,7 @@ function chooseDestination(): void {
                       </dd>
                     </div>
                   </dl>
-                  <div v-if="selectedEntity.renamed" class="mt-1.5 text-accent">
+                  <div v-if="selectedEntity.renamed" class="mt-1.5 text-warning">
                     Auto-renamed: {{ selectedEntity.renameReason }}
                   </div>
                   <div v-if="selectedEntity.conflict" class="mt-1.5 text-warning">
@@ -861,7 +911,7 @@ function chooseDestination(): void {
                         </li>
                       </ul>
                     </details>
-                    <div v-if="entity.renamed" class="mt-1 text-[10px] text-accent">
+                    <div v-if="entity.renamed" class="mt-1 text-[10px] text-warning">
                       New name: {{ entity.destinationStem }}
                     </div>
                   </div>

@@ -354,45 +354,33 @@ fn rebuild_summary(plan: &mut IngestPlan) {
     plan.summary = summary;
 }
 
-fn render_optional(
-    template: &str,
-    context: &TemplateContext<'_>,
-) -> std::result::Result<Option<String>, String> {
-    if template.trim().is_empty() {
-        return Ok(None);
-    }
-    let value = render_text(template, context)?;
+fn literal_optional(value: &str) -> Option<String> {
     let value = value.trim();
     if value.is_empty() {
-        Ok(None)
+        None
     } else {
-        Ok(Some(value.to_string()))
+        Some(value.to_string())
     }
 }
 
-fn render_iptc(
-    rules: &IngestRules,
-    context: &TemplateContext<'_>,
-) -> std::result::Result<IngestIptcValues, String> {
+/// IPTC fields are literal text. They are never parsed as templates, so braces
+/// and other characters in a title or keyword reach the destination verbatim.
+fn literal_iptc(rules: &IngestRules) -> IngestIptcValues {
     let mut keywords = Vec::new();
     let mut seen = HashSet::new();
-    for template in &rules.iptc.keywords {
-        if template.trim().is_empty() {
-            continue;
-        }
-        let rendered = render_text(template, context)?;
-        let rendered = rendered.trim();
-        if !rendered.is_empty() && seen.insert(rendered.to_ascii_lowercase()) {
-            keywords.push(rendered.to_string());
+    for keyword in &rules.iptc.keywords {
+        let keyword = keyword.trim();
+        if !keyword.is_empty() && seen.insert(keyword.to_ascii_lowercase()) {
+            keywords.push(keyword.to_string());
         }
     }
-    Ok(IngestIptcValues {
-        title: render_optional(&rules.iptc.title, context)?,
-        description: render_optional(&rules.iptc.description, context)?,
-        creator: render_optional(&rules.iptc.creator, context)?,
-        copyright: render_optional(&rules.iptc.copyright, context)?,
+    IngestIptcValues {
+        title: literal_optional(&rules.iptc.title),
+        description: literal_optional(&rules.iptc.description),
+        creator: literal_optional(&rules.iptc.creator),
+        copyright: literal_optional(&rules.iptc.copyright),
         keywords,
-    })
+    }
 }
 
 fn validate_rules(rules: &IngestRules) -> Vec<String> {
@@ -408,27 +396,6 @@ fn validate_rules(rules: &IngestRules) -> Vec<String> {
         &rules.job_code,
         &rules.custom_text,
     ));
-    for template in [
-        &rules.iptc.title,
-        &rules.iptc.description,
-        &rules.iptc.creator,
-        &rules.iptc.copyright,
-    ] {
-        problems.extend(validate_required_inputs(
-            template,
-            TemplateKind::Text,
-            &rules.job_code,
-            &rules.custom_text,
-        ));
-    }
-    for template in &rules.iptc.keywords {
-        problems.extend(validate_required_inputs(
-            template,
-            TemplateKind::Text,
-            &rules.job_code,
-            &rules.custom_text,
-        ));
-    }
     problems.sort();
     problems.dedup();
     problems
@@ -554,6 +521,7 @@ pub fn plan_ingest(request: &IngestRequest) -> Result<IngestPlan> {
     }
 
     let mut prepared = Vec::new();
+    let iptc = literal_iptc(&request.rules);
     for source in sources {
         let capture = capture_for_entity(
             &source.files,
@@ -583,13 +551,7 @@ pub fn plan_ingest(request: &IngestRequest) -> Result<IngestPlan> {
         prepared.push(Prepared {
             source,
             capture,
-            iptc: IngestIptcValues {
-                title: None,
-                description: None,
-                creator: None,
-                copyright: None,
-                keywords: Vec::new(),
-            },
+            iptc: iptc.clone(),
             warnings,
         });
     }
@@ -610,7 +572,7 @@ pub fn plan_ingest(request: &IngestRequest) -> Result<IngestPlan> {
 
     let counter_start = request.rules.counter_start;
     let counter_padding = request.rules.counter_padding.min(12);
-    for (index, mut prepared) in prepared.into_iter().enumerate() {
+    for (index, prepared) in prepared.into_iter().enumerate() {
         let counter = counter_start.saturating_add(index as u32);
         let context = TemplateContext {
             capture: &prepared.capture,
@@ -625,8 +587,6 @@ pub fn plan_ingest(request: &IngestRequest) -> Result<IngestPlan> {
         let stem = render_text(&request.rules.filename_template, &context)
             .and_then(|value| validate_rendered_filename(&value))
             .map_err(LumioError::Ingest)?;
-        let iptc = render_iptc(&request.rules, &context).map_err(LumioError::Ingest)?;
-        prepared.iptc = iptc;
         let destination_dir = folder
             .iter()
             .fold(destination.clone(), |path, segment| path.join(segment));
@@ -1012,5 +972,27 @@ mod tests {
             .find(|file| file.role == IngestFileRole::Xmp)
             .unwrap();
         assert!(xmp.destination.ends_with("NEW.xmp"));
+    }
+
+    #[test]
+    fn iptc_values_are_literal_text_and_are_deduplicated() {
+        let mut rules = rules();
+        rules.iptc.title = "{YYYY} {job_code}".into();
+        rules.iptc.description = "  ".into();
+        rules.iptc.creator = "Jane Doe".into();
+        rules.iptc.copyright = "© 2026 Jane".into();
+        rules.iptc.keywords = vec![
+            "Travel".into(),
+            "travel".into(),
+            " {counter} ".into(),
+            "  ".into(),
+        ];
+
+        let iptc = literal_iptc(&rules);
+        assert_eq!(iptc.title.as_deref(), Some("{YYYY} {job_code}"));
+        assert_eq!(iptc.description, None);
+        assert_eq!(iptc.creator.as_deref(), Some("Jane Doe"));
+        assert_eq!(iptc.copyright.as_deref(), Some("© 2026 Jane"));
+        assert_eq!(iptc.keywords, vec!["Travel", "{counter}"]);
     }
 }

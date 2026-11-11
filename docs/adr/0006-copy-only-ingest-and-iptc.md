@@ -33,13 +33,13 @@ writing adds a third risk: an XMP rewrite can silently drop fields that Lumio do
 - **Conflicts are explicit.** Existing files and duplicate output names make an entity a
   conflict. The default is Skip. Keep both renames the whole entity with `_2`, `_3`, … and never
   lands on another existing file. Replace requires a per-entity confirmation in the UI.
-- **IPTC writing targets destination copies only.** RAW entities receive
-  `XMP-dc:Title`, `Description`, `Creator`, `Rights` and `Subject` in their copied XMP sidecar
-  (`XMP-dc:*)`; standalone JPEGs receive the same XMP properties plus legacy IPTC IIM. Only
-  non-empty requested fields are passed to ExifTool, so unrelated XMP fields, namespaces and
-  the rest of the packet are preserved. A minimal valid packet is created when a RAW entity has
-  no source sidecar. ExifTool is mandatory for IPTC and every write is read back for
-  verification. Source files and source sidecars are never modified.
+- **IPTC writing targets destination copies only.** IPTC fields are literal text, not templates.
+  RAW entities receive `XMP-dc:Title`, `Description`, `Creator`, `Rights` and `Subject` in their
+  copied XMP sidecar (`XMP-dc:*)`; standalone JPEGs receive the same XMP properties plus legacy
+  IPTC IIM. Only non-empty requested fields are passed to ExifTool, so unrelated XMP fields,
+  namespaces and the rest of the packet are preserved. A minimal valid packet is created when a
+  RAW entity has no source sidecar. ExifTool is mandatory for IPTC and every write is read back
+  for verification. Source files and source sidecars are never modified.
 - **XMP sidecar naming** is `{filename}.{ext}.xmp` by default (for example `NEW.CR3.xmp`), with a
   persisted setting for `{filename}.xmp` (`NEW.xmp`).
 - **Library registration** reuses the folder-addition path. Adding a destination already covered

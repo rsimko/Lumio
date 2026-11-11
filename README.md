@@ -56,12 +56,12 @@ Cataloguing, search and the keyword editor come later.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.
   Toggle **Assoc.** in the list header to reveal every associated JPG and XMP file as indented,
   connected rows beneath the RAW they belong to.
-- Open any photo in a distraction-free fullscreen viewer from the info panel, the filmstrip
+- Open any photo in a distraction-free fullscreen viewer from the top toolbar, the filmstrip
   view, or with the keyboard.
 - Rate photos from 1–5 stars, apply one of five standard color labels, mark Pick/Reject/Unflag
-  and toggle favorites from the info panel, with `1`–`5`, `P`, `X`, `U` and `Shift+F` working in
-  both browse and fullscreen. Multi-selection shows mixed values and applies changes as one
-  batch; tiles, list rows, the filmstrip and the viewer show compact indicators.
+  and toggle favorites from the info panel, with `1`–`5`, `Option`+`6`–`0`, `P`, `X`, `U` and
+  `Shift+F` working in both browse and fullscreen. Multi-selection shows mixed values and applies
+  changes as one batch; tiles, list rows, the filmstrip and the viewer show compact indicators.
 - Edits update the existing XMP rather than regenerating it. RAW, TIFF, PNG and WebP use a
   sidecar; a standalone JPEG embeds XMP; a JPEG with a sidecar writes only that sidecar. Writes
   are staged, read back field-by-field, and checked so unrelated XMP (Darktable history, masks,
@@ -73,7 +73,7 @@ Cataloguing, search and the keyword editor come later.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
-  the same cached preview; both tabs share one tile.
+  the same cached preview; both tabs share one tile and the histogram opens by default.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
   keyboard shortcuts.
 - Settings for the Avenir interface font, bundled JetBrains Mono, and text size.

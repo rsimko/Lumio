@@ -751,7 +751,7 @@ export const useLibraryStore = defineStore('library', () => {
     void applyMetadataPatch(ratingPatch(current.value, current.mixed, next));
   }
 
-  function setColorLabel(label: ColorLabel): void {
+  function setColorLabel(label: ColorLabel | null): void {
     const current = commonMetadataValue(selectedAssets.value, (value) => value.label, null);
     void applyMetadataPatch(labelPatch(current.value, current.mixed, label));
   }

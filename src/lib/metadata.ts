@@ -87,12 +87,16 @@ export function ratingPatch(current: number, mixed: boolean, next: number): Meta
   return { rating: next };
 }
 
-/** Clicking the active label clears it; another label replaces the selection. */
+/**
+ * Clicking the active label clears it; another label replaces the selection.
+ * Passing null clears the label for every selected photo.
+ */
 export function labelPatch(
   current: ColorLabel | null,
   mixed: boolean,
-  next: ColorLabel,
+  next: ColorLabel | null,
 ): MetadataUpdate {
+  if (next === null) return { clearLabel: true };
   if (!mixed && current === next) return { clearLabel: true };
   return { label: next };
 }

@@ -60,8 +60,16 @@ function setRating(value: number): void {
   if (!busy.value && count.value) store.setRating(value);
 }
 
+function clearRating(): void {
+  if (!busy.value && count.value) store.setRating(0);
+}
+
 function setLabel(value: ColorLabel): void {
   if (!busy.value && count.value) store.setColorLabel(value);
+}
+
+function clearLabel(): void {
+  if (!busy.value && count.value) store.setColorLabel(null);
 }
 
 function setCull(value: CullFlag): void {
@@ -91,70 +99,99 @@ function toggleFavorite(): void {
     </div>
 
     <div class="space-y-2.5">
-      <div class="flex items-center justify-between gap-2">
-        <span class="w-14 shrink-0 text-2xs text-subtle">Rating</span>
-        <div class="flex items-center gap-0.5" role="group" aria-label="Star rating">
+      <div class="flex min-h-7 items-center gap-2">
+        <span class="w-12 shrink-0 text-2xs text-subtle">Rating</span>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <div class="flex items-center gap-0.5" role="group" aria-label="Star rating">
+            <button
+              v-for="value in [1, 2, 3, 4, 5]"
+              :key="value"
+              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2 disabled:opacity-50"
+              :class="starFilled(value) ? 'text-amber-400' : 'text-subtle/60'"
+              :title="
+                !rating.mixed && rating.value === value
+                  ? `Clear ${value}-star rating`
+                  : `Rate ${value} ${value === 1 ? 'star' : 'stars'}`
+              "
+              :aria-label="`Rate ${value} ${value === 1 ? 'star' : 'stars'}`"
+              :aria-pressed="starFilled(value)"
+              :disabled="busy"
+              @click="setRating(value)"
+            >
+              <Star
+                class="h-3.5 w-3.5"
+                :fill="starFilled(value) ? 'currentColor' : 'none'"
+                :stroke-width="starFilled(value) ? 1.5 : 1.75"
+              />
+            </button>
+          </div>
           <button
-            v-for="value in [1, 2, 3, 4, 5]"
-            :key="value"
-            class="grid h-7 w-7 place-items-center rounded-md transition hover:bg-panel-2 disabled:opacity-50"
-            :class="starFilled(value) ? 'text-amber-400' : 'text-subtle/60'"
+            class="rounded px-1 py-0.5 text-2xs font-medium text-subtle transition hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
             :title="
-              !rating.mixed && rating.value === value
-                ? `Clear ${value}-star rating`
-                : `Rate ${value} ${value === 1 ? 'star' : 'stars'}`
+              rating.mixed
+                ? 'Clear rating for all selected photos'
+                : rating.value
+                  ? `Clear ${rating.value}-star rating`
+                  : 'No rating'
             "
-            :aria-label="`Rate ${value} ${value === 1 ? 'star' : 'stars'}`"
-            :aria-pressed="starFilled(value)"
-            :disabled="busy"
-            @click="setRating(value)"
+            :disabled="busy || (!rating.mixed && rating.value === 0)"
+            aria-label="Clear rating"
+            @click="clearRating"
           >
-            <Star
-              class="h-4 w-4"
-              :fill="starFilled(value) ? 'currentColor' : 'none'"
-              :stroke-width="starFilled(value) ? 1.5 : 1.75"
-            />
+            Clear
           </button>
-          <span v-if="rating.mixed" class="ml-1 text-2xs text-subtle">Mixed</span>
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-2">
-        <span class="w-14 shrink-0 text-2xs text-subtle">Label</span>
-        <div class="flex items-center gap-1.5" role="group" aria-label="Color label">
+      <div class="flex min-h-7 items-center gap-2">
+        <span class="w-12 shrink-0 text-2xs text-subtle">Label</span>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5" role="group" aria-label="Color label">
+            <button
+              v-for="color in COLOR_LABELS"
+              :key="color"
+              class="h-5 w-5 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110 disabled:opacity-50"
+              :class="[
+                COLOR_LABEL_SWATCHES[color],
+                labelActive(color)
+                  ? ['ring-ink/70', 'scale-110']
+                  : ['ring-transparent', 'opacity-75 hover:opacity-100'],
+              ]"
+              :title="
+                labelActive(color)
+                  ? `Clear ${COLOR_LABEL_NAMES[color].toLowerCase()} label`
+                  : `Set ${COLOR_LABEL_NAMES[color].toLowerCase()} label`
+              "
+              :aria-label="
+                labelActive(color)
+                  ? `Clear ${COLOR_LABEL_NAMES[color]} label`
+                  : `Set ${COLOR_LABEL_NAMES[color]} label`
+              "
+              :aria-pressed="labelActive(color)"
+              :disabled="busy"
+              @click="setLabel(color)"
+            />
+          </div>
           <button
-            v-for="color in COLOR_LABELS"
-            :key="color"
-            class="h-5 w-5 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110 disabled:opacity-50"
-            :class="[
-              COLOR_LABEL_SWATCHES[color],
-              labelActive(color)
-                ? ['ring-ink/70', 'scale-110']
-                : ['ring-transparent', 'opacity-75 hover:opacity-100'],
-            ]"
+            class="rounded px-1 py-0.5 text-2xs font-medium text-subtle transition hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
             :title="
-              labelActive(color)
-                ? `Clear ${COLOR_LABEL_NAMES[color].toLowerCase()} label`
-                : `Set ${COLOR_LABEL_NAMES[color].toLowerCase()} label`
+              label.mixed
+                ? 'Clear labels for all selected photos'
+                : label.value
+                  ? `Clear ${COLOR_LABEL_NAMES[label.value].toLowerCase()} label`
+                  : 'No label'
             "
-            :aria-label="`Set ${COLOR_LABEL_NAMES[color]} label`"
-            :aria-pressed="labelActive(color)"
-            :disabled="busy"
-            @click="setLabel(color)"
-          />
-          <span v-if="label.mixed" class="ml-0.5 text-2xs text-subtle">Mixed</span>
-          <span
-            v-else-if="label.value"
-            class="ml-0.5 text-2xs text-muted"
+            :disabled="busy || (!label.mixed && !label.value)"
+            aria-label="Clear color label"
+            @click="clearLabel"
           >
-            {{ COLOR_LABEL_NAMES[label.value] }}
-          </span>
-          <span v-else class="ml-0.5 text-2xs text-subtle">None</span>
+            Clear
+          </button>
         </div>
       </div>
 
       <div class="flex items-center justify-between gap-2">
-        <span class="w-14 shrink-0 text-2xs text-subtle">Culling</span>
+        <span class="w-12 shrink-0 text-2xs text-subtle">Culling</span>
         <div class="flex items-center gap-1" role="group" aria-label="Culling flag">
           <button
             class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition disabled:opacity-50"
@@ -198,7 +235,7 @@ function toggleFavorite(): void {
       </div>
 
       <div class="flex items-center justify-between gap-2">
-        <span class="w-14 shrink-0 text-2xs text-subtle">Favorite</span>
+        <span class="w-12 shrink-0 text-2xs text-subtle">Favorite</span>
         <button
           class="flex h-7 items-center gap-1.5 rounded-md border px-2 text-2xs font-medium transition disabled:opacity-50"
           :class="

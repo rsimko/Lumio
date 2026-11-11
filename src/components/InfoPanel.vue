@@ -9,8 +9,6 @@ import {
   Image as ImageIcon,
   Info,
   Loader2,
-  Maximize2,
-  PanelRightClose,
   Trash2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -47,7 +45,7 @@ const thumb = useThumbnail(
 
 type DetailTab = 'preview' | 'histogram';
 
-const detailTab = ref<DetailTab>('preview');
+const detailTab = ref<DetailTab>('histogram');
 const histogram = ref<HistogramData | null>(null);
 const histogramStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
 const histogramError = ref<string | null>(null);
@@ -162,15 +160,8 @@ async function revealPrimary() {
     class="relative flex h-full shrink-0 flex-col border-l border-line bg-panel"
     :style="{ width: `${store.settings.infoWidth}px` }"
   >
-    <div class="flex h-10 shrink-0 items-center justify-between px-3">
+    <div class="flex h-10 shrink-0 items-center px-3">
       <span class="panel-heading">Info</span>
-      <button
-        class="btn-icon-sm"
-        :title="`Hide info panel (${store.shortcutLabel('library.info')})`"
-        @click="store.toggleInfo()"
-      >
-        <PanelRightClose class="h-3.5 w-3.5" />
-      </button>
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
@@ -256,43 +247,36 @@ async function revealPrimary() {
             />
           </div>
 
-          <h3 class="mt-3 break-all text-xs font-semibold leading-snug text-ink">
-            {{ asset.fileName }}
-          </h3>
-          <p class="mt-1 break-all text-2xs leading-snug text-subtle selectable">
-            {{ asset.primaryPath }}
-          </p>
-
-          <div class="mt-2.5 flex gap-1.5">
-            <button class="btn flex-1" title="Open with the default application" @click="openPrimary()">
-              <ExternalLink class="h-3.5 w-3.5" />
-              Open
+          <div class="mt-2.5 flex items-center gap-1.5">
+            <button
+              class="btn min-w-0 flex-1 justify-center px-2"
+              title="Open with the default application"
+              @click="openPrimary()"
+            >
+              <ExternalLink class="h-3.5 w-3.5 shrink-0" />
+              <span class="truncate">Open</span>
             </button>
-            <button class="btn flex-1" title="Show the file in Finder" @click="revealPrimary()">
-              <FolderOpen class="h-3.5 w-3.5" />
-              Reveal
+            <button
+              class="btn min-w-0 flex-1 justify-center px-2"
+              title="Show the file in Finder"
+              @click="revealPrimary()"
+            >
+              <FolderOpen class="h-3.5 w-3.5 shrink-0" />
+              <span class="truncate">Reveal</span>
+            </button>
+            <button
+              class="btn min-w-0 flex-1 justify-center px-2 text-danger hover:border-danger/40 hover:bg-danger/10"
+              :title="
+                store.selectedCount > 1
+                  ? `Delete ${store.selectedCount} selected photos`
+                  : 'Delete this photo'
+              "
+              @click="store.openDeleteAssets()"
+            >
+              <Trash2 class="h-3.5 w-3.5 shrink-0" />
+              <span class="truncate">Delete</span>
             </button>
           </div>
-          <button
-            class="btn mt-1.5 w-full"
-            :title="`Open in fullscreen viewer (${store.shortcutLabel('browse.fullscreen')})`"
-            @click="store.openFullscreen()"
-          >
-            <Maximize2 class="h-3.5 w-3.5" />
-            Fullscreen
-          </button>
-          <button
-            class="btn mt-1.5 w-full text-danger hover:border-danger/40 hover:bg-danger/10"
-            :title="
-              store.selectedCount > 1
-                ? `Delete ${store.selectedCount} selected photos`
-                : 'Delete this photo'
-            "
-            @click="store.openDeleteAssets()"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-            {{ store.selectedCount > 1 ? `Delete ${store.selectedCount} photos…` : 'Delete photo…' }}
-          </button>
         </div>
 
         <MetadataEditor />

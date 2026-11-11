@@ -41,7 +41,18 @@ describe('shortcut bindings', () => {
     expect(bindingFromEvent(keyEvent('?', { shiftKey: true }))).toBe('question');
     expect(bindingFromEvent(keyEvent('o', { metaKey: true }))).toBe('mod+o');
     expect(bindingFromEvent(keyEvent(' ', { shiftKey: true }))).toBe('shift+space');
+    expect(bindingFromEvent(keyEvent('§', { altKey: true, code: 'Digit6' }))).toBe('alt+6');
     expect(bindingFromEvent(keyEvent('Meta'))).toBeNull();
+  });
+
+  it('matches macOS Option combinations by physical key code', () => {
+    expect(
+      eventMatchesBinding(keyEvent('§', { altKey: true, code: 'Digit6' }), 'alt+6'),
+    ).toBe(true);
+    expect(
+      eventMatchesBinding(keyEvent('§', { altKey: true, code: 'Digit7' }), 'alt+6'),
+    ).toBe(false);
+    expect(eventMatchesBinding(keyEvent('§', { code: 'Digit6' }), 'alt+6')).toBe(false);
   });
 
   it('matches modifiers against the mod abstraction', () => {
@@ -119,6 +130,11 @@ describe('shortcut bindings', () => {
       'metadata.rating3': '3',
       'metadata.rating4': '4',
       'metadata.rating5': '5',
+      'metadata.labelRed': 'alt+6',
+      'metadata.labelYellow': 'alt+7',
+      'metadata.labelGreen': 'alt+8',
+      'metadata.labelBlue': 'alt+9',
+      'metadata.labelPurple': 'alt+0',
       'metadata.pick': 'p',
       'metadata.reject': 'x',
       'metadata.unflag': 'u',

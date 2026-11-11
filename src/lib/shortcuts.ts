@@ -23,6 +23,11 @@ export type ShortcutId =
   | 'metadata.rating3'
   | 'metadata.rating4'
   | 'metadata.rating5'
+  | 'metadata.labelRed'
+  | 'metadata.labelYellow'
+  | 'metadata.labelGreen'
+  | 'metadata.labelBlue'
+  | 'metadata.labelPurple'
   | 'metadata.pick'
   | 'metadata.reject'
   | 'metadata.unflag'
@@ -144,6 +149,41 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     group: 'Metadata',
     context: 'browse',
     binding: '5',
+  },
+  {
+    id: 'metadata.labelRed',
+    label: 'Apply red color label',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'alt+6',
+  },
+  {
+    id: 'metadata.labelYellow',
+    label: 'Apply yellow color label',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'alt+7',
+  },
+  {
+    id: 'metadata.labelGreen',
+    label: 'Apply green color label',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'alt+8',
+  },
+  {
+    id: 'metadata.labelBlue',
+    label: 'Apply blue color label',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'alt+9',
+  },
+  {
+    id: 'metadata.labelPurple',
+    label: 'Apply purple color label',
+    group: 'Metadata',
+    context: 'browse',
+    binding: 'alt+0',
   },
   {
     id: 'metadata.pick',
@@ -443,6 +483,22 @@ export function normalizeEventKey(key: string): string | null {
   return null;
 }
 
+const PHYSICAL_KEY_CODE = /^(?:Key([A-Z])|Digit([0-9]))$/;
+
+/**
+ * Resolve the normalised key an event represents. macOS replaces `event.key`
+ * with a symbol while Option is held (for example Option+6 produces `§`), so
+ * fall back to the physical key code for letters and digits.
+ */
+function eventKey(event: KeyboardEvent): string | null {
+  const key = normalizeEventKey(event.key);
+  if (key) return key;
+  if (!event.altKey) return null;
+  const match = PHYSICAL_KEY_CODE.exec(event.code);
+  if (!match) return null;
+  return (match[1] ?? match[2]).toLowerCase();
+}
+
 function isShiftSensitive(key: string): boolean {
   return /^[a-z]$/.test(key) || SHIFT_SENSITIVE_KEYS.has(key) || /^f\d+$/.test(key);
 }
@@ -490,7 +546,7 @@ export function canonicalBinding(binding: string): string | null {
 
 export function bindingFromEvent(event: KeyboardEvent): string | null {
   if (MODIFIER_KEYS.has(event.key)) return null;
-  const key = normalizeEventKey(event.key);
+  const key = eventKey(event);
   if (!key) return null;
   return serializeBinding({
     key,
@@ -505,7 +561,7 @@ export function bindingFromEvent(event: KeyboardEvent): string | null {
 export function eventMatchesBinding(event: KeyboardEvent, binding: string): boolean {
   const parsed = parseBinding(binding);
   if (!parsed) return false;
-  const key = normalizeEventKey(event.key);
+  const key = eventKey(event);
   if (!key || key !== parsed.key) return false;
   if ((event.metaKey || event.ctrlKey) !== parsed.mod) return false;
   if (event.altKey !== parsed.alt) return false;

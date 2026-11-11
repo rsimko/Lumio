@@ -6,12 +6,13 @@ import {
   FolderOpen,
   FolderPlus,
   Import,
+  Info,
   LayoutGrid,
   List,
   Loader2,
+  Maximize2,
   Moon,
   PanelBottom,
-  PanelRight,
   Rows3,
   Sun,
 } from 'lucide-vue-next';
@@ -201,12 +202,20 @@ function onSizeInput(event: Event) {
       </button>
       <button
         class="btn-icon"
+        :title="`Open fullscreen viewer (${store.shortcutLabel('browse.fullscreen')})`"
+        :disabled="!store.assets.length"
+        @click="store.openFullscreen()"
+      >
+        <Maximize2 class="h-3.5 w-3.5" />
+      </button>
+      <button
+        class="btn-icon"
         :class="store.infoVisible ? 'bg-accent-soft text-accent' : ''"
         :title="`Toggle info panel (${store.shortcutLabel('library.info')})`"
         :aria-pressed="store.infoVisible"
         @click="store.toggleInfo()"
       >
-        <PanelRight class="h-3.5 w-3.5" />
+        <Info class="h-3.5 w-3.5" />
       </button>
       <button
         class="btn-icon"

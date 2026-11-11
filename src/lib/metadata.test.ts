@@ -84,6 +84,8 @@ describe('metadata patches', () => {
     expect(labelPatch(null, false, 'green')).toEqual({ label: 'green' });
     expect(labelPatch('green', false, 'green')).toEqual({ clearLabel: true });
     expect(labelPatch(null, true, 'green')).toEqual({ label: 'green' });
+    expect(labelPatch('green', false, null)).toEqual({ clearLabel: true });
+    expect(labelPatch(null, true, null)).toEqual({ clearLabel: true });
   });
 
   it('sets cull flags and clears the active flag', () => {

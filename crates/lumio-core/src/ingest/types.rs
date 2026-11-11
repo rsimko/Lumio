@@ -349,7 +349,12 @@ pub struct IngestPlan {
     pub sources: Vec<PathBuf>,
     pub destination: PathBuf,
     pub rules: IngestRules,
+    /// The resolved ExifTool path used by this plan.
     pub exiftool_path: Option<PathBuf>,
+    /// The ExifTool setting at Dry Run time. `None` means auto-detect. This is
+    /// kept separately so the UI can detect setting changes without having to
+    /// know which executable auto-detection picked.
+    pub requested_exiftool_path: Option<PathBuf>,
     pub tools: IngestTools,
     pub entities: Vec<IngestEntity>,
     pub warnings: Vec<IngestWarning>,

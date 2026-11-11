@@ -9,6 +9,8 @@ import type {
   XmpNaming,
 } from '@/types';
 
+import { basename } from './format';
+
 export type IngestTemplateKind = 'folder' | 'filename' | 'text';
 
 export interface IngestToken {
@@ -154,6 +156,28 @@ export function ingestRulesFromSettings(settings: IngestSettings): IngestRules {
       keywords: [...settings.iptc.keywords],
     },
   };
+}
+
+/**
+ * True when the stored plan no longer matches the current settings inputs.
+ * The resolved ExifTool executable is intentionally not compared: auto-detect
+ * stores a concrete path in the plan while the setting stays null.
+ */
+export function isIngestPlanStale(
+  plan: Pick<IngestPlan, 'rules' | 'requestedExiftoolPath' | 'destination' | 'sources'>,
+  settings: IngestSettings,
+  destination: string | null,
+  sources: string[],
+): boolean {
+  const current = normalizeIngestSettings(settings);
+  if (JSON.stringify(ingestRulesFromSettings(current)) !== JSON.stringify(plan.rules)) {
+    return true;
+  }
+  if ((plan.requestedExiftoolPath ?? null) !== (current.exiftoolPath ?? null)) return true;
+  if (plan.destination !== destination) return true;
+  const plannedSources = [...plan.sources].sort();
+  const currentSources = [...sources].sort();
+  return JSON.stringify(plannedSources) !== JSON.stringify(currentSources);
 }
 
 export function hasIptcValues(settings: IngestSettings): boolean {
@@ -346,6 +370,22 @@ export function insertIngestToken(
 export const PREVIEW_SAMPLE_STEM = 'IMG_1234';
 export const PREVIEW_SAMPLE_EXTENSION = 'RAF';
 
+export interface IngestPreviewSample {
+  stem: string;
+  extension: string;
+}
+
+/** Split a real photo path into the stem and extension shown in the preview. */
+export function previewSampleFromPath(
+  path: string | null | undefined,
+): IngestPreviewSample | null {
+  if (!path) return null;
+  const name = basename(path);
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot >= name.length - 1) return null;
+  return { stem: name.slice(0, dot), extension: name.slice(dot + 1) };
+}
+
 function padPreviewNumber(value: number, padding = 2): string {
   const safePadding = Number.isFinite(padding)
     ? Math.max(0, Math.min(12, Math.round(padding)))
@@ -361,6 +401,7 @@ function renderPreviewTemplate(
     'jobCode' | 'customText' | 'counterStart' | 'counterPadding'
   >,
   now: Date,
+  sampleStem: string,
 ): string {
   const values: Record<string, string> = {
     YYYY: String(now.getFullYear()),
@@ -371,7 +412,7 @@ function renderPreviewTemplate(
     ss: padPreviewNumber(now.getSeconds()),
     job_code: settings.jobCode.trim(),
     custom_text: settings.customText.trim(),
-    default_filename: PREVIEW_SAMPLE_STEM,
+    default_filename: sampleStem,
     counter: padPreviewNumber(settings.counterStart, settings.counterPadding),
   };
   return template.replace(/\{([^{}]*)\}/g, (match, token: string) => values[token] ?? match);
@@ -385,8 +426,8 @@ export interface IngestDestinationPreview {
 
 /**
  * Best-effort rendering of the current folder and filename templates for the
- * live preview. It deliberately uses a sample photo and never validates paths;
- * the Dry Run remains the authoritative check.
+ * live preview. Pass a real sample to show the first available photo; without
+ * one it falls back to a neutral sample. The Dry Run remains authoritative.
  */
 export function previewIngestDestination(
   settings: Pick<
@@ -399,19 +440,93 @@ export function previewIngestDestination(
     | 'counterPadding'
   >,
   now = new Date(),
+  sample: IngestPreviewSample | null = null,
 ): IngestDestinationPreview {
-  const folder = renderPreviewTemplate(settings.folderTemplate, settings, now)
+  const sampleStem = sample?.stem.trim() || PREVIEW_SAMPLE_STEM;
+  const sampleExtension = (sample?.extension || PREVIEW_SAMPLE_EXTENSION).replace(/^\.+/, '');
+  const folder = renderPreviewTemplate(settings.folderTemplate, settings, now, sampleStem)
     .split('/')
     .map((segment) => segment.trim())
     .filter(Boolean)
     .join('/');
-  const stem = renderPreviewTemplate(settings.filenameTemplate, settings, now).trim();
-  const filename = stem ? `${stem}.${PREVIEW_SAMPLE_EXTENSION}` : '';
+  const stem = renderPreviewTemplate(settings.filenameTemplate, settings, now, sampleStem).trim();
+  const filename = stem ? `${stem}${sampleExtension ? `.${sampleExtension}` : ''}` : '';
   return {
     folder,
     filename,
     relativePath: [folder, filename].filter(Boolean).join('/'),
   };
+}
+
+export interface IngestDestinationTreeFolder {
+  name: string;
+  /** Folder path relative to the ingest destination; empty for the root. */
+  path: string;
+  folders: IngestDestinationTreeFolder[];
+  entities: IngestEntity[];
+}
+
+/** The full destination filename of an entity, including its extension. */
+export function ingestDestinationFileName(entity: IngestEntity): string {
+  const primary = entity.plannedFiles.find((file) => file.primary);
+  if (primary) return basename(primary.destination);
+  const sourceName = basename(entity.primaryPath);
+  const dot = sourceName.lastIndexOf('.');
+  return `${entity.destinationStem}${dot > 0 ? sourceName.slice(dot) : ''}`;
+}
+
+function compareIngestNames(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function sortIngestDestinationTree(folder: IngestDestinationTreeFolder): void {
+  folder.folders.sort((left, right) => compareIngestNames(left.name, right.name));
+  folder.entities.sort((left, right) =>
+    compareIngestNames(ingestDestinationFileName(left), ingestDestinationFileName(right)),
+  );
+  for (const child of folder.folders) sortIngestDestinationTree(child);
+}
+
+/**
+ * Group planned photos into the folder hierarchy they will be copied into.
+ * Folders are sorted by name and photos by destination filename.
+ */
+export function buildIngestDestinationTree(
+  plan: Pick<IngestPlan, 'destination' | 'entities'>,
+): IngestDestinationTreeFolder {
+  const rootPath = plan.destination.replace(/[\\/]+$/, '');
+  const normalizedRoot = rootPath.replace(/\\/g, '/');
+  const root: IngestDestinationTreeFolder = {
+    name: basename(rootPath) || rootPath,
+    path: '',
+    folders: [],
+    entities: [],
+  };
+
+  for (const entity of plan.entities) {
+    const normalizedDir = entity.destinationDir.replace(/\\/g, '/').replace(/\/+$/, '');
+    let relative = '';
+    if (normalizedDir !== normalizedRoot) {
+      relative = normalizedDir.startsWith(`${normalizedRoot}/`)
+        ? normalizedDir.slice(normalizedRoot.length + 1)
+        : normalizedDir.replace(/^\/+/, '');
+    }
+
+    let folder = root;
+    for (const part of relative.split('/').filter(Boolean)) {
+      const path = folder.path ? `${folder.path}/${part}` : part;
+      let child = folder.folders.find((candidate) => candidate.name === part);
+      if (!child) {
+        child = { name: part, path, folders: [], entities: [] };
+        folder.folders.push(child);
+      }
+      folder = child;
+    }
+    folder.entities.push(entity);
+  }
+
+  sortIngestDestinationTree(root);
+  return root;
 }
 
 export function xmpNamingLabel(naming: XmpNaming): string {

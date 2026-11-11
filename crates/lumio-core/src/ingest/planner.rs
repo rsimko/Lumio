@@ -429,6 +429,7 @@ pub fn plan_ingest(request: &IngestRequest) -> Result<IngestPlan> {
         destination: destination.clone(),
         rules: request.rules.clone(),
         exiftool_path: tools.exiftool.as_ref().map(|info| info.path.clone()),
+        requested_exiftool_path: request.exiftool_path.clone(),
         tools: tools.clone(),
         entities: Vec::new(),
         warnings: Vec::new(),
@@ -765,6 +766,24 @@ mod tests {
             rules: rules(),
             exiftool_path: None,
         }
+    }
+
+    #[test]
+    fn plan_keeps_the_requested_exiftool_setting_separate_from_the_resolved_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(source.join("a.CR3"), b"raw").unwrap();
+
+        let requested = temp.path().join("missing-exiftool");
+        let mut request = request(vec![source], &destination);
+        request.exiftool_path = Some(requested.clone());
+        let plan = plan_ingest(&request).unwrap();
+
+        assert_eq!(plan.requested_exiftool_path, Some(requested.clone()));
+        assert_ne!(plan.exiftool_path.as_ref(), Some(&requested));
     }
 
     #[test]

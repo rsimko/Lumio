@@ -361,7 +361,10 @@ export interface IngestPlan {
   sources: string[];
   destination: string;
   rules: IngestRules;
+  /** Resolved ExifTool executable used by this plan. */
   exiftoolPath: string | null;
+  /** ExifTool setting at Dry Run time; null means auto-detect. */
+  requestedExiftoolPath: string | null;
   tools: IngestTools;
   entities: IngestEntity[];
   warnings: IngestWarning[];

@@ -49,9 +49,10 @@ writing adds a third risk: an XMP rewrite can silently drop fields that Lumio do
 
 - Ingest doubles disk usage for the copied files while staging; verification happens before the
   commit, so the visible destination only ever contains complete groups.
-- The stored plan is a snapshot. If templates, job code, counter settings or the ExifTool path
-  change after a Dry Run, the UI marks the plan stale and requires a new Dry Run instead of
-  executing outdated paths.
+- The stored plan is a snapshot. If templates, job code, counter settings or the requested
+  ExifTool setting change after a Dry Run, the UI marks the plan stale and requires a new Dry Run
+  instead of executing outdated paths. The plan stores the requested ExifTool setting separately
+  from the resolved executable, so auto-detection does not look like a settings change.
 - IPTC writes go through ExifTool, which reformats the XMP packet. Fields are preserved
   semantically, not byte-for-byte.
 - Replacing a file is not atomic across the group in the filesystem sense; it is atomic from the

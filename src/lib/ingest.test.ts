@@ -3,21 +3,25 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_INGEST_SETTINGS,
   INGEST_TOKEN_GROUPS,
+  buildIngestDestinationTree,
   buildIngestReport,
   captureSourceLabel,
   defaultReportName,
   hasIptcValues,
+  ingestDestinationFileName,
   ingestRulesFromSettings,
   ingestTokenSnippet,
   insertIngestToken,
+  isIngestPlanStale,
   normalizeIngestSettings,
   previewIngestDestination,
+  previewSampleFromPath,
   validateIngestSettings,
   validateIngestTemplate,
   xmpNamingExample,
   xmpNamingLabel,
 } from '@/lib/ingest';
-import type { IngestPlan } from '@/types';
+import type { IngestEntity, IngestPlan } from '@/types';
 
 describe('ingest settings', () => {
   it('has safe defaults that match the backend', () => {
@@ -192,6 +196,50 @@ describe('token insertion', () => {
   });
 });
 
+describe('stale plan detection', () => {
+  const settings = normalizeIngestSettings({
+    folderTemplate: '{YYYY}/{MM}',
+    filenameTemplate: '{default_filename}',
+  });
+  const plan = {
+    rules: ingestRulesFromSettings(settings),
+    exiftoolPath: '/opt/homebrew/bin/exiftool',
+    requestedExiftoolPath: null,
+    destination: '/destination',
+    sources: ['/source/a', '/source/b'],
+  };
+
+  it('stays fresh when ExifTool was auto-detected and the setting is still null', () => {
+    expect(isIngestPlanStale(plan, settings, '/destination', ['/source/b', '/source/a'])).toBe(
+      false,
+    );
+  });
+
+  it('becomes stale when the ExifTool setting changes', () => {
+    expect(
+      isIngestPlanStale(
+        plan,
+        { ...settings, exiftoolPath: '/custom/exiftool' },
+        '/destination',
+        plan.sources,
+      ),
+    ).toBe(true);
+  });
+
+  it('becomes stale when templates, destination or sources change', () => {
+    expect(
+      isIngestPlanStale(
+        plan,
+        { ...settings, filenameTemplate: '{counter}_{default_filename}' },
+        '/destination',
+        plan.sources,
+      ),
+    ).toBe(true);
+    expect(isIngestPlanStale(plan, settings, '/other', plan.sources)).toBe(true);
+    expect(isIngestPlanStale(plan, settings, '/destination', ['/source/a'])).toBe(true);
+  });
+});
+
 describe('destination preview', () => {
   it('renders the folder path, filename and sample extension', () => {
     const preview = previewIngestDestination(
@@ -234,6 +282,78 @@ describe('destination preview', () => {
     expect(preview.filename).toBe('');
     expect(preview.relativePath).toBe('2026/11');
   });
+
+  it('uses a real photo name and extension when one is available', () => {
+    const preview = previewIngestDestination(
+      normalizeIngestSettings({
+        folderTemplate: '{YYYY}/{MM}',
+        filenameTemplate: '{YYYY}{MM}{DD}_{default_filename}',
+      }),
+      new Date(2026, 10, 11),
+      { stem: 'palawan-112', extension: 'RAF' },
+    );
+    expect(preview).toEqual({
+      folder: '2026/11',
+      filename: '20261111_palawan-112.RAF',
+      relativePath: '2026/11/20261111_palawan-112.RAF',
+    });
+  });
+
+  it('falls back to the sample photo when the real name is incomplete', () => {
+    expect(previewSampleFromPath('/photos/palawan-112.RAF')).toEqual({
+      stem: 'palawan-112',
+      extension: 'RAF',
+    });
+    expect(previewSampleFromPath('/photos/palawan-112')).toBeNull();
+    expect(previewSampleFromPath('/photos/folder/')).toBeNull();
+    expect(previewSampleFromPath(null)).toBeNull();
+  });
+});
+
+describe('destination tree', () => {
+  function treeEntity(id: string, destinationDir: string, stem: string): IngestEntity {
+    return {
+      id,
+      destinationDir,
+      destinationStem: stem,
+      primaryPath: `/source/${stem}.CR3`,
+      plannedFiles: [
+        {
+          source: `/source/${stem}.CR3`,
+          destination: `${destinationDir}/${stem}.CR3`,
+          role: 'raw',
+          size: 1,
+          primary: true,
+          generated: false,
+        },
+      ],
+    } as IngestEntity;
+  }
+
+  it('groups photos into sorted destination folders', () => {
+    const tree = buildIngestDestinationTree({
+      destination: '/destination',
+      entities: [
+        treeEntity('november', '/destination/2026/11', 'november'),
+        treeEntity('october', '/destination/2026/10', 'october'),
+        treeEntity('root', '/destination', 'root'),
+        treeEntity('nested', '/destination/2026/11/Sub', 'nested'),
+      ],
+    });
+
+    expect(tree.name).toBe('destination');
+    expect(tree.entities.map((entity) => entity.id)).toEqual(['root']);
+    expect(tree.folders.map((folder) => folder.name)).toEqual(['2026']);
+
+    const year = tree.folders[0];
+    expect(year.folders.map((folder) => folder.name)).toEqual(['10', '11']);
+    expect(year.folders[0].entities.map((entity) => entity.id)).toEqual(['october']);
+    expect(year.folders[1].entities.map((entity) => entity.id)).toEqual(['november']);
+    expect(year.folders[1].folders.map((folder) => folder.name)).toEqual(['Sub']);
+    expect(year.folders[1].folders[0].path).toBe('2026/11/Sub');
+    expect(year.folders[1].folders[0].entities.map((entity) => entity.id)).toEqual(['nested']);
+    expect(ingestDestinationFileName(year.folders[1].entities[0])).toBe('november.CR3');
+  });
 });
 
 describe('report helpers', () => {
@@ -267,6 +387,7 @@ describe('report helpers', () => {
         },
       },
       exiftoolPath: null,
+      requestedExiftoolPath: null,
       tools: { exiftool: null },
       entities: [
         {

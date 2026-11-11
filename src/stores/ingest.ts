@@ -9,6 +9,7 @@ import {
   defaultReportName,
   hasIptcValues,
   ingestRulesFromSettings,
+  isIngestPlanStale,
   normalizeIngestSettings,
   validateIngestSettings,
 } from '@/lib/ingest';
@@ -145,16 +146,7 @@ export const useIngestStore = defineStore('ingest', () => {
    */
   const planStale = computed(() => {
     if (!plan.value) return false;
-    const current = normalizeIngestSettings(draft.value);
-    if (JSON.stringify(ingestRulesFromSettings(current)) !== JSON.stringify(plan.value.rules)) {
-      return true;
-    }
-    const currentTool = current.exiftoolPath ?? null;
-    if ((plan.value.exiftoolPath ?? null) !== currentTool) return true;
-    if (plan.value.destination !== destination.value) return true;
-    const plannedSources = [...plan.value.sources].sort();
-    const currentSources = [...sources.value].sort();
-    return JSON.stringify(plannedSources) !== JSON.stringify(currentSources);
+    return isIngestPlanStale(plan.value, draft.value, destination.value, sources.value);
   });
 
   const canRun = computed(
@@ -308,6 +300,9 @@ export const useIngestStore = defineStore('ingest', () => {
         exiftoolPath: normalized.exiftoolPath,
       });
       plan.value = nextPlan;
+      // The backend canonicalizes the destination. Adopt that exact path so the
+      // stale-plan check compares like with like.
+      destination.value = nextPlan.destination;
       progress.value = {
         ...emptyProgress(),
         totalEntities: nextPlan.summary.entities,

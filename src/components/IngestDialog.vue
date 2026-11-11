@@ -12,6 +12,7 @@ import {
   FolderPlus,
   HardDrive,
   ListChecks,
+  ListTree,
   Loader2,
   MonitorUp,
   Play,
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   Save,
   ScrollText,
+  Table2,
   Trash2,
   X,
   XCircle,
@@ -30,7 +32,15 @@ import IngestKeywordEditor from '@/components/IngestKeywordEditor.vue';
 import IngestTemplateEditor from '@/components/IngestTemplateEditor.vue';
 import IngestTokenPalette from '@/components/IngestTokenPalette.vue';
 import { basename, formatBytes, formatCount } from '@/lib/format';
-import { captureSourceLabel, previewIngestDestination } from '@/lib/ingest';
+import {
+  buildIngestDestinationTree,
+  captureSourceLabel,
+  ingestDestinationFileName,
+  previewIngestDestination,
+  previewSampleFromPath,
+  type IngestDestinationTreeFolder,
+  type IngestPreviewSample,
+} from '@/lib/ingest';
 import { useIngestStore, type IngestTab } from '@/stores/ingest';
 import type { IngestConflictResolution, IngestEntity } from '@/types';
 
@@ -44,6 +54,7 @@ type TemplateField = 'folder' | 'filename';
 const activeTemplate = ref<TemplateField>('folder');
 const folderEditor = ref<{ insert: (token: string) => void } | null>(null);
 const filenameEditor = ref<{ insert: (token: string) => void } | null>(null);
+const previewView = ref<'table' | 'tree'>('table');
 
 const SOURCE_FILE_EXTENSIONS = new Set([
   'cr2',
@@ -59,7 +70,28 @@ const SOURCE_FILE_EXTENSIONS = new Set([
   'xmp',
 ]);
 
-const templatePreview = computed(() => previewIngestDestination(store.draft));
+/**
+ * Use the first planned photo for the live preview, or the first selected file
+ * before a Dry Run. The neutral sample remains the fallback.
+ */
+const previewSample = computed<IngestPreviewSample | null>(() => {
+  const firstEntity = store.plan?.entities[0];
+  if (firstEntity) {
+    const sample = previewSampleFromPath(firstEntity.primaryPath);
+    if (sample) return { ...sample, stem: firstEntity.stem || sample.stem };
+  }
+  for (const source of store.sources) {
+    if (!isFileSource(source)) continue;
+    const sample = previewSampleFromPath(source);
+    if (!sample || sample.extension.toLowerCase() === 'xmp') continue;
+    return sample;
+  }
+  return null;
+});
+
+const templatePreview = computed(() =>
+  previewIngestDestination(store.draft, new Date(), previewSample.value),
+);
 const previewPath = computed(() => {
   const destination = store.destination?.replace(/\/+$/, '') ?? '';
   const relative = templatePreview.value.relativePath;
@@ -78,6 +110,59 @@ const tabs = computed<{ id: IngestTab; label: string; count?: number }[]>(() => 
 ]);
 
 const plan = computed(() => store.plan);
+
+interface DestinationTreeRow {
+  kind: 'folder' | 'photo';
+  depth: number;
+  name: string;
+  path: string;
+  photoCount: number;
+  entity: IngestEntity | null;
+}
+
+function treePhotoCount(folder: IngestDestinationTreeFolder): number {
+  return (
+    folder.entities.length +
+    folder.folders.reduce((total, child) => total + treePhotoCount(child), 0)
+  );
+}
+
+const treeRows = computed<DestinationTreeRow[]>(() => {
+  if (!plan.value) return [];
+  const rootPath = plan.value.destination.replace(/\/+$/, '');
+  const root = buildIngestDestinationTree(plan.value);
+  const rows: DestinationTreeRow[] = [];
+  const walk = (folder: IngestDestinationTreeFolder, depth: number): void => {
+    rows.push({
+      kind: 'folder',
+      depth,
+      name: folder.name,
+      path: folder.path ? `${rootPath}/${folder.path}` : rootPath,
+      photoCount: treePhotoCount(folder),
+      entity: null,
+    });
+    for (const child of folder.folders) walk(child, depth + 1);
+    for (const entity of folder.entities) {
+      rows.push({
+        kind: 'photo',
+        depth: depth + 1,
+        name: ingestDestinationFileName(entity),
+        path: entity.destinationDir,
+        photoCount: 0,
+        entity,
+      });
+    }
+  };
+  walk(root, 0);
+  return rows;
+});
+
+function togglePreviewEntity(row: DestinationTreeRow): void {
+  if (!row.entity) return;
+  selectedEntityId.value =
+    selectedEntityId.value === row.entity.id ? null : row.entity.id;
+}
+
 const selectedEntity = computed<IngestEntity | null>(() =>
   selectedEntityId.value ? (store.entityFor(selectedEntityId.value) ?? null) : null,
 );
@@ -199,7 +284,6 @@ function chooseDestination(): void {
 <template>
   <AppDialog
     title="Ingest photos"
-    subtitle="Copy RAW, JPEG and XMP files into a structured destination."
     full
     flush
     @close="store.closeDialog()"
@@ -382,7 +466,12 @@ function chooseDestination(): void {
                 </div>
               </label>
             </div>
-            <p class="text-[10px] text-subtle">Templates store the folder and filename pattern.</p>
+            <p
+              class="text-[10px] text-subtle"
+              title="~/Library/Application Support/com.lumio.desktop/settings.json"
+            >
+              Saved in Lumio settings (settings.json), not in the destination.
+            </p>
           </div>
 
           <div class="grid gap-3 lg:grid-cols-2">
@@ -432,7 +521,7 @@ function chooseDestination(): void {
             <span
               class="shrink-0 rounded bg-line px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide text-subtle"
             >
-              sample
+              {{ previewSample ? 'first photo' : 'sample' }}
             </span>
           </div>
           <p v-if="store.templateError" class="mt-1 text-[10px] text-danger">
@@ -638,7 +727,7 @@ function chooseDestination(): void {
                 </p>
               </div>
               <template v-else>
-                <div class="mb-2 flex flex-wrap gap-1.5 text-[10px]">
+                <div class="mb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
                   <span class="rounded border border-line bg-panel px-1.5 py-0.5 text-muted">
                     {{ formatCount(plan.summary.entities) }} photos
                   </span>
@@ -666,9 +755,37 @@ function chooseDestination(): void {
                   >
                     {{ plan.summary.warnings }} warning(s)
                   </span>
+                  <div class="ml-auto flex items-center gap-0.5 rounded border border-line bg-panel p-0.5">
+                    <button
+                      class="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] transition"
+                      :class="
+                        previewView === 'table'
+                          ? 'bg-accent-soft text-accent'
+                          : 'text-muted hover:text-ink'
+                      "
+                      title="Show the preview as a table"
+                      @click="previewView = 'table'"
+                    >
+                      <Table2 class="h-3 w-3" />
+                      Table
+                    </button>
+                    <button
+                      class="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] transition"
+                      :class="
+                        previewView === 'tree'
+                          ? 'bg-accent-soft text-accent'
+                          : 'text-muted hover:text-ink'
+                      "
+                      title="Show the destination as a folder tree"
+                      @click="previewView = 'tree'"
+                    >
+                      <ListTree class="h-3 w-3" />
+                      Tree
+                    </button>
+                  </div>
                 </div>
 
-                <div class="overflow-x-auto rounded border border-line">
+                <div v-if="previewView === 'table'" class="overflow-x-auto rounded border border-line">
                   <div
                     class="grid min-w-[660px] grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
                   >
@@ -717,6 +834,52 @@ function chooseDestination(): void {
                       </span>
                     </span>
                   </button>
+                </div>
+
+                <div v-else class="overflow-hidden rounded border border-line">
+                  <div
+                    class="flex items-center gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
+                  >
+                    <span class="min-w-0 flex-1">Destination tree</span>
+                    <span class="shrink-0 normal-case tracking-normal">
+                      {{ formatCount(plan.summary.entities) }} photo(s)
+                    </span>
+                  </div>
+                  <template v-for="row in treeRows" :key="row.kind === 'folder' ? `folder:${row.path}` : row.entity?.id">
+                    <div
+                      v-if="row.kind === 'folder'"
+                      class="flex items-center gap-1.5 border-b border-line/60 py-1 pr-2 text-[10px] last:border-b-0"
+                      :style="{ paddingLeft: `${8 + row.depth * 16}px` }"
+                      :title="row.path"
+                    >
+                      <FolderOpen class="h-3 w-3 shrink-0 text-subtle" />
+                      <span class="min-w-0 flex-1 truncate font-medium text-ink">
+                        {{ row.name }}
+                      </span>
+                      <span class="shrink-0 text-[9px] text-subtle">
+                        {{ row.photoCount }} {{ row.photoCount === 1 ? 'photo' : 'photos' }}
+                      </span>
+                    </div>
+                    <button
+                      v-else-if="row.entity"
+                      class="flex w-full items-center gap-1.5 border-b border-line/60 py-1 pr-2 text-left text-[10px] transition last:border-b-0 hover:bg-panel-2"
+                      :class="selectedEntityId === row.entity.id ? 'bg-panel-2' : ''"
+                      :style="{ paddingLeft: `${8 + row.depth * 16}px` }"
+                      :title="row.path"
+                      @click="togglePreviewEntity(row)"
+                    >
+                      <FileImage class="h-3 w-3 shrink-0 text-subtle" />
+                      <span class="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">
+                        {{ row.name }}
+                      </span>
+                      <span
+                        class="shrink-0 rounded border px-1 py-0.5 text-[8px] font-medium"
+                        :class="statusClass(row.entity)"
+                      >
+                        {{ statusLabel(row.entity) }}
+                      </span>
+                    </button>
+                  </template>
                 </div>
 
                 <div

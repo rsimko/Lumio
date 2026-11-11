@@ -187,7 +187,7 @@ browser, in-place metadata editing, cloud sync, HEIC/AVIF, map and albums.
 
 | Data | Location |
 | --- | --- |
-| Library roots and UI settings | `~/Library/Application Support/com.lumio.desktop/settings.json` |
+| Library roots, UI settings and ingest templates | `~/Library/Application Support/com.lumio.desktop/settings.json` |
 | Thumbnail cache | `~/Library/Caches/com.lumio.desktop/thumbnails/` |
 
 On Linux these follow the XDG config/cache directories. Deleting the cache is always safe;

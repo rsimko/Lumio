@@ -162,7 +162,7 @@ function chooseDestination(): void {
     @close="store.closeDialog()"
   >
     <div class="flex min-h-0 flex-1 flex-col">
-      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-3">
         <div
           v-if="store.planError || store.runError"
           class="mb-3 flex items-start gap-2 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs leading-relaxed text-danger"
@@ -174,7 +174,7 @@ function chooseDestination(): void {
           </button>
         </div>
 
-        <div class="grid gap-3 xl:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)]">
+        <div class="grid gap-3 lg:grid-cols-[minmax(300px,0.9fr)_minmax(380px,1.1fr)]">
           <section class="rounded-lg border border-line bg-panel/60 p-3">
             <div class="mb-2 flex items-center justify-between gap-2">
               <h3 class="text-xs font-semibold text-ink">Sources</h3>
@@ -367,7 +367,7 @@ function chooseDestination(): void {
           </div>
         </section>
 
-        <section class="mt-3 grid gap-3 xl:grid-cols-[1fr_1fr_auto]">
+        <section class="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
           <label class="block rounded-lg border border-line bg-panel/60 p-3">
             <span class="mb-1 block text-[10px] font-medium uppercase tracking-wide text-subtle">
               Job code
@@ -541,7 +541,7 @@ function chooseDestination(): void {
         </section>
 
         <section class="mt-3 flex h-[min(460px,42vh)] min-h-[260px] flex-col overflow-hidden rounded-lg border border-line bg-panel/60">
-          <div class="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1.5">
+          <div class="flex shrink-0 flex-wrap items-center gap-1 border-b border-line px-2 py-1.5">
             <button
               v-for="entry in tabs"
               :key="entry.id"
@@ -565,7 +565,7 @@ function chooseDestination(): void {
                 {{ entry.count }}
               </span>
             </button>
-            <span class="ml-auto text-[10px] text-subtle">
+            <span class="ml-auto pl-2 text-[10px] text-subtle">
               <template v-if="plan">
                 {{ formatCount(plan.summary.entities) }} photo(s) ·
                 {{ formatCount(plan.summary.files) }} file(s) ·
@@ -618,9 +618,9 @@ function chooseDestination(): void {
                   </span>
                 </div>
 
-                <div class="overflow-hidden rounded border border-line">
+                <div class="overflow-x-auto rounded border border-line">
                   <div
-                    class="grid grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
+                    class="grid min-w-[660px] grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] gap-2 border-b border-line bg-panel px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-subtle"
                   >
                     <span>Photo</span>
                     <span>Capture</span>
@@ -630,7 +630,7 @@ function chooseDestination(): void {
                   <button
                     v-for="entity in plan.entities"
                     :key="entity.id"
-                    class="grid w-full grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] items-start gap-2 border-b border-line/60 px-2 py-1.5 text-left text-[10px] transition last:border-b-0 hover:bg-panel-2"
+                    class="grid min-w-[660px] w-full grid-cols-[minmax(180px,1.1fr)_minmax(110px,0.7fr)_minmax(220px,1.6fr)_110px] items-start gap-2 border-b border-line/60 px-2 py-1.5 text-left text-[10px] transition last:border-b-0 hover:bg-panel-2"
                     :class="selectedEntityId === entity.id ? 'bg-panel-2' : ''"
                     @click="selectedEntityId = selectedEntityId === entity.id ? null : entity.id"
                   >
@@ -681,7 +681,7 @@ function chooseDestination(): void {
                       <X class="h-3 w-3" />
                     </button>
                   </div>
-                  <dl class="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                  <dl class="grid gap-x-4 gap-y-1 sm:grid-cols-2 [&>div]:min-w-0">
                     <div>
                       <dt class="text-subtle">Source folder</dt>
                       <dd class="truncate font-mono text-[9px] text-muted">
@@ -935,7 +935,7 @@ function chooseDestination(): void {
                   </button>
                 </div>
                 <pre
-                  class="min-h-0 flex-1 overflow-auto rounded border border-line bg-panel p-2 font-mono text-[9px] leading-relaxed text-muted"
+                  class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded border border-line bg-panel p-2 font-mono text-[9px] leading-relaxed text-muted"
                   >{{ store.reportText }}</pre
                 >
               </template>
@@ -952,8 +952,8 @@ function chooseDestination(): void {
         </div>
       </div>
 
-      <footer class="border-t border-line bg-panel px-4 py-2.5">
-        <div class="flex items-center gap-3">
+      <footer class="border-t border-line bg-panel py-2.5 pl-4 pr-7">
+        <div class="flex flex-wrap items-center gap-3">
           <div class="min-w-0 flex-1">
             <div v-if="store.running" class="min-w-0">
               <div class="mb-1 flex items-center justify-between gap-2 text-[10px]">
@@ -978,7 +978,7 @@ function chooseDestination(): void {
                 />
               </div>
             </div>
-            <div v-else class="flex min-w-0 items-center gap-2 text-[10px] text-subtle">
+            <div v-else class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-subtle">
               <template v-if="plan">
                 <span>
                   {{ formatCount(plan.summary.entities) }} photo(s), {{ formatCount(plan.summary.files) }}

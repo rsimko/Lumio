@@ -149,13 +149,7 @@ function toggleFavorite(): void {
             <button
               v-for="color in COLOR_LABELS"
               :key="color"
-              class="h-4 w-4 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110"
-              :class="[
-                COLOR_LABEL_SWATCHES[color],
-                labelActive(color)
-                  ? ['ring-ink/70', 'scale-110']
-                  : ['ring-transparent', 'opacity-75 hover:opacity-100'],
-              ]"
+              class="group grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2"
               :title="
                 labelActive(color)
                   ? `Clear ${COLOR_LABEL_NAMES[color].toLowerCase()} label`
@@ -168,7 +162,17 @@ function toggleFavorite(): void {
               "
               :aria-pressed="labelActive(color)"
               @click="setLabel(color)"
-            />
+            >
+              <span
+                class="block h-4 w-4 rounded-full ring-2 ring-offset-1 ring-offset-panel transition group-hover:scale-110"
+                :class="[
+                  COLOR_LABEL_SWATCHES[color],
+                  labelActive(color)
+                    ? ['ring-ink/70', 'scale-110']
+                    : ['ring-transparent', 'opacity-75 group-hover:opacity-100'],
+                ]"
+              />
+            </button>
           </div>
           <button
             class="rounded px-1 py-0.5 text-2xs font-medium text-subtle transition hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"

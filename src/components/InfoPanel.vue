@@ -22,6 +22,7 @@ import ResizeHandle from '@/components/ResizeHandle.vue';
 import SourceBadge from '@/components/SourceBadge.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { api, errorMessage } from '@/api';
+import { assetPreviewKey } from '@/lib/assets';
 import {
   basename,
   formatAperture,
@@ -118,7 +119,7 @@ async function loadHistogram(): Promise<void> {
     return;
   }
 
-  const key = `${current.id}:${preview.edge}`;
+  const key = `${assetPreviewKey(current)}:${preview.edge}`;
   const cached = histogramCache.get(key);
   if (cached) {
     resetHistogram();
@@ -186,7 +187,8 @@ async function loadCameraInfo(): Promise<void> {
     return;
   }
 
-  const cached = cameraCache.get(current.id);
+  const key = `${current.id}:${current.companionJpeg ?? ''}`;
+  const cached = cameraCache.get(key);
   if (cached) {
     cameraInfo.value = cached;
     cameraStatus.value = 'ready';
@@ -200,7 +202,7 @@ async function loadCameraInfo(): Promise<void> {
   try {
     const data = await api.cameraInfo(current);
     if (request !== cameraRequest) return;
-    rememberCameraInfo(current.id, data);
+    rememberCameraInfo(key, data);
     cameraInfo.value = data;
     cameraStatus.value = 'ready';
   } catch (error) {
@@ -211,7 +213,7 @@ async function loadCameraInfo(): Promise<void> {
 }
 
 watch(
-  () => asset.value?.id ?? null,
+  [() => asset.value?.id ?? null, () => asset.value?.companionJpeg ?? null],
   () => {
     void loadCameraInfo();
   },

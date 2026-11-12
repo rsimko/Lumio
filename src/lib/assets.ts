@@ -30,6 +30,15 @@ export function assetAssociations(asset: PhotoAsset): AssetAssociation[] {
   return associations;
 }
 
+/**
+ * Inputs that decide which file backs a preview. The value changes when a
+ * rescan discovers or removes a companion JPEG, so thumbnail caches can be
+ * invalidated without restarting the app.
+ */
+export function assetPreviewKey(asset: PhotoAsset): string {
+  return `${asset.id}:${asset.previewHint}:${asset.companionJpeg ?? ''}`;
+}
+
 /** Every file that belongs to one photo, in primary-first order. */
 export function assetFilePaths(asset: PhotoAsset): string[] {
   const paths = [

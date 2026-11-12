@@ -725,6 +725,50 @@ mod tests {
     }
 
     #[test]
+    fn companion_jpegs_and_xmps_match_case_insensitively() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::write(root.join("IMG_0001.CR3"), b"raw").unwrap();
+        write_jpeg(&root.join("IMG_0001.JPG"));
+        fs::write(root.join("IMG_0001.XMP"), b"<xmp/>").unwrap();
+        fs::write(root.join("IMG_0002.CR3"), b"raw").unwrap();
+        write_jpeg(&root.join("IMG_0002.JPEG"));
+        fs::write(root.join("IMG_0003.CR3"), b"raw").unwrap();
+        write_jpeg(&root.join("IMG_0003.JPEG"));
+        write_jpeg(&root.join("IMG_0003.JPG"));
+
+        let result = scan_photos(root, false, &[]).unwrap();
+        assert_eq!(result.assets.len(), 3);
+
+        let first = &result.assets[0];
+        assert_eq!(
+            first.companion_jpeg.as_deref(),
+            Some(root.join("IMG_0001.JPG").as_path())
+        );
+        assert_eq!(
+            first.xmp_sidecar.as_deref(),
+            Some(root.join("IMG_0001.XMP").as_path())
+        );
+        assert_eq!(first.preview_hint, PreviewSource::CompanionJpeg);
+
+        let second = &result.assets[1];
+        assert_eq!(
+            second.companion_jpeg.as_deref(),
+            Some(root.join("IMG_0002.JPEG").as_path())
+        );
+        assert_eq!(second.preview_hint, PreviewSource::CompanionJpeg);
+
+        // `jpg` wins over `jpeg` regardless of extension casing.
+        let third = &result.assets[2];
+        assert_eq!(
+            third.companion_jpeg.as_deref(),
+            Some(root.join("IMG_0003.JPG").as_path())
+        );
+        assert_eq!(third.extra_companions.len(), 1);
+        assert_eq!(third.preview_hint, PreviewSource::CompanionJpeg);
+    }
+
+    #[test]
     fn scan_populates_metadata_from_sidecars() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();

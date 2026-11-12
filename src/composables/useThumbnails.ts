@@ -2,6 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { reactive, ref, shallowRef, watch, type Ref } from 'vue';
 
 import { api, errorMessage } from '@/api';
+import { assetPreviewKey } from '@/lib/assets';
 import type { PhotoAsset, PreviewSource } from '@/types';
 
 const EDGE_BUCKETS = [256, 512, 1024, 2048, 2560];
@@ -61,13 +62,13 @@ export function displayEdge(cssSize: number): number {
   return bucketEdge(Math.ceil(cssSize * devicePixelRatioValue()));
 }
 
-export function thumbnailKey(assetId: string, edge: number): string {
-  return `${thumbnailEpoch.value}:${assetId}:${edge}`;
+export function thumbnailKey(asset: PhotoAsset, edge: number): string {
+  return `${thumbnailEpoch.value}:${assetPreviewKey(asset)}:${edge}`;
 }
 
 export function getThumbnail(asset: PhotoAsset, edge: number): ThumbEntry {
   const bucketed = bucketEdge(edge);
-  const key = thumbnailKey(asset.id, bucketed);
+  const key = thumbnailKey(asset, bucketed);
   const existing = entries.get(key);
   if (existing) return existing;
 

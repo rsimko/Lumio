@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assetAssociations,
   assetFilePaths,
+  assetPreviewKey,
   collectAssetFilePaths,
   sharedAssociationPaths,
 } from '@/lib/assets';
@@ -65,6 +66,22 @@ describe('asset file helpers', () => {
       { path: '/photos/IMG_0001.CR2.xmp', kind: 'xmp', extra: false },
       { path: '/photos/IMG_0001.xmp', kind: 'xmp', extra: true },
     ]);
+  });
+
+  it('changes the preview key when a scan finds a companion JPEG', () => {
+    const before = asset({
+      id: 'a',
+      primaryPath: '/photos/IMG_0001.CR3',
+      previewHint: 'embeddedRaw',
+    });
+    const after = asset({
+      ...before,
+      previewHint: 'companionJpeg',
+      companionJpeg: '/photos/IMG_0001.JPG',
+    });
+
+    expect(assetPreviewKey(before)).not.toBe(assetPreviewKey(after));
+    expect(assetPreviewKey(after)).toContain('IMG_0001.JPG');
   });
 
   it('reports associations shared with photos outside the batch', () => {

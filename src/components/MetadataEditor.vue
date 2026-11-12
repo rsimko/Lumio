@@ -149,7 +149,7 @@ function toggleFavorite(): void {
             <button
               v-for="color in COLOR_LABELS"
               :key="color"
-              class="h-5 w-5 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110"
+              class="h-4 w-4 rounded-full ring-2 ring-offset-1 ring-offset-panel transition hover:scale-110"
               :class="[
                 COLOR_LABEL_SWATCHES[color],
                 labelActive(color)

@@ -10,23 +10,23 @@
     'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, monospace;
   --font-scale: 1;
 
-  --c-app: 237 241 241;
-  --c-panel: 247 249 249;
-  --c-panel-2: 233 238 238;
-  --c-elevated: 252 253 253;
-  --c-main: 228 234 234;
-  --c-canvas: 214 222 222;
-  --c-line: 203 213 213;
-  --c-line-strong: 175 190 190;
-  --c-ink: 27 29 34;
-  --c-muted: 89 105 108;
-  --c-subtle: 99 118 121;
-  --c-accent: 67 116 126;
-  --c-accent-soft: 228 237 238;
+  --c-app: 190 193 193;
+  --c-panel: 198 199 199;
+  --c-panel-2: 186 190 190;
+  --c-elevated: 202 202 202;
+  --c-main: 182 187 187;
+  --c-canvas: 171 178 178;
+  --c-line: 162 170 170;
+  --c-line-strong: 140 152 152;
+  --c-ink: 22 23 27;
+  --c-muted: 71 84 86;
+  --c-subtle: 79 94 97;
+  --c-accent: 54 93 101;
+  --c-accent-soft: 182 190 190;
   --c-accent-ink: 255 255 255;
-  --c-danger: 174 75 64;
-  --c-warning: 143 107 42;
-  --c-success: 60 125 99;
+  --c-danger: 139 60 51;
+  --c-warning: 114 86 34;
+  --c-success: 48 100 79;
 }
 
 .dark {

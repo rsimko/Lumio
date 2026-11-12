@@ -314,32 +314,24 @@ async function revealPrimary() {
                 Histogram
               </button>
             </div>
-            <div
-              v-if="detailTab === 'histogram'"
-              class="flex items-center gap-1.5"
+            <button
+              v-if="detailTab === 'histogram' && asset.kind === 'raw'"
+              class="rounded border px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider transition"
+              :class="
+                showRawHistogram
+                  ? 'border-accent/40 bg-accent-soft text-accent'
+                  : 'border-line bg-panel text-subtle hover:bg-panel-2 hover:text-ink'
+              "
+              :aria-pressed="showRawHistogram"
+              :title="
+                showRawHistogram
+                  ? 'Show the histogram from the rendered preview'
+                  : 'Show the histogram from RAW sensor data'
+              "
+              @click="toggleRawHistogram"
             >
-              <button
-                v-if="asset.kind === 'raw'"
-                class="rounded border px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider transition"
-                :class="
-                  showRawHistogram
-                    ? 'border-accent/40 bg-accent-soft text-accent'
-                    : 'border-line bg-panel text-subtle hover:bg-panel-2 hover:text-ink'
-                "
-                :aria-pressed="showRawHistogram"
-                :title="
-                  showRawHistogram
-                    ? 'Show the histogram from the rendered preview'
-                    : 'Show the histogram from RAW sensor data'
-                "
-                @click="toggleRawHistogram"
-              >
-                RAW
-              </button>
-              <span v-if="histogram" class="text-2xs tabular-nums text-subtle">
-                {{ formatCount(histogram.pixels) }} px
-              </span>
-            </div>
+              RAW
+            </button>
           </div>
 
           <div

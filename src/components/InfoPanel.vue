@@ -272,36 +272,6 @@ async function revealPrimary() {
   }
 }
 
-interface AssociationRow {
-  key: string;
-  kind: 'jpeg' | 'xmp';
-  path: string | null;
-  extra: boolean;
-}
-
-const associationRows = computed<AssociationRow[]>(() => {
-  const current = asset.value;
-  if (!current) return [];
-  const rows: AssociationRow[] = [
-    { key: 'jpeg', kind: 'jpeg', path: current.companionJpeg, extra: false },
-    { key: 'xmp', kind: 'xmp', path: current.xmpSidecar, extra: false },
-  ];
-  for (const path of current.extraCompanions) {
-    rows.push({ key: `jpeg:${path}`, kind: 'jpeg', path, extra: true });
-  }
-  for (const path of current.extraSidecars) {
-    rows.push({ key: `xmp:${path}`, kind: 'xmp', path, extra: true });
-  }
-  return rows;
-});
-
-function associationLabel(row: AssociationRow): string {
-  if (row.kind === 'jpeg') {
-    return row.extra ? 'Extra companion JPEG' : 'Companion JPEG';
-  }
-  return row.extra ? 'Extra XMP sidecar' : 'XMP sidecar';
-}
-
 async function revealAssociation(path: string | null): Promise<void> {
   if (!path) return;
   try {
@@ -309,6 +279,23 @@ async function revealAssociation(path: string | null): Promise<void> {
   } catch (error) {
     store.addToast(errorMessage(error), 'error');
   }
+}
+
+function associationTitle(kind: 'jpeg' | 'xmp'): string {
+  const current = asset.value;
+  if (!current) return '';
+  const path = kind === 'jpeg' ? current.companionJpeg : current.xmpSidecar;
+  const label = kind === 'jpeg' ? 'companion JPEG' : 'XMP sidecar';
+  if (!path) return `No ${label} found`;
+  const extra =
+    kind === 'jpeg' ? current.extraCompanions.length : current.extraSidecars.length;
+  return `Reveal ${basename(path)} in Finder${extra ? ` (+${extra} more)` : ''}`;
+}
+
+function revealAssociationKind(kind: 'jpeg' | 'xmp'): void {
+  const current = asset.value;
+  if (!current) return;
+  void revealAssociation(kind === 'jpeg' ? current.companionJpeg : current.xmpSidecar);
 }
 </script>
 
@@ -510,6 +497,12 @@ async function revealAssociation(path: string | null): Promise<void> {
 
         <InfoSection title="File" class="info-section-left">
           <div class="info-row">
+            <span class="info-label">Filename</span>
+            <span class="info-value break-all selectable" :title="asset.fileName">
+              {{ asset.fileName }}
+            </span>
+          </div>
+          <div class="info-row">
             <span class="info-label">Type</span>
             <span class="info-value">
               {{ kindLabel(asset.kind, asset.extension) }}
@@ -534,42 +527,40 @@ async function revealAssociation(path: string | null): Promise<void> {
               {{ asset.relativeDir || 'Library root' }}
             </span>
           </div>
-        </InfoSection>
-
-        <InfoSection title="Associations">
-          <div
-            v-for="row in associationRows"
-            :key="row.key"
-            class="flex min-h-6 items-center gap-1.5"
-          >
-            <span
-              class="badge w-8 shrink-0 justify-center ring-1"
-              :class="
-                row.kind === 'jpeg'
-                  ? 'bg-success/15 text-success ring-success/20'
-                  : 'bg-accent-soft text-accent ring-accent/20'
-              "
-              :title="associationLabel(row)"
-            >
-              {{ row.kind === 'jpeg' ? 'JPG' : 'XMP' }}
+          <div class="info-row">
+            <span class="info-label">Associations</span>
+            <span class="flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                class="badge rounded-full ring-1 transition"
+                :class="
+                  asset.companionJpeg
+                    ? 'cursor-pointer bg-success/15 text-success ring-success/20 hover:bg-success/25'
+                    : 'cursor-default bg-panel-2/60 text-subtle/70 ring-line'
+                "
+                :title="associationTitle('jpeg')"
+                :aria-label="associationTitle('jpeg')"
+                :aria-disabled="!asset.companionJpeg"
+                @click="revealAssociationKind('jpeg')"
+              >
+                JPG
+              </button>
+              <button
+                type="button"
+                class="badge rounded-full ring-1 transition"
+                :class="
+                  asset.xmpSidecar
+                    ? 'cursor-pointer bg-accent-soft text-accent ring-accent/20 hover:bg-accent/20'
+                    : 'cursor-default bg-panel-2/60 text-subtle/70 ring-line'
+                "
+                :title="associationTitle('xmp')"
+                :aria-label="associationTitle('xmp')"
+                :aria-disabled="!asset.xmpSidecar"
+                @click="revealAssociationKind('xmp')"
+              >
+                XMP
+              </button>
             </span>
-            <span
-              class="min-w-0 flex-1 truncate text-2xs"
-              :class="row.path ? 'text-ink' : 'text-subtle'"
-              :title="row.path ?? `${associationLabel(row)} not found`"
-            >
-              {{ row.path ? basename(row.path) : 'Not found' }}
-            </span>
-            <button
-              v-if="row.path"
-              class="btn-icon-sm"
-              :title="`Show ${basename(row.path)} in Finder`"
-              :aria-label="`Show ${basename(row.path)} in Finder`"
-              @click="revealAssociation(row.path)"
-            >
-              <FolderOpen class="h-3 w-3" />
-            </button>
-            <span v-else class="h-6 w-6 shrink-0" aria-hidden="true" />
           </div>
         </InfoSection>
       </template>

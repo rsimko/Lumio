@@ -62,7 +62,8 @@ Cataloguing, search and hierarchical keyword editing come later.
   (Pick, Reject or Unflagged) and favorites. Multiple values inside one group match any selected
   value; different groups must all match. Active filters are session-only, show a count in the rail,
   and can be cleared in one click from the filter panel or the main view header.
-- Companion JPEG and XMP associations are shown as badges in list view and the info panel.
+- Companion JPEG and XMP associations are shown as badges in list view and as clickable pills in
+  the info panel's File section; clicking a pill reveals that file in Finder.
   Toggle **Assoc.** in the list header to reveal every associated JPG and XMP file as indented,
   connected rows beneath the RAW they belong to.
 - Open any photo in a distraction-free fullscreen viewer from the top toolbar, the filmstrip
@@ -93,8 +94,8 @@ Cataloguing, search and hierarchical keyword editing come later.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
   the same cached preview; both tabs share one tile and the histogram opens by default. RAW
   photos have a RAW button that recomputes the histogram from decoded sensor samples.
-- Collapse info-panel sections such as Metadata, Keywords, IPTC, Location, Camera and lens, File
-  and Associations to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO,
+- Collapse info-panel sections such as Metadata, Keywords, IPTC, Location, Camera and lens, and
+  File to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO,
   focal length and GPS coordinates are read from embedded EXIF; RAW files also try the rawler
   decoder and their companion JPEG. Reading this information does not require ExifTool.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size,

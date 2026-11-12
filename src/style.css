@@ -183,6 +183,16 @@
     @apply min-w-0 break-words text-right text-xs text-ink;
   }
 
+  /* Camera and file details read as label/value columns instead of pushing
+     long names and paths to the right edge of the panel. */
+  .info-section-left .info-row {
+    @apply grid grid-cols-[96px_minmax(0,1fr)] items-start gap-3 py-1.5;
+  }
+
+  .info-section-left .info-value {
+    @apply text-left;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide;
   }

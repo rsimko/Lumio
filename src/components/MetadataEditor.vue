@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
-  CircleSlash,
   Flag,
   Heart,
   Loader2,
@@ -144,7 +143,7 @@ function toggleFavorite(): void {
       <div class="flex min-h-7 items-center gap-2">
         <span class="w-12 shrink-0 text-2xs text-subtle">Label</span>
         <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
-          <div class="flex items-center gap-1.5" role="group" aria-label="Color label">
+          <div class="flex items-center gap-0.5" role="group" aria-label="Color label">
             <button
               v-for="color in COLOR_LABELS"
               :key="color"
@@ -191,70 +190,79 @@ function toggleFavorite(): void {
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex min-h-7 items-center gap-2">
         <span class="w-12 shrink-0 text-2xs text-subtle">Culling</span>
-        <div class="flex items-center gap-1" role="group" aria-label="Culling flag">
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <div class="flex items-center gap-0.5" role="group" aria-label="Culling flag">
+            <button
+              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2"
+              :class="cullActive('pick') ? 'text-success' : 'text-subtle/60'"
+              :title="cullActive('pick') ? 'Clear pick flag' : 'Mark as picked'"
+              :aria-label="cullActive('pick') ? 'Clear pick flag' : 'Mark as picked'"
+              :aria-pressed="cullActive('pick')"
+              @click="setCull('pick')"
+            >
+              <Flag
+                class="h-3.5 w-3.5"
+                :fill="cullActive('pick') ? 'currentColor' : 'none'"
+              />
+            </button>
+            <button
+              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2"
+              :class="cullActive('reject') ? 'text-danger' : 'text-subtle/60'"
+              :title="cullActive('reject') ? 'Clear reject flag' : 'Mark as rejected'"
+              :aria-label="cullActive('reject') ? 'Clear reject flag' : 'Mark as rejected'"
+              :aria-pressed="cullActive('reject')"
+              @click="setCull('reject')"
+            >
+              <X class="h-3.5 w-3.5" />
+            </button>
+          </div>
           <button
-            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition"
-            :class="
-              cullActive('pick')
-                ? 'border-success/40 bg-success/15 text-success'
-                : 'border-line bg-panel text-muted hover:bg-panel-2 hover:text-ink'
+            class="rounded px-1 py-0.5 text-2xs font-medium text-subtle transition hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+            :title="
+              cull.mixed
+                ? 'Clear culling flags for all selected photos'
+                : cull.value
+                  ? `Clear ${cull.value === 'pick' ? 'pick' : 'reject'} flag`
+                  : 'No culling flag'
             "
-            title="Pick"
-            :aria-pressed="cullActive('pick')"
-            @click="setCull('pick')"
-          >
-            <Flag class="h-3 w-3" :fill="cullActive('pick') ? 'currentColor' : 'none'" />
-            Pick
-          </button>
-          <button
-            class="flex h-7 items-center gap-1 rounded-md border px-2 text-2xs font-medium transition"
-            :class="
-              cullActive('reject')
-                ? 'border-danger/40 bg-danger/15 text-danger'
-                : 'border-line bg-panel text-muted hover:bg-panel-2 hover:text-ink'
-            "
-            title="Reject"
-            :aria-pressed="cullActive('reject')"
-            @click="setCull('reject')"
-          >
-            <X class="h-3 w-3" />
-            Reject
-          </button>
-          <button
-            class="grid h-7 w-7 place-items-center rounded-md border border-line bg-panel text-subtle transition hover:bg-panel-2 hover:text-ink"
-            title="Remove cull flag"
+            :disabled="!cull.mixed && !cull.value"
+            aria-label="Clear culling flag"
             @click="unflag"
           >
-            <CircleSlash class="h-3 w-3" />
+            Clear
           </button>
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex min-h-7 items-center gap-2">
         <span class="w-12 shrink-0 text-2xs text-subtle">Favorite</span>
-        <button
-          class="flex h-7 items-center gap-1.5 rounded-md border px-2 text-2xs font-medium transition"
-          :class="
-            !favorite.mixed && favorite.value
-              ? 'border-rose-400/40 bg-rose-400/15 text-rose-400'
-              : 'border-line bg-panel text-muted hover:bg-panel-2 hover:text-ink'
-          "
-          :title="
-            !favorite.mixed && favorite.value
-              ? `Remove favorite (${store.shortcutLabel('metadata.favorite')})`
-              : `Mark as favorite (${store.shortcutLabel('metadata.favorite')})`
-          "
-          :aria-pressed="!favorite.mixed && favorite.value"
-          @click="toggleFavorite"
-        >
-          <Heart
-            class="h-3 w-3"
-            :fill="!favorite.mixed && favorite.value ? 'currentColor' : 'none'"
-          />
-          {{ favorite.mixed ? 'Mixed' : favorite.value ? 'Favorite' : 'Not favorite' }}
-        </button>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <div class="flex items-center gap-0.5" role="group" aria-label="Favorite">
+            <button
+              class="grid h-6 w-6 place-items-center rounded-md transition hover:bg-panel-2"
+              :class="
+                !favorite.mixed && favorite.value ? 'text-rose-500' : 'text-subtle/60'
+              "
+              :title="
+                !favorite.mixed && favorite.value
+                  ? `Remove favorite (${store.shortcutLabel('metadata.favorite')})`
+                  : `Mark as favorite (${store.shortcutLabel('metadata.favorite')})`
+              "
+              :aria-label="
+                !favorite.mixed && favorite.value ? 'Remove favorite' : 'Mark as favorite'
+              "
+              :aria-pressed="!favorite.mixed && favorite.value"
+              @click="toggleFavorite"
+            >
+              <Heart
+                class="h-3.5 w-3.5"
+                :fill="!favorite.mixed && favorite.value ? 'currentColor' : 'none'"
+              />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

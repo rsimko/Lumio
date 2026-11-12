@@ -444,7 +444,7 @@ async function revealAssociation(path: string | null): Promise<void> {
 
         <MetadataEditor class="mb-2" />
 
-        <InfoSection title="Camera and lens">
+        <InfoSection title="Camera and lens" class="info-section-left">
           <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">
             Reading camera metadata…
           </div>
@@ -493,7 +493,7 @@ async function revealAssociation(path: string | null): Promise<void> {
           <p v-else class="py-0.5 text-2xs text-subtle">No camera metadata found.</p>
         </InfoSection>
 
-        <InfoSection title="File">
+        <InfoSection title="File" class="info-section-left">
           <div class="info-row">
             <span class="info-label">Type</span>
             <span class="info-value">

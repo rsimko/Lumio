@@ -145,22 +145,22 @@ function onSizeInput(event: Event) {
 
       <div class="mx-0.5 h-5 w-px bg-line" />
 
-      <div
-        class="hidden items-center gap-1.5 xl:flex"
-        :class="sizeSliderVisible ? '' : 'invisible'"
-      >
+      <div class="flex w-20 shrink-0 items-center">
         <input
           type="range"
           min="120"
           max="480"
           step="4"
-          class="w-20 cursor-pointer"
+          class="w-20 cursor-pointer disabled:cursor-default disabled:opacity-35"
           style="accent-color: rgb(var(--c-accent))"
           :value="store.settings.thumbnailSize"
-          :title="`Thumbnail size (${store.shortcutLabel('browse.thumbLarger')} / ${store.shortcutLabel('browse.thumbSmaller')})`"
+          :disabled="!sizeSliderVisible"
+          :title="
+            sizeSliderVisible
+              ? `Thumbnail size (${store.shortcutLabel('browse.thumbLarger')} / ${store.shortcutLabel('browse.thumbSmaller')})`
+              : 'Thumbnail size is available in grid, masonry and justified views'
+          "
           aria-label="Thumbnail size"
-          :aria-hidden="!sizeSliderVisible"
-          :tabindex="sizeSliderVisible ? 0 : -1"
           @input="onSizeInput"
         />
       </div>
@@ -191,10 +191,18 @@ function onSizeInput(event: Event) {
       <div class="mx-0.5 h-5 w-px bg-line" />
 
       <button
-        v-if="store.viewMode === 'filmstrip'"
         class="btn-icon"
-        :class="store.settings.filmstripVisible ? 'bg-accent-soft text-accent' : ''"
-        :title="`Show or hide the filmstrip (${store.shortcutLabel('library.filmstrip')})`"
+        :class="
+          store.viewMode === 'filmstrip' && store.settings.filmstripVisible
+            ? 'bg-accent-soft text-accent'
+            : ''
+        "
+        :disabled="store.viewMode !== 'filmstrip'"
+        :title="
+          store.viewMode === 'filmstrip'
+            ? `Show or hide the filmstrip (${store.shortcutLabel('library.filmstrip')})`
+            : 'Filmstrip controls are available in Filmstrip view'
+        "
         :aria-pressed="store.settings.filmstripVisible"
         @click="store.toggleFilmstrip()"
       >

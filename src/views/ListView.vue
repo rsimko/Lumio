@@ -75,11 +75,12 @@ watch(
       class="grid h-8 shrink-0 items-center gap-3 border-b border-line bg-app/60 px-4 text-2xs font-semibold uppercase tracking-[0.1em] text-subtle"
       :class="
         compact
-          ? 'grid-cols-[minmax(0,1fr)_54px_100px_72px]'
-          : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_72px]'
+          ? 'grid-cols-[minmax(0,1fr)_96px_54px_100px_72px]'
+          : 'grid-cols-[minmax(0,1fr)_104px_60px_104px_84px_112px_72px]'
       "
     >
       <span>Name</span>
+      <span title="Rating, label and culling">Marks</span>
       <span>Type</span>
       <span>Dimensions</span>
       <template v-if="!compact">

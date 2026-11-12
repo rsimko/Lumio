@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import {
   COLOR_LABEL_NAMES,
   COLOR_LABEL_SWATCHES,
+  formatRating,
   hasVisibleMetadata,
 } from '@/lib/metadata';
 import type { PhotoAsset } from '@/types';
@@ -12,8 +13,8 @@ import type { PhotoAsset } from '@/types';
 const props = withDefaults(
   defineProps<{
     asset: PhotoAsset;
-    /** Overlay chips are drawn over photo pixels; inline badges sit in a row. */
-    variant?: 'overlay' | 'inline';
+    /** Overlay chips are drawn on photos; inline badges sit in a row. */
+    variant?: 'overlay' | 'inline' | 'list';
   }>(),
   { variant: 'overlay' },
 );
@@ -21,6 +22,7 @@ const props = withDefaults(
 const metadata = computed(() => props.asset.metadata);
 const visible = computed(() => hasVisibleMetadata(metadata.value));
 const overlay = computed(() => props.variant === 'overlay');
+const list = computed(() => props.variant === 'list');
 
 const chipClass = computed(() =>
   overlay.value
@@ -32,42 +34,53 @@ const chipClass = computed(() =>
 <template>
   <span
     v-if="visible"
-    class="flex items-center gap-1 text-3xs leading-none"
-    :class="overlay ? 'drop-shadow-sm' : 'text-muted'"
+    class="flex items-center gap-1 leading-none"
+    :class="[overlay ? 'drop-shadow-sm' : 'text-muted', list ? 'text-2xs' : 'text-3xs']"
     aria-label="Photo metadata"
   >
     <span
       v-if="metadata.rating > 0"
       class="flex items-center gap-0.5 font-semibold tabular-nums"
-      :class="[chipClass, overlay ? 'text-amber-300' : 'text-amber-500']"
+      :class="
+        list
+          ? 'tracking-tight text-amber-500'
+          : [chipClass, overlay ? 'text-amber-300' : 'text-amber-500']
+      "
       :title="`${metadata.rating} ${metadata.rating === 1 ? 'star' : 'stars'}`"
     >
-      <Star class="h-2.5 w-2.5" fill="currentColor" />
-      {{ metadata.rating }}
+      <template v-if="list">{{ formatRating(metadata.rating) }}</template>
+      <template v-else>
+        <Star class="h-2.5 w-2.5" fill="currentColor" />
+        {{ metadata.rating }}
+      </template>
     </span>
     <span
       v-if="metadata.label"
-      class="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/25"
-      :class="COLOR_LABEL_SWATCHES[metadata.label]"
+      class="shrink-0 rounded-full ring-1 ring-black/25"
+      :class="[COLOR_LABEL_SWATCHES[metadata.label], list ? 'h-2.5 w-2.5' : 'h-2 w-2']"
       :title="`${COLOR_LABEL_NAMES[metadata.label]} label`"
     />
     <span
       v-if="metadata.favorite"
-      :class="[chipClass, overlay ? 'text-rose-300' : 'text-rose-500']"
+      :class="
+        list ? 'text-rose-500' : [chipClass, overlay ? 'text-rose-300' : 'text-rose-500']
+      "
       title="Favorite"
     >
       <Heart class="h-2.5 w-2.5" fill="currentColor" />
     </span>
     <span
       v-if="metadata.cull === 'pick'"
-      :class="[chipClass, overlay ? 'text-emerald-300' : 'text-success']"
+      :class="
+        list ? 'text-success' : [chipClass, overlay ? 'text-emerald-300' : 'text-success']
+      "
       title="Picked"
     >
       <Flag class="h-2.5 w-2.5" fill="currentColor" />
     </span>
     <span
       v-else-if="metadata.cull === 'reject'"
-      :class="[chipClass, overlay ? 'text-red-300' : 'text-danger']"
+      :class="list ? 'text-danger' : [chipClass, overlay ? 'text-red-300' : 'text-danger']"
       title="Rejected"
     >
       <X class="h-2.5 w-2.5" />

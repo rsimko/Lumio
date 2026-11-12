@@ -69,8 +69,8 @@ const subline = computed(() => {
     :class="[
       selected ? 'bg-accent-soft/70' : 'hover:bg-panel-2/60',
       compact
-        ? 'grid-cols-[minmax(0,1fr)_54px_100px_72px]'
-        : 'grid-cols-[minmax(0,1fr)_60px_104px_84px_112px_72px]',
+        ? 'grid-cols-[minmax(0,1fr)_96px_54px_100px_72px]'
+        : 'grid-cols-[minmax(0,1fr)_104px_60px_104px_84px_112px_72px]',
     ]"
     @click="emit('select', $event)"
     @dblclick="$emit('open')"
@@ -104,14 +104,15 @@ const subline = computed(() => {
         />
       </div>
       <div class="min-w-0">
-        <div class="flex min-w-0 items-center gap-1.5">
-          <p class="truncate text-xs font-medium text-ink">{{ asset.fileName }}</p>
-          <MetadataBadges :asset="asset" variant="inline" class="shrink-0" />
-        </div>
+        <p class="truncate text-xs font-medium text-ink">{{ asset.fileName }}</p>
         <p class="mt-0.5 truncate text-2xs text-subtle">
           {{ subline }}
         </p>
       </div>
+    </div>
+
+    <div class="flex min-w-0 items-center">
+      <MetadataBadges :asset="asset" variant="list" />
     </div>
 
     <span

@@ -41,7 +41,9 @@ const viewComponent = computed(() => {
   }
 });
 
-const showHeader = computed(() => Boolean(store.selectedFolder));
+const showHeader = computed(
+  () => Boolean(store.selectedFolder) || store.isLibraryScope,
+);
 const showSkeleton = computed(
   () => store.scanState === 'loading' && store.totalCount === 0,
 );
@@ -69,7 +71,12 @@ const showWelcome = computed(
     !store.selectedFolder,
 );
 const showChooseFolder = computed(
-  () => !store.initializing && store.hasRoots && !store.selectedFolder && !showWelcome.value,
+  () =>
+    !store.initializing &&
+    store.hasRoots &&
+    !store.selectedFolder &&
+    !store.isLibraryScope &&
+    !showWelcome.value,
 );
 const permissionHint = computed(() => store.scanErrorCode === 'permissionDenied');
 
@@ -88,12 +95,22 @@ function removeSelectedRoot() {
       v-if="showHeader"
       class="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-app/55 px-4"
     >
-      <FolderOpen class="h-3.5 w-3.5 shrink-0 text-subtle" />
-      <span class="truncate text-xs font-medium text-ink" :title="store.selectedFolder ?? ''">
-        {{ store.folderName }}
+      <FolderOpen v-if="!store.isLibraryScope" class="h-3.5 w-3.5 shrink-0 text-subtle" />
+      <Images v-else class="h-3.5 w-3.5 shrink-0 text-subtle" />
+      <span
+        class="truncate text-xs font-medium text-ink"
+        :title="store.isLibraryScope ? store.viewSubtitle : (store.selectedFolder ?? '')"
+      >
+        {{ store.viewTitle }}
       </span>
       <span
-        v-if="store.settings.recursive"
+        v-if="store.isLibraryScope"
+        class="badge bg-accent-soft text-accent ring-1 ring-accent/15"
+      >
+        All folders
+      </span>
+      <span
+        v-else-if="store.settings.recursive"
         class="badge bg-accent-soft text-accent ring-1 ring-accent/15"
       >
         Recursive
@@ -271,7 +288,7 @@ function removeSelectedRoot() {
             <AlertTriangle class="h-5 w-5" />
           </div>
           <h2 class="text-sm font-semibold text-ink">
-            Could not open {{ store.folderName }}
+            {{ store.isLibraryScope ? 'Could not scan the library' : `Could not open ${store.folderName}` }}
           </h2>
           <p class="mt-2 break-words text-xs leading-relaxed text-muted">
             {{ store.scanError }}
@@ -283,9 +300,14 @@ function removeSelectedRoot() {
             macOS may be blocking access. Allow Lumio under System Settings → Privacy &amp;
             Security → Files and Folders, then try again.
           </p>
-          <p class="mt-3 break-all font-mono text-2xs text-subtle">{{ store.selectedFolder }}</p>
+          <p
+            v-if="!store.isLibraryScope"
+            class="mt-3 break-all font-mono text-2xs text-subtle"
+          >
+            {{ store.selectedFolder }}
+          </p>
           <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <button class="btn-primary" @click="store.scanFolder()">
+            <button class="btn-primary" @click="store.reloadCurrentScope()">
               <RefreshCw class="h-3.5 w-3.5" />
               Try again
             </button>
@@ -309,7 +331,8 @@ function removeSelectedRoot() {
           <h2 class="text-sm font-semibold text-ink">No photos match these filters</h2>
           <p class="mt-1 text-xs leading-relaxed text-muted">
             None of the {{ formatCount(store.totalCount) }}
-            {{ pluralize(store.totalCount, 'photo') }} in this folder match the
+            {{ pluralize(store.totalCount, 'photo') }} in
+            {{ store.isLibraryScope ? 'the library' : 'this folder' }} match the
             {{ store.activeFilterCount }}
             {{ store.activeFilterCount === 1 ? 'active filter' : 'active filters' }}.
           </p>
@@ -331,12 +354,16 @@ function removeSelectedRoot() {
           <div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-panel-2 text-subtle">
             <FolderSearch class="h-5 w-5" />
           </div>
-          <h2 class="text-sm font-semibold text-ink">No photos here</h2>
+          <h2 class="text-sm font-semibold text-ink">
+            {{ store.isLibraryScope ? 'No photos in the library' : 'No photos here' }}
+          </h2>
           <p class="mt-1 text-xs leading-relaxed text-muted">
             {{
-              store.settings.recursive
-                ? 'This folder and its subfolders contain no supported photos.'
-                : 'This folder contains no supported photos. Nested folders may have some.'
+              store.isLibraryScope
+                ? 'The folders in your library contain no supported photos.'
+                : store.settings.recursive
+                  ? 'This folder and its subfolders contain no supported photos.'
+                  : 'This folder contains no supported photos. Nested folders may have some.'
             }}
           </p>
           <div class="mt-4 flex items-center justify-center gap-2">
@@ -345,11 +372,19 @@ function removeSelectedRoot() {
               Refresh
             </button>
             <button
-              v-if="!store.settings.recursive"
+              v-if="!store.isLibraryScope && !store.settings.recursive"
               class="btn-primary"
               @click="store.setRecursive(true)"
             >
               Include subfolders
+            </button>
+            <button
+              v-else-if="store.isLibraryScope"
+              class="btn-primary"
+              @click="store.addRoot()"
+            >
+              <FolderPlus class="h-3.5 w-3.5" />
+              Add folder
             </button>
           </div>
           <p class="mt-4 text-2xs text-subtle">

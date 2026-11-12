@@ -7,6 +7,7 @@ import {
   FolderPlus,
   Import,
   Info,
+  Images,
   LayoutGrid,
   List,
   Loader2,
@@ -99,8 +100,15 @@ function onSizeInput(event: Event) {
     <div class="mx-0.5 h-5 w-px shrink-0 bg-line" />
 
     <nav class="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-xs" aria-label="Folder path">
-      <FolderOpen class="mr-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
-      <template v-if="store.breadcrumb.length">
+      <FolderOpen v-if="!store.isLibraryScope" class="mr-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
+      <Images v-else class="mr-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
+      <template v-if="store.isLibraryScope">
+        <span class="truncate font-medium text-ink">Entire library</span>
+        <span class="truncate text-subtle">
+          · {{ store.roots.length }} {{ store.roots.length === 1 ? 'folder' : 'folders' }}
+        </span>
+      </template>
+      <template v-else-if="store.breadcrumb.length">
         <template v-for="(crumb, index) in store.breadcrumb" :key="crumb.path">
           <button
             class="max-w-[150px] truncate rounded px-1 py-1 transition hover:bg-panel-2"

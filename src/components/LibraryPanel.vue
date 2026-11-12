@@ -43,8 +43,8 @@ function commitResize(width: number) {
       <div v-if="store.leftPanelTab === 'library'" class="flex items-center gap-0.5">
         <button
           class="btn-icon-sm"
-          :title="`Refresh selected folder (${store.shortcutLabel('library.refresh')})`"
-          :disabled="!store.selectedFolder"
+          :title="`Refresh ${store.isLibraryScope ? 'entire library' : 'selected folder'} (${store.shortcutLabel('library.refresh')})`"
+          :disabled="store.isLibraryScope ? !store.roots.length : !store.selectedFolder"
           @click="store.refresh()"
         >
           <RefreshCw

@@ -10,6 +10,7 @@ const store = useLibraryStore();
 const leftText = computed(() => {
   if (store.selectedCount > 1) return `${store.selectedCount} photos selected`;
   if (store.selectedAsset) return store.selectedAsset.fileName;
+  if (store.isLibraryScope) return store.viewSubtitle;
   if (store.selectedFolder) return store.relativeFolderLabel;
   if (store.initializing) return 'Opening library…';
   return 'Ready';
@@ -50,7 +51,8 @@ const statusDot = computed(() => {
         >
       </span>
       <span v-if="store.hasActiveFilters" class="font-medium text-accent">Filtered</span>
-      <span v-if="store.settings.recursive" class="text-accent">Recursive</span>
+      <span v-if="store.isLibraryScope" class="font-medium text-accent">Library-wide</span>
+      <span v-else-if="store.settings.recursive" class="text-accent">Recursive</span>
       <span v-if="store.scanState === 'ready' && store.scanElapsedMs" class="hidden tabular-nums md:inline">
         Scanned in {{ formatDuration(store.scanElapsedMs) }}
       </span>

@@ -20,6 +20,7 @@ import {
   type AssetFilters,
   type CullFilterValue,
   type FavoriteFilterValue,
+  type FilterScope,
   type LabelFilterValue,
   type RatingFilterValue,
 } from '@/lib/filters';
@@ -202,7 +203,9 @@ export const useLibraryStore = defineStore('library', () => {
   /** Every asset from the current scan, before the Filters tab narrows the view. */
   const allAssets = shallowRef<PhotoAsset[]>([]);
   const filters = ref<AssetFilters>(emptyFilters());
+  const filterScope = ref<FilterScope>('folder');
   const assets = computed(() => filterAssets(allAssets.value, filters.value));
+  const isLibraryScope = computed(() => filterScope.value === 'library');
   const leftPanelTab = ref<'library' | 'filters'>('library');
   const warnings = ref<ScanWarning[]>([]);
   const scanState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -492,6 +495,23 @@ export const useLibraryStore = defineStore('library', () => {
     return `${selectedRoot.value.name}${selectedFolder.value.slice(base.length)}`;
   });
 
+  /** Name shown in the main header and status bar for the active scope. */
+  const viewTitle = computed(() => (isLibraryScope.value ? 'Entire library' : folderName.value));
+
+  /** Secondary line describing the active scope. */
+  const viewSubtitle = computed(() => {
+    if (isLibraryScope.value) {
+      const count = roots.value.length;
+      return `${count} ${count === 1 ? 'folder' : 'folders'} in the library`;
+    }
+    return relativeFolderLabel.value;
+  });
+
+  /** Changes whenever the browsed photo set changes, including scope changes. */
+  const browseKey = computed(() =>
+    isLibraryScope.value ? '__library__' : selectedFolder.value,
+  );
+
   const breadcrumb = computed<BreadcrumbItem[]>(() => {
     const folder = selectedFolder.value;
     const root = selectedRoot.value;
@@ -598,7 +618,7 @@ export const useLibraryStore = defineStore('library', () => {
   function setRecursive(value: boolean): void {
     if (settings.value.recursive === value) return;
     updateSettings({ recursive: value });
-    if (selectedFolder.value) void scanFolder();
+    if (filterScope.value === 'folder' && selectedFolder.value) void scanFolder();
   }
 
   function setFilmstripVisible(value: boolean): void {
@@ -974,6 +994,22 @@ export const useLibraryStore = defineStore('library', () => {
     filters.value = emptyFilters();
   }
 
+  async function setFilterScope(scope: FilterScope): Promise<void> {
+    if (filterScope.value === scope) return;
+    if (scope === 'library' && !roots.value.length) return;
+    filterScope.value = scope;
+    applySelection(emptySelection());
+    allAssets.value = [];
+    warnings.value = [];
+    scanElapsedMs.value = 0;
+    scanError.value = null;
+    scanErrorCode.value = null;
+    scanState.value = 'idle';
+    focusIndexAfterScan = null;
+    if (scope === 'library') await scanLibrary();
+    else if (selectedFolder.value) await scanFolder();
+  }
+
   function setLeftPanelTab(tab: 'library' | 'filters'): void {
     leftPanelTab.value = tab;
   }
@@ -1122,6 +1158,85 @@ export const useLibraryStore = defineStore('library', () => {
 
   let scanToken = 0;
 
+  /**
+   * Scan every registered root recursively. Each root is scanned in turn and
+   * failures are collected as warnings, so one disconnected drive cannot hide
+   * the readable folders.
+   */
+  async function scanLibrary(): Promise<void> {
+    const token = ++scanToken;
+    scanState.value = 'loading';
+    scanError.value = null;
+    scanErrorCode.value = null;
+    warnings.value = [];
+    scanRecursive.value = true;
+    const startedAt = Date.now();
+
+    const collected: PhotoAsset[] = [];
+    const collectedWarnings: ScanWarning[] = [];
+    const seen = new Set<string>();
+    let scannedRoots = 0;
+    let firstFailure: unknown = null;
+
+    for (const root of roots.value) {
+      if (!root.available) {
+        collectedWarnings.push({
+          path: root.path,
+          message: root.error ?? 'Folder is unavailable.',
+        });
+        continue;
+      }
+      try {
+        const result = await api.scanFolder(root.path, true);
+        if (token !== scanToken) return;
+        scannedRoots += 1;
+        collectedWarnings.push(...result.warnings);
+        for (const asset of result.assets) {
+          if (seen.has(asset.id)) continue;
+          seen.add(asset.id);
+          collected.push(asset);
+        }
+      } catch (error) {
+        if (token !== scanToken) return;
+        if (firstFailure === null) firstFailure = error;
+        collectedWarnings.push({ path: root.path, message: errorMessage(error) });
+      }
+    }
+
+    if (token !== scanToken) return;
+    allAssets.value = collected;
+    warnings.value = collectedWarnings;
+    scanElapsedMs.value = Date.now() - startedAt;
+
+    if (!scannedRoots) {
+      applySelection(emptySelection());
+      focusIndexAfterScan = null;
+      scanState.value = 'error';
+      scanError.value = roots.value.length
+        ? 'No library folders could be scanned.'
+        : 'Add a folder to the library first.';
+      scanErrorCode.value = roots.value.length && firstFailure
+        ? errorCode(firstFailure)
+        : 'notFound';
+      return;
+    }
+
+    scanState.value = 'ready';
+    applySelection(
+      reconcileSelection(
+        assetOrder.value,
+        currentSelection(),
+        focusIndexAfterScan,
+      ),
+    );
+    focusIndexAfterScan = null;
+  }
+
+  async function reloadCurrentScope(): Promise<void> {
+    if (filterScope.value === 'library') await scanLibrary();
+    else await scanFolder();
+  }
+
   async function selectFolder(
     path: string,
     rootId: string,
@@ -1133,10 +1248,19 @@ export const useLibraryStore = defineStore('library', () => {
       addToast('That folder is not part of the registered library.', 'error');
       return;
     }
-    if (path === selectedFolder.value && rootId === selectedRootId.value && !options.force) {
+    // Choosing a folder always returns to folder scope, including when the
+    // folder row is already selected but the library-wide scan is showing.
+    const switchingScope = filterScope.value === 'library';
+    if (
+      !switchingScope &&
+      path === selectedFolder.value &&
+      rootId === selectedRootId.value &&
+      !options.force
+    ) {
       if (scanState.value === 'error') await scanFolder();
       return;
     }
+    filterScope.value = 'folder';
     selectedRootId.value = rootId;
     selectedFolder.value = path;
     applySelection(emptySelection());
@@ -1520,6 +1644,8 @@ export const useLibraryStore = defineStore('library', () => {
         scanError.value = null;
         scanErrorCode.value = null;
         scanElapsedMs.value = 0;
+        settings.value = { ...settings.value, lastRootId: null, lastFolder: null };
+        queuePersist();
       } else {
         // Keep the multiselection, minus any removed rows.
         const remaining = currentFolderSelection().ids.filter(
@@ -1563,7 +1689,35 @@ export const useLibraryStore = defineStore('library', () => {
         );
       }
 
-      if (removedSelected) {
+      if (removedPaths.length && filterScope.value === 'library') {
+        // Keep the library-wide view alive and rescan whatever roots remain.
+        if (roots.value.length) {
+          applySelection(emptySelection());
+          await scanLibrary();
+          if (removedSelected) {
+            const fallback = fallbackFolderAfterRemoval(wasSelectedPath, removedPaths);
+            if (fallback) {
+              selectedRootId.value = fallback.rootId;
+              selectedFolder.value = fallback.path;
+              settings.value = {
+                ...settings.value,
+                lastRootId: fallback.rootId,
+                lastFolder: fallback.path,
+              };
+              queuePersist();
+            }
+          }
+        } else {
+          filterScope.value = 'folder';
+          allAssets.value = [];
+          warnings.value = [];
+          applySelection(emptySelection());
+          scanState.value = 'idle';
+          scanError.value = null;
+          scanErrorCode.value = null;
+          scanElapsedMs.value = 0;
+        }
+      } else if (removedSelected) {
         const fallback = fallbackFolderAfterRemoval(wasSelectedPath, removedPaths);
         if (fallback) {
           const root = roots.value.find((candidate) => candidate.id === fallback.rootId);
@@ -1617,7 +1771,8 @@ export const useLibraryStore = defineStore('library', () => {
     for (const folder of new Set(folders)) {
       if (tree.has(folder)) await loadChildren(folder, true);
     }
-    if (selectedFolder.value) await scanFolder();
+    if (filterScope.value === 'library') await scanLibrary();
+    else if (selectedFolder.value) await scanFolder();
   }
 
   async function moveAssetsToFolder(destination: string): Promise<boolean> {
@@ -1744,11 +1899,26 @@ export const useLibraryStore = defineStore('library', () => {
     folderCountsEpoch.value += 1;
 
     // Only the displayed folder needs its assets rescanned.
-    if (folder === selectedFolder.value) await scanFolder();
+    if (filterScope.value === 'library') await scanLibrary();
+    else if (folder === selectedFolder.value) await scanFolder();
   }
 
   async function refresh(): Promise<void> {
+    if (filterScope.value === 'library') {
+      await refreshLibrary();
+      return;
+    }
     await refreshFolder();
+  }
+
+  /** Refresh tree metadata and the library-wide photo scan together. */
+  async function refreshLibrary(): Promise<void> {
+    for (const key of [...folderImageCounts.keys()]) folderImageCounts.delete(key);
+    folderCountsEpoch.value += 1;
+    for (const path of [...expanded]) {
+      if (tree.has(path)) await loadChildren(path, true);
+    }
+    await scanLibrary();
   }
 
   async function clearThumbnailCache(): Promise<void> {
@@ -1842,6 +2012,9 @@ export const useLibraryStore = defineStore('library', () => {
     selectedFolder,
     folderName,
     relativeFolderLabel,
+    viewTitle,
+    viewSubtitle,
+    browseKey,
     breadcrumb,
     hasRoots,
     // scanning
@@ -1849,6 +2022,9 @@ export const useLibraryStore = defineStore('library', () => {
     totalCount,
     filteredCount,
     filters,
+    filterScope,
+    isLibraryScope,
+    setFilterScope,
     hasActiveFilters,
     activeFilterCount,
     toggleRatingFilter,
@@ -1869,7 +2045,10 @@ export const useLibraryStore = defineStore('library', () => {
     stats,
     selectFolder,
     scanFolder,
+    scanLibrary,
+    reloadCurrentScope,
     refresh,
+    refreshLibrary,
     refreshFolder,
     addRoot,
     registerRoot,

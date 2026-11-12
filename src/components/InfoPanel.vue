@@ -5,6 +5,7 @@ import {
   ExternalLink,
   FolderOpen,
   Image as ImageIcon,
+  Images,
   Info,
   Loader2,
   Trash2,
@@ -573,20 +574,24 @@ async function revealAssociation(path: string | null): Promise<void> {
         </InfoSection>
       </template>
 
-      <template v-else-if="store.selectedFolder">
+      <template v-else-if="store.selectedFolder || store.isLibraryScope">
         <div class="px-3 py-2">
           <div class="flex items-center gap-2">
-            <FolderOpen class="h-3.5 w-3.5 shrink-0 text-subtle" />
-            <h3 class="min-w-0 truncate text-xs font-semibold text-ink" :title="store.selectedFolder">
-              {{ store.folderName }}
+            <FolderOpen v-if="!store.isLibraryScope" class="h-3.5 w-3.5 shrink-0 text-subtle" />
+            <Images v-else class="h-3.5 w-3.5 shrink-0 text-subtle" />
+            <h3
+              class="min-w-0 truncate text-xs font-semibold text-ink"
+              :title="store.isLibraryScope ? store.viewSubtitle : (store.selectedFolder ?? '')"
+            >
+              {{ store.viewTitle }}
             </h3>
           </div>
           <p class="mt-1 break-all text-2xs leading-snug text-subtle selectable">
-            {{ store.relativeFolderLabel }}
+            {{ store.viewSubtitle }}
           </p>
         </div>
 
-        <InfoSection title="Contents">
+        <InfoSection :title="store.isLibraryScope ? 'Library contents' : 'Contents'">
           <div class="grid grid-cols-2 gap-1.5">
             <div class="rounded-md border border-line bg-elevated px-2.5 py-2">
               <p class="text-base font-semibold tabular-nums leading-tight text-ink">
@@ -628,8 +633,16 @@ async function revealAssociation(path: string | null): Promise<void> {
 
         <InfoSection title="Scan">
           <div class="info-row">
-            <span class="info-label">Subfolders</span>
-            <span class="info-value">{{ store.settings.recursive ? 'Included' : 'Not included' }}</span>
+            <span class="info-label">{{ store.isLibraryScope ? 'Scope' : 'Subfolders' }}</span>
+            <span class="info-value">
+              {{
+                store.isLibraryScope
+                  ? 'Entire library'
+                  : store.settings.recursive
+                    ? 'Included'
+                    : 'Not included'
+              }}
+            </span>
           </div>
           <div class="info-row">
             <span class="info-label">Duration</span>

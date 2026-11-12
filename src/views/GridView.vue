@@ -12,7 +12,7 @@ const store = useLibraryStore();
 const scroller = ref<HTMLElement | null>(null);
 const metrics = useScrollMetrics(scroller);
 const { width, height, scrollTop } = metrics;
-useBrowseScroll(scroller, metrics, () => store.selectedFolder);
+useBrowseScroll(scroller, metrics, () => store.browseKey);
 
 const layout = computed(() =>
   computeGrid(store.assets.length, width.value, store.settings.thumbnailSize),
@@ -78,7 +78,7 @@ function scrollSelectionIntoView() {
 watch(() => store.selectedIndex, scrollSelectionIntoView);
 
 watch(
-  () => store.selectedFolder,
+  () => store.browseKey,
   () => {
     if (scroller.value) scroller.value.scrollTop = 0;
   },

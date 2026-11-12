@@ -70,7 +70,7 @@ function scrollSelectionIntoView() {
 watch([() => store.selectedIndex, width, itemWidth], scrollSelectionIntoView);
 
 watch(
-  () => store.selectedFolder,
+  () => store.browseKey,
   () => {
     if (scroller.value) scroller.value.scrollLeft = 0;
   },

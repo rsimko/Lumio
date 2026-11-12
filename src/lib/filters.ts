@@ -6,6 +6,9 @@ export type LabelFilterValue = ColorLabel | 'unlabeled';
 export type CullFilterValue = CullFlag | 'unflagged';
 export type FavoriteFilterValue = 'favorite' | 'notFavorite';
 
+/** Where the active filters look for photos. */
+export type FilterScope = 'folder' | 'library';
+
 /** Filters for the current folder. Values inside a group match any value. */
 export interface AssetFilters {
   ratings: RatingFilterValue[];

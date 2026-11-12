@@ -57,11 +57,11 @@ Cataloguing, search and hierarchical keyword editing come later.
   reversed in Settings → Library → Hidden photos.
 - Double-click any thumbnail to open it in filmstrip view.
 - See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
-- Filter the current folder from the Filters tab in the left rail by rating (including Unrated), color
-  label (including Unlabeled), culling (Pick, Reject or Unflagged) and favorites. Multiple values
-  inside one group match any selected value; different groups must all match. Active filters are
-  session-only, show a count in the rail, and can be cleared in one click from the filter panel or
-  the main view header.
+- Filter photos from the Filters tab in the left rail. Choose **Current folder** or **Entire library**
+  at the top, then filter by rating (including Unrated), color label (including Unlabeled), culling
+  (Pick, Reject or Unflagged) and favorites. Multiple values inside one group match any selected
+  value; different groups must all match. Active filters are session-only, show a count in the rail,
+  and can be cleared in one click from the filter panel or the main view header.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.
   Toggle **Assoc.** in the list header to reveal every associated JPG and XMP file as indented,
   connected rows beneath the RAW they belong to.

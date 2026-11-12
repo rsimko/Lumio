@@ -31,13 +31,6 @@ export function formatCoordinates(
   return [lat, lon].filter(Boolean).join(', ');
 }
 
-export function formatAltitude(value: number | null | undefined): string {
-  if (!finite(value)) return '';
-  const metres = Math.abs(value);
-  const rounded = metres >= 100 ? Math.round(metres) : Math.round(metres * 10) / 10;
-  return `${rounded.toLocaleString()} m ${value < 0 ? 'below' : 'above'} sea level`;
-}
-
 /**
  * Parse decimal degrees or simple DMS input such as `48.8567 N`,
  * `48 51 24 N` or `48°51'24"N`. Returns null for blank or invalid values.

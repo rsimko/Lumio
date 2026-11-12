@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  formatAltitude,
   formatCoordinates,
   formatLatitude,
   formatLongitude,
@@ -20,12 +19,6 @@ describe('coordinate formatting', () => {
     expect(formatLongitude(-118.735)).toBe('118.73500° W');
     expect(formatCoordinates(48.8566, -2.3508)).toBe('48.85660° N, 2.35080° W');
     expect(formatCoordinates(null, null)).toBe('');
-  });
-
-  it('formats altitude relative to sea level', () => {
-    expect(formatAltitude(125)).toBe('125 m above sea level');
-    expect(formatAltitude(-12.5)).toBe('12.5 m below sea level');
-    expect(formatAltitude(null)).toBe('');
   });
 });
 

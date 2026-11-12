@@ -78,9 +78,8 @@ Cataloguing, search and hierarchical keyword editing come later.
 - Edit city, state/province, country, country code and sublocation, plus latitude, longitude and
   altitude. Coordinates accept decimal degrees or simple DMS, are validated before writing, and
   can be cleared independently. A compact offline map placeholder shows the location pin and
-  offers **Open in Maps**. Camera EXIF GPS is preferred when present; switch between the Camera
-  and XMP sources, or edit a coordinate to store an XMP position. Camera GPS can also be copied
-  into XMP with one click.
+  offers **Open in Maps**. Camera EXIF GPS is shown by default when present; if only XMP
+  coordinates exist, those are shown unchanged. Editing a field stores the value in XMP.
 - Edits update the existing XMP rather than regenerating it. RAW, TIFF, PNG and WebP use a
   sidecar; a standalone JPEG embeds XMP; a JPEG with a sidecar writes only that sidecar. Writes
   are staged, read back field-by-field, and checked so unrelated XMP (Darktable history, masks,

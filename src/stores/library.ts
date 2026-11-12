@@ -229,6 +229,9 @@ export const useLibraryStore = defineStore('library', () => {
   const clearingCache = ref(false);
   const metadataBusy = ref(false);
   const metadataError = ref<string | null>(null);
+  /** Timestamp of the last silent metadata write, used for the Saved cue. */
+  const metadataSavedAt = ref(0);
+  let metadataQueue: Promise<void> = Promise.resolve();
   const toasts = ref<Toast[]>([]);
 
   watch(primaryId, () => {
@@ -697,39 +700,39 @@ export const useLibraryStore = defineStore('library', () => {
     void editSelectionWithApplication(editor.path);
   }
 
-  async function applyMetadataPatch(
+  async function runMetadataPatch(
     update: MetadataUpdate,
-    targets?: readonly PhotoAsset[],
+    targetIds: readonly string[],
+    silent: boolean,
   ): Promise<void> {
-    const source = targets ?? selectedAssets.value;
-    const assetsToUpdate = source.filter((asset) => asset.primaryPath);
+    const wanted = new Set(targetIds);
+    const assetsToUpdate = assets.value.filter((asset) => wanted.has(asset.id));
     if (!assetsToUpdate.length) {
-      addToast('Select a photo to edit metadata.', 'info');
+      if (!silent) addToast('Select a photo to edit metadata.', 'info');
       return;
     }
-    if (metadataBusy.value) return;
     metadataBusy.value = true;
     metadataError.value = null;
 
-    // Update the controls immediately so clicks feel instant. The revision is
-    // deliberately left untouched: the backend still receives the revision the
-    // metadata had before this edit.
-    const targetIds = new Set(assetsToUpdate.map((asset) => asset.id));
+    // Requests capture the revision the photo had before this queued edit.
+    // Earlier edits in the queue have already merged their new revision.
+    const requests = assetsToUpdate.map((asset) => ({
+      asset,
+      expectedRevision: asset.metadata?.revision ?? '',
+      update,
+    }));
+
+    // The optimistic value was applied when the edit was enqueued. Reapply it
+    // in case a previous write merged a server snapshot over it in the meantime.
     const snapshots = new Map<string, PhotoMetadata>();
     assets.value = assets.value.map((asset) => {
-      if (!targetIds.has(asset.id)) return asset;
+      if (!wanted.has(asset.id)) return asset;
       snapshots.set(asset.id, asset.metadata);
       return { ...asset, metadata: applyMetadataUpdate(asset.metadata, update) };
     });
 
     try {
-      const outcome = await api.updateMetadata(
-        assetsToUpdate.map((asset) => ({
-          asset,
-          expectedRevision: asset.metadata?.revision ?? '',
-          update,
-        })),
-      );
+      const outcome = await api.updateMetadata(requests);
 
       if (outcome.updated.length) {
         const byId = new Map(outcome.updated.map((result) => [result.assetId, result]));
@@ -744,12 +747,16 @@ export const useLibraryStore = defineStore('library', () => {
             result.modifiedMs,
           );
         });
-        addToast(
-          `Updated metadata for ${outcome.updated.length} ${
-            outcome.updated.length === 1 ? 'photo' : 'photos'
-          }.`,
-          'success',
-        );
+        if (silent) {
+          metadataSavedAt.value = Date.now();
+        } else {
+          addToast(
+            `Updated metadata for ${outcome.updated.length} ${
+              outcome.updated.length === 1 ? 'photo' : 'photos'
+            }.`,
+            'success',
+          );
+        }
       }
 
       if (outcome.failed.length) {
@@ -779,6 +786,37 @@ export const useLibraryStore = defineStore('library', () => {
     } finally {
       metadataBusy.value = false;
     }
+  }
+
+  /**
+   * Metadata writes are serialized so a blur and a quick follow-up edit never
+   * race each other's revisions. Updates apply when their turn starts.
+   */
+  function applyMetadataPatch(
+    update: MetadataUpdate,
+    targets?: readonly PhotoAsset[],
+    options: { silent?: boolean } = {},
+  ): Promise<void> {
+    const targetIds = (targets ?? selectedAssets.value).map((asset) => asset.id);
+    if (!targetIds.length) {
+      if (!options.silent) addToast('Select a photo to edit metadata.', 'info');
+      return Promise.resolve();
+    }
+
+    // Apply immediately for responsive controls. The queued task re-applies it
+    // and only then records its rollback snapshot.
+    const wanted = new Set(targetIds);
+    assets.value = assets.value.map((asset) =>
+      wanted.has(asset.id)
+        ? { ...asset, metadata: applyMetadataUpdate(asset.metadata, update) }
+        : asset,
+    );
+
+    const task = metadataQueue.then(() =>
+      runMetadataPatch(update, targetIds, options.silent === true),
+    );
+    metadataQueue = task.catch(() => undefined);
+    return task;
   }
 
   function setRating(rating: number): void {
@@ -1873,6 +1911,7 @@ export const useLibraryStore = defineStore('library', () => {
     // metadata
     metadataBusy,
     metadataError,
+    metadataSavedAt,
     applyMetadataPatch,
     setRating,
     setColorLabel,

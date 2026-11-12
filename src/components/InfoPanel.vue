@@ -12,6 +12,9 @@ import {
 import { computed, ref, watch } from 'vue';
 
 import InfoSection from '@/components/InfoSection.vue';
+import IptcEditor from '@/components/IptcEditor.vue';
+import KeywordsEditor from '@/components/KeywordsEditor.vue';
+import LocationEditor from '@/components/LocationEditor.vue';
 import MetadataEditor from '@/components/MetadataEditor.vue';
 import PhotoHistogram from '@/components/PhotoHistogram.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
@@ -227,7 +230,10 @@ const hasCameraInfo = computed(() => {
         info.shutterSpeed != null ||
         info.aperture != null ||
         info.iso != null ||
-        info.focalLength != null),
+        info.focalLength != null ||
+        info.latitude != null ||
+        info.longitude != null ||
+        info.altitude != null),
   );
 });
 
@@ -443,6 +449,14 @@ async function revealAssociation(path: string | null): Promise<void> {
         </div>
 
         <MetadataEditor class="mb-2" />
+        <KeywordsEditor class="mb-2" />
+        <IptcEditor class="mb-2" />
+        <LocationEditor
+          class="mb-2"
+          :camera-latitude="cameraInfo?.latitude ?? null"
+          :camera-longitude="cameraInfo?.longitude ?? null"
+          :camera-altitude="cameraInfo?.altitude ?? null"
+        />
 
         <InfoSection title="Camera and lens" class="info-section-left">
           <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">

@@ -4,6 +4,7 @@ import {
   applyMetadataUpdate,
   commonMetadataValue,
   cullPatch,
+  emptyIptc,
   favoritePatch,
   formatRating,
   hasVisibleMetadata,
@@ -20,6 +21,7 @@ function metadata(patch: Partial<PhotoMetadata> = {}): PhotoMetadata {
     favorite: false,
     keywords: [],
     hierarchicalKeywords: [],
+    iptc: emptyIptc(),
     source: 'sidecar',
     revision: 'revision',
     issues: [],
@@ -122,5 +124,40 @@ describe('metadata patches', () => {
     expect(hasVisibleMetadata(metadata())).toBe(false);
     expect(hasVisibleMetadata(metadata({ favorite: true }))).toBe(true);
     expect(hasVisibleMetadata(metadata({ keywords: ['one'] }))).toBe(true);
+    expect(
+      hasVisibleMetadata(metadata({ iptc: { ...emptyIptc(), city: 'Palawan' } })),
+    ).toBe(true);
+    expect(
+      hasVisibleMetadata(metadata({ iptc: { ...emptyIptc(), latitude: 9.7 } })),
+    ).toBe(true);
+  });
+
+  it('merges IPTC text and coordinates without dropping unrelated fields', () => {
+    const current = metadata({
+      iptc: {
+        ...emptyIptc(),
+        city: 'Palawan',
+        latitude: 9.7,
+        longitude: 118.7,
+      },
+    });
+    const next = applyMetadataUpdate(current, {
+      iptc: {
+        description: 'New description',
+        countryCode: 'ph',
+        clearLatitude: true,
+        altitude: -12,
+      },
+    });
+    expect(next.iptc).toMatchObject({
+      city: 'Palawan',
+      description: 'New description',
+      countryCode: 'PH',
+      latitude: null,
+      longitude: 118.7,
+      altitude: -12,
+    });
+    expect(next.revision).toBe(current.revision);
+    expect(current.iptc.latitude).toBe(9.7);
   });
 });

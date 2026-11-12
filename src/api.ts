@@ -61,6 +61,8 @@ export const api = {
   cameraInfo: (asset: PhotoAsset) => invoke<CameraInfo>('get_camera_info', { asset }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),
   openAsset: (path: string) => invoke<void>('open_asset', { path }),
+  openMaps: (latitude: number, longitude: number) =>
+    invoke<void>('open_maps', { latitude, longitude }),
   editAssets: (paths: string[], application: string) =>
     invoke<void>('edit_assets', { paths, application }),
   revealAsset: (path: string) => invoke<void>('reveal_asset', { path }),

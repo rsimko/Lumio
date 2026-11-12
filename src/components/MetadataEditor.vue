@@ -34,8 +34,6 @@ const favorite = computed(() =>
 );
 
 const issues = computed(() => single.value?.metadata.issues ?? []);
-const keywords = computed(() => single.value?.metadata.keywords ?? []);
-const hierarchicalKeywords = computed(() => single.value?.metadata.hierarchicalKeywords ?? []);
 const source = computed(() =>
   single.value ? metadataSourceLabel(single.value.metadata.source) : 'Multiple photos',
 );
@@ -299,33 +297,6 @@ function toggleFavorite(): void {
 
     <div v-if="store.metadataError" class="mt-2 text-2xs leading-relaxed text-danger">
       {{ store.metadataError }}
-    </div>
-
-    <div
-      v-if="single && (keywords.length || hierarchicalKeywords.length)"
-      class="mt-2.5 border-t border-line/60 pt-2"
-    >
-      <div class="mb-1 flex items-center justify-between">
-        <span class="text-2xs text-subtle">Keywords</span>
-        <span class="text-3xs uppercase tracking-wide text-subtle/70">Read-only</span>
-      </div>
-      <div class="flex flex-wrap gap-1">
-        <span
-          v-for="keyword in keywords"
-          :key="`flat-${keyword}`"
-          class="rounded bg-panel-2 px-1.5 py-0.5 text-2xs text-muted"
-        >
-          {{ keyword }}
-        </span>
-        <span
-          v-for="keyword in hierarchicalKeywords"
-          :key="`hier-${keyword}`"
-          class="rounded bg-accent-soft px-1.5 py-0.5 text-2xs text-accent"
-          :title="`Hierarchical keyword: ${keyword}`"
-        >
-          {{ keyword.replaceAll('|', ' › ') }}
-        </span>
-      </div>
     </div>
   </InfoSection>
 </template>

@@ -741,6 +741,27 @@ pub async fn reveal_asset(state: State<'_, AppState>, path: String) -> Result<()
 }
 
 #[tauri::command]
+pub async fn open_maps(latitude: f64, longitude: f64) -> Result<(), CommandError> {
+    if !latitude.is_finite()
+        || !longitude.is_finite()
+        || !(-90.0..=90.0).contains(&latitude)
+        || !(-180.0..=180.0).contains(&longitude)
+    {
+        return Err(CommandError::new(
+            "invalidCoordinates",
+            "Latitude and longitude must be valid coordinates.",
+        ));
+    }
+    let url = format!(
+        "https://maps.apple.com/?ll={latitude:.6},{longitude:.6}&q={latitude:.6},{longitude:.6}"
+    );
+    tauri::async_runtime::spawn_blocking(move || tauri_plugin_opener::open_url(url, None::<&str>))
+        .await
+        .map_err(|error| CommandError::new("internal", format!("Map task failed: {error}")))?
+        .map_err(|error| CommandError::new("openFailed", error.to_string()))
+}
+
+#[tauri::command]
 pub fn update_ingest_settings(
     state: State<'_, AppState>,
     ingest: IngestSettings,

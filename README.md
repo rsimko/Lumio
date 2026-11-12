@@ -5,12 +5,13 @@ This is a persolan project and I am building it for my personal needs and it is 
 
 Lumio is a local-first browser for RAW photography. Point it at folders that already
 contain photos and it shows them in place — nothing is imported, moved or renamed. Photos are
-only written when you explicitly rate, label, flag or favorite them, and even then only the XMP
-properties Lumio owns are changed. It is built with Rust, Tauri 2, Vue 3 and TypeScript.
+only written when you explicitly edit metadata, and even then only the XMP properties Lumio
+owns are changed. It is built with Rust, Tauri 2, Vue 3 and TypeScript.
 
 This is **Milestone 1**: fast, correct folder-based browsing with honest preview-source
-labelling, a copy-only camera-card ingest, and in-place ratings, labels, culling and favorites.
-Cataloguing, search and the keyword editor come later.
+labelling, a copy-only camera-card ingest, and in-place ratings, labels, culling, favorites,
+IPTC and location metadata.
+Cataloguing, search and hierarchical keyword editing come later.
 
 ![Lumio showing a folder of RAW photos in the grid layout](docs/screenshot.jpg)
 
@@ -65,13 +66,20 @@ Cataloguing, search and the keyword editor come later.
   and toggle favorites from the info panel, with `1`–`5`, `Option`+`6`–`0`, `P`, `X`, `U` and
   `Shift+F` working in both browse and fullscreen. Multi-selection shows mixed values and applies
   changes as one batch; tiles, list rows and the viewer show compact indicators.
+- Edit IPTC title, headline, description, creator, credit, copyright and source from a dedicated
+  info-panel section. Edits save automatically on blur or Enter, queue in order, and apply to
+  every selected photo. Existing `dc:title`, `dc:description` and `dc:rights` language variants
+  are preserved when the `x-default` value changes.
+- Edit city, state/province, country, country code and sublocation, plus latitude, longitude and
+  altitude. Coordinates accept decimal degrees or simple DMS, are validated before writing, and
+  can be cleared independently. A compact offline map placeholder shows the location pin and
+  offers **Open in Maps**; camera EXIF GPS is detected and can be imported with one click.
 - Edits update the existing XMP rather than regenerating it. RAW, TIFF, PNG and WebP use a
   sidecar; a standalone JPEG embeds XMP; a JPEG with a sidecar writes only that sidecar. Writes
   are staged, read back field-by-field, and checked so unrelated XMP (Darktable history, masks,
   private namespaces and unknown tags) survives. A revision fingerprint rejects stale edits.
-- Flat and hierarchical keywords are read from `dc:subject` and `lr:hierarchicalSubject` and
-  shown read-only in the info panel. The write path and tests already support both collections;
-  only the keyword editor UI is deferred.
+- Flat keywords are read from `dc:subject` and edited as chips in the info panel one photo at a
+  time. Hierarchical keywords are read from `lr:hierarchicalSubject` and shown read-only.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
   RAW preview, or a placeholder when none can be extracted. Preview badges use the short
@@ -79,10 +87,10 @@ Cataloguing, search and the keyword editor come later.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
   the same cached preview; both tabs share one tile and the histogram opens by default. RAW
   photos have a RAW button that recomputes the histogram from decoded sensor samples.
-- Collapse info-panel sections such as Metadata, Camera and lens, File and Associations to keep
-  the panel compact. Camera make/model, lens, shutter, aperture, ISO and focal length are read
-  from embedded EXIF; RAW files also try the rawler decoder and their companion JPEG. Reading
-  this information does not require ExifTool.
+- Collapse info-panel sections such as Metadata, Keywords, IPTC, Location, Camera and lens, File
+  and Associations to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO,
+  focal length and GPS coordinates are read from embedded EXIF; RAW files also try the rawler
+  decoder and their companion JPEG. Reading this information does not require ExifTool.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size,
   corner roundness and keyboard shortcuts.
 - A tabbed Settings dialog keeps appearance, library, editor, ingest and storage preferences
@@ -130,6 +138,21 @@ above:
 | Favorite | `lumio:Favorite` | Boolean. |
 | Keywords | `dc:subject` | Flat keyword bag. |
 | Hierarchical keywords | `lr:hierarchicalSubject` | `Parent\|Child` paths. |
+| Title | `dc:title` | RDF language alternative; edits write `x-default`. |
+| Description | `dc:description` | RDF language alternative; edits write `x-default`. |
+| Creator | `dc:creator` | The first creator is shown; editing replaces the creator list. |
+| Copyright | `dc:rights` | RDF language alternative; edits write `x-default`. |
+| Headline | `photoshop:Headline` | Plain text. |
+| Credit | `photoshop:Credit` | Plain text. |
+| Source | `photoshop:Source` | Plain text. |
+| City | `photoshop:City` | Plain text. |
+| State / Province | `photoshop:State` | Plain text. |
+| Country | `photoshop:Country` | Plain text. |
+| Location | `Iptc4xmpCore:Location` | Sublocation or landmark. |
+| Country code | `Iptc4xmpCore:CountryCode` | Normalised to uppercase. |
+| Latitude | `exif:GPSLatitude` | Signed decimal degrees, -90 to 90. |
+| Longitude | `exif:GPSLongitude` | Signed decimal degrees, -180 to 180. |
+| Altitude | `exif:GPSAltitude` + `exif:GPSAltitudeRef` | Metres relative to sea level. |
 
 The private namespace is `https://lumio.app/ns/1.0/`. Lumio generates an ExifTool tag
 configuration at `exiftool-lumio.config` in the application cache on startup. Unknown labels
@@ -142,8 +165,8 @@ unreadable or malformed XMP does block the write.
 - Rust 1.85+ (edition 2024).
 - Node.js 20.19+ or 22.12+, and pnpm.
 - ExifTool is optional for browsing and ingest scanning (Lumio falls back to `rawler`,
-  `kamadak-exif` and its native XMP parser) but is required to write IPTC metadata during
-  ingest and to edit photo ratings, labels, culling or favorites. Set its path in
+  `kamadak-exif` and its native XMP parser) but is required to write IPTC and location metadata
+  and to edit photo ratings, labels, culling, favorites or keywords. Set its path in
   Settings → Ingest if it is not on `PATH`.
 
 Windows is not a target for Milestone 1.
@@ -223,11 +246,11 @@ webview against registered roots, and runs blocking work off the UI thread.
 
 In scope: folder roots, nested tree, scanning, association, five views, fullscreen,
 preview-source indication, copy-only ingest with templates and IPTC writing, in-place ratings,
-color labels, culling and favorites (including flat/hierarchical keyword read/write in the
-core), error handling, settings, tests and documentation.
+color labels, culling and favorites, editable IPTC/location/geolocation metadata, flat keyword
+editing, a location-map placeholder, error handling, settings, tests and documentation.
 
-Explicitly deferred: SQLite catalogue, search and filtering, keyword editing UI, cloud sync,
-HEIC/AVIF, map and albums.
+Explicitly deferred: SQLite catalogue, search and filtering, hierarchical keyword editing,
+cloud sync, HEIC/AVIF, a full interactive map and albums.
 
 ## Configuration and data locations
 

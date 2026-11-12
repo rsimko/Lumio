@@ -21,6 +21,12 @@ pub struct CameraInfo {
     pub aperture: Option<f64>,
     pub iso: Option<u32>,
     pub focal_length: Option<f64>,
+    /// GPS latitude in signed decimal degrees, when the camera recorded it.
+    pub latitude: Option<f64>,
+    /// GPS longitude in signed decimal degrees.
+    pub longitude: Option<f64>,
+    /// GPS altitude in metres, relative to sea level.
+    pub altitude: Option<f64>,
 }
 
 impl CameraInfo {
@@ -32,6 +38,9 @@ impl CameraInfo {
             && self.aperture.is_none()
             && self.iso.is_none()
             && self.focal_length.is_none()
+            && self.latitude.is_none()
+            && self.longitude.is_none()
+            && self.altitude.is_none()
     }
 
     fn is_complete(&self) -> bool {
@@ -66,6 +75,15 @@ impl CameraInfo {
         if self.focal_length.is_none() {
             self.focal_length = other.focal_length;
         }
+        if self.latitude.is_none() {
+            self.latitude = other.latitude;
+        }
+        if self.longitude.is_none() {
+            self.longitude = other.longitude;
+        }
+        if self.altitude.is_none() {
+            self.altitude = other.altitude;
+        }
     }
 }
 
@@ -74,7 +92,7 @@ impl CameraInfo {
 /// camera and lens data; everything falls back to the native EXIF reader.
 pub fn read_camera_info(primary: &Path, companion: Option<&Path>) -> CameraInfo {
     let mut info = read_native(primary).unwrap_or_default();
-    if !info.is_complete() {
+    if !info.is_complete() || info.latitude.is_none() || info.longitude.is_none() {
         if let Some(companion) = companion.and_then(read_native) {
             info.fill_missing(companion);
         }
@@ -114,6 +132,27 @@ fn read_raw(path: &Path) -> Option<CameraInfo> {
         .as_ref()
         .and_then(|lens| clean(lens.lens_name.clone()))
         .or_else(|| clean(exif.lens_model.clone().unwrap_or_default()));
+    let gps = exif.gps.as_ref();
+    let latitude = gps
+        .and_then(|gps| raw_coordinate(gps.gps_latitude.as_ref(), gps.gps_latitude_ref.as_deref()))
+        .filter(|value| (-90.0..=90.0).contains(value));
+    let longitude = gps
+        .and_then(|gps| {
+            raw_coordinate(gps.gps_longitude.as_ref(), gps.gps_longitude_ref.as_deref())
+        })
+        .filter(|value| (-180.0..=180.0).contains(value));
+    let altitude = gps.and_then(|gps| {
+        gps.gps_altitude
+            .map(|value| {
+                let metres = f64::from(value.as_f32());
+                if gps.gps_altitude_ref == Some(1) {
+                    -metres
+                } else {
+                    metres
+                }
+            })
+            .filter(|value| value.is_finite())
+    });
     let info = CameraInfo {
         make: clean(make),
         model: clean(model),
@@ -144,6 +183,9 @@ fn read_raw(path: &Path) -> Option<CameraInfo> {
             .focal_length
             .map(|value| f64::from(value.as_f32()))
             .and_then(positive),
+        latitude,
+        longitude,
+        altitude,
     };
     (!info.is_empty()).then_some(info)
 }
@@ -170,8 +212,71 @@ fn read_exif(path: &Path) -> Option<CameraInfo> {
             .or_else(|| uint_field(&exif, Tag::ISOSpeed))
             .filter(|iso| *iso > 0),
         focal_length: positive_field(&exif, Tag::FocalLength),
+        latitude: gps_coordinate(&exif, Tag::GPSLatitude, Tag::GPSLatitudeRef),
+        longitude: gps_coordinate(&exif, Tag::GPSLongitude, Tag::GPSLongitudeRef),
+        altitude: gps_altitude(&exif),
     };
     (!info.is_empty()).then_some(info)
+}
+
+fn raw_coordinate(
+    values: Option<&[rawler::formats::tiff::Rational; 3]>,
+    reference: Option<&str>,
+) -> Option<f64> {
+    let values = values?;
+    let mut value = f64::from(values[0].as_f32())
+        + f64::from(values[1].as_f32()) / 60.0
+        + f64::from(values[2].as_f32()) / 3600.0;
+    if !value.is_finite() {
+        return None;
+    }
+    let negative = reference.is_some_and(|reference| {
+        matches!(reference.trim().to_ascii_uppercase().as_str(), "S" | "W")
+    });
+    if negative {
+        value = -value;
+    }
+    Some(value)
+}
+
+fn gps_coordinate(exif: &exif::Exif, tag: Tag, reference_tag: Tag) -> Option<f64> {
+    let field = exif.get_field(tag, In::PRIMARY)?;
+    let Value::Rational(values) = &field.value else {
+        return None;
+    };
+    let mut value = values.first()?.to_f64()
+        + values.get(1).map_or(0.0, |value| value.to_f64() / 60.0)
+        + values.get(2).map_or(0.0, |value| value.to_f64() / 3600.0);
+    if !value.is_finite() {
+        return None;
+    }
+    if let Some(reference) = ascii_field(exif, reference_tag) {
+        if matches!(reference.trim().to_ascii_uppercase().as_str(), "S" | "W") {
+            value = -value;
+        }
+    }
+    Some(value)
+}
+
+fn gps_altitude(exif: &exif::Exif) -> Option<f64> {
+    let metres = number_field(exif, Tag::GPSAltitude)?;
+    let below_sea_level = exif
+        .get_field(Tag::GPSAltitudeRef, In::PRIMARY)
+        .and_then(|field| field.value.get_uint(0))
+        == Some(1);
+    Some(if below_sea_level { -metres } else { metres })
+}
+
+fn ascii_field(exif: &exif::Exif, tag: Tag) -> Option<String> {
+    let field = exif.get_field(tag, In::PRIMARY)?;
+    match &field.value {
+        Value::Ascii(parts) => parts
+            .iter()
+            .filter_map(|part| String::from_utf8(part.clone()).ok())
+            .map(|part| part.trim_matches('\0').trim().to_string())
+            .find(|part| !part.is_empty()),
+        _ => Some(field.value.display_as(tag).to_string()),
+    }
 }
 
 fn text_field(exif: &exif::Exif, tag: Tag) -> Option<String> {

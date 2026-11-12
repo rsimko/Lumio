@@ -120,6 +120,24 @@ export interface MetadataIssue {
   message: string;
 }
 
+export interface IptcMetadata {
+  title: string;
+  description: string;
+  creator: string;
+  copyright: string;
+  headline: string;
+  credit: string;
+  source: string;
+  city: string;
+  state: string;
+  country: string;
+  location: string;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+  altitude: number | null;
+}
+
 export interface PhotoMetadata {
   rating: number;
   label: ColorLabel | null;
@@ -127,9 +145,31 @@ export interface PhotoMetadata {
   favorite: boolean;
   keywords: string[];
   hierarchicalKeywords: string[];
+  iptc: IptcMetadata;
   source: MetadataSource;
   revision: string;
   issues: MetadataIssue[];
+}
+
+export interface IptcUpdate {
+  title?: string;
+  description?: string;
+  creator?: string;
+  copyright?: string;
+  headline?: string;
+  credit?: string;
+  source?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  location?: string;
+  countryCode?: string;
+  latitude?: number;
+  clearLatitude?: boolean;
+  longitude?: number;
+  clearLongitude?: boolean;
+  altitude?: number;
+  clearAltitude?: boolean;
 }
 
 export interface MetadataUpdate {
@@ -141,6 +181,7 @@ export interface MetadataUpdate {
   favorite?: boolean;
   keywords?: string[];
   hierarchicalKeywords?: string[];
+  iptc?: IptcUpdate;
 }
 
 export interface MetadataUpdateRequest {
@@ -219,6 +260,12 @@ export interface CameraInfo {
   iso: number | null;
   /** Focal length in millimetres. */
   focalLength: number | null;
+  /** GPS latitude in signed decimal degrees. */
+  latitude: number | null;
+  /** GPS longitude in signed decimal degrees. */
+  longitude: number | null;
+  /** GPS altitude in metres above sea level. */
+  altitude: number | null;
 }
 
 export interface HistogramData {

@@ -1,6 +1,7 @@
 import type {
   ColorLabel,
   CullFlag,
+  IptcMetadata,
   MetadataSource,
   MetadataUpdate,
   PhotoAsset,
@@ -42,6 +43,26 @@ export const COLOR_LABEL_RINGS: Record<ColorLabel, string> = {
 
 export const METADATA_STARS = [1, 2, 3, 4, 5] as const;
 
+export function emptyIptc(): IptcMetadata {
+  return {
+    title: '',
+    description: '',
+    creator: '',
+    copyright: '',
+    headline: '',
+    credit: '',
+    source: '',
+    city: '',
+    state: '',
+    country: '',
+    location: '',
+    countryCode: '',
+    latitude: null,
+    longitude: null,
+    altitude: null,
+  };
+}
+
 export function emptyMetadata(): PhotoMetadata {
   return {
     rating: 0,
@@ -50,6 +71,7 @@ export function emptyMetadata(): PhotoMetadata {
     favorite: false,
     keywords: [],
     hierarchicalKeywords: [],
+    iptc: emptyIptc(),
     source: 'none',
     revision: '',
     issues: [],
@@ -92,6 +114,31 @@ export function applyMetadataUpdate(
   metadata: PhotoMetadata,
   update: MetadataUpdate,
 ): PhotoMetadata {
+  const currentIptc = metadata.iptc ?? emptyIptc();
+  const patch = update.iptc;
+  const iptc = patch
+    ? {
+        ...currentIptc,
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.description !== undefined ? { description: patch.description } : {}),
+        ...(patch.creator !== undefined ? { creator: patch.creator } : {}),
+        ...(patch.copyright !== undefined ? { copyright: patch.copyright } : {}),
+        ...(patch.headline !== undefined ? { headline: patch.headline } : {}),
+        ...(patch.credit !== undefined ? { credit: patch.credit } : {}),
+        ...(patch.source !== undefined ? { source: patch.source } : {}),
+        ...(patch.city !== undefined ? { city: patch.city } : {}),
+        ...(patch.state !== undefined ? { state: patch.state } : {}),
+        ...(patch.country !== undefined ? { country: patch.country } : {}),
+        ...(patch.location !== undefined ? { location: patch.location } : {}),
+        ...(patch.countryCode !== undefined
+          ? { countryCode: patch.countryCode.toUpperCase() }
+          : {}),
+        latitude: patch.clearLatitude ? null : (patch.latitude ?? currentIptc.latitude),
+        longitude: patch.clearLongitude ? null : (patch.longitude ?? currentIptc.longitude),
+        altitude: patch.clearAltitude ? null : (patch.altitude ?? currentIptc.altitude),
+      }
+    : currentIptc;
+
   return {
     ...metadata,
     rating: update.rating ?? metadata.rating,
@@ -100,6 +147,7 @@ export function applyMetadataUpdate(
     favorite: update.favorite ?? metadata.favorite,
     keywords: update.keywords ?? metadata.keywords,
     hierarchicalKeywords: update.hierarchicalKeywords ?? metadata.hierarchicalKeywords,
+    iptc,
   };
 }
 
@@ -137,6 +185,29 @@ export function formatRating(rating: number): string {
   return `${'★'.repeat(filled)}${'☆'.repeat(5 - filled)}`;
 }
 
+export function hasIptcMetadata(iptc: IptcMetadata | undefined): boolean {
+  if (!iptc) return false;
+  return (
+    Boolean(
+      iptc.title ||
+        iptc.description ||
+        iptc.creator ||
+        iptc.copyright ||
+        iptc.headline ||
+        iptc.credit ||
+        iptc.source ||
+        iptc.city ||
+        iptc.state ||
+        iptc.country ||
+        iptc.location ||
+        iptc.countryCode,
+    ) ||
+    iptc.latitude !== null ||
+    iptc.longitude !== null ||
+    iptc.altitude !== null
+  );
+}
+
 export function hasVisibleMetadata(metadata: PhotoMetadata | undefined): boolean {
   if (!metadata) return false;
   return (
@@ -145,7 +216,8 @@ export function hasVisibleMetadata(metadata: PhotoMetadata | undefined): boolean
     metadata.cull !== null ||
     metadata.favorite ||
     metadata.keywords.length > 0 ||
-    metadata.hierarchicalKeywords.length > 0
+    metadata.hierarchicalKeywords.length > 0 ||
+    hasIptcMetadata(metadata.iptc)
   );
 }
 

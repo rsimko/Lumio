@@ -46,6 +46,7 @@ pub fn run() {
             commands::edit_assets,
             commands::open_asset,
             commands::reveal_asset,
+            commands::open_maps,
             commands::update_ingest_settings,
             commands::detect_ingest_tools,
             commands::create_ingest_plan,

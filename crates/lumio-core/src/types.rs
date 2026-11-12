@@ -171,7 +171,7 @@ pub enum PreviewSource {
     Placeholder,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoAsset {
     pub id: String,
@@ -195,7 +195,7 @@ pub struct PhotoAsset {
     pub metadata: PhotoMetadata,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     pub folder: PathBuf,

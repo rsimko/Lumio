@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use lumio_core::camera::read_camera_info;
 
@@ -31,4 +32,34 @@ fn companion_jpeg_fills_missing_camera_fields() {
 #[test]
 fn missing_files_return_empty_information() {
     assert!(read_camera_info(Path::new("/nonexistent/photo.cr3"), None).is_empty());
+}
+
+#[test]
+fn reads_gps_coordinates_and_altitude_from_camera_exif() {
+    let Some(exiftool) =
+        lumio_core::ingest::metadata::discover_exiftool(None).map(|info| info.path)
+    else {
+        return;
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("gps.jpg");
+    std::fs::copy(fixture(), &path).unwrap();
+    let status = Command::new(exiftool)
+        .args([
+            "-overwrite_original",
+            "-GPSLatitude=48.8567",
+            "-GPSLatitudeRef=N",
+            "-GPSLongitude=2.3508",
+            "-GPSLongitudeRef=W",
+            "-GPSAltitude=35.5",
+        ])
+        .arg(&path)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let info = read_camera_info(&path, None);
+    assert!((info.latitude.unwrap() - 48.8567).abs() < 1e-4);
+    assert!((info.longitude.unwrap() + 2.3508).abs() < 1e-4);
+    assert!((info.altitude.unwrap() - 35.5).abs() < 0.01);
 }

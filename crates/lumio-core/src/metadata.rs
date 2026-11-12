@@ -32,7 +32,24 @@ const KEY_SUBJECT: &str = "{http://purl.org/dc/elements/1.1/}subject";
 const KEY_HIERARCHICAL: &str = "{http://ns.adobe.com/lightroom/1.0/}hierarchicalSubject";
 const KEY_CULL: &str = "{https://lumio.app/ns/1.0/}Cull";
 const KEY_FAVORITE: &str = "{https://lumio.app/ns/1.0/}Favorite";
+const KEY_TITLE: &str = "{http://purl.org/dc/elements/1.1/}title";
+const KEY_DESCRIPTION: &str = "{http://purl.org/dc/elements/1.1/}description";
+const KEY_CREATOR: &str = "{http://purl.org/dc/elements/1.1/}creator";
+const KEY_RIGHTS: &str = "{http://purl.org/dc/elements/1.1/}rights";
+const KEY_CITY: &str = "{http://ns.adobe.com/photoshop/1.0/}City";
+const KEY_STATE: &str = "{http://ns.adobe.com/photoshop/1.0/}State";
+const KEY_COUNTRY: &str = "{http://ns.adobe.com/photoshop/1.0/}Country";
+const KEY_HEADLINE: &str = "{http://ns.adobe.com/photoshop/1.0/}Headline";
+const KEY_CREDIT: &str = "{http://ns.adobe.com/photoshop/1.0/}Credit";
+const KEY_SOURCE: &str = "{http://ns.adobe.com/photoshop/1.0/}Source";
+const KEY_LOCATION: &str = "{http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/}Location";
+const KEY_COUNTRY_CODE: &str = "{http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/}CountryCode";
+const KEY_GPS_LATITUDE: &str = "{http://ns.adobe.com/exif/1.0/}GPSLatitude";
+const KEY_GPS_LONGITUDE: &str = "{http://ns.adobe.com/exif/1.0/}GPSLongitude";
+const KEY_GPS_ALTITUDE: &str = "{http://ns.adobe.com/exif/1.0/}GPSAltitude";
+const KEY_GPS_ALTITUDE_REF: &str = "{http://ns.adobe.com/exif/1.0/}GPSAltitudeRef";
 
+#[allow(dead_code)]
 const WRITABLE_KEYS: &[&str] = &[
     KEY_RATING,
     KEY_LABEL,
@@ -40,6 +57,22 @@ const WRITABLE_KEYS: &[&str] = &[
     KEY_HIERARCHICAL,
     KEY_CULL,
     KEY_FAVORITE,
+    KEY_TITLE,
+    KEY_DESCRIPTION,
+    KEY_CREATOR,
+    KEY_RIGHTS,
+    KEY_CITY,
+    KEY_STATE,
+    KEY_COUNTRY,
+    KEY_HEADLINE,
+    KEY_CREDIT,
+    KEY_SOURCE,
+    KEY_LOCATION,
+    KEY_COUNTRY_CODE,
+    KEY_GPS_LATITUDE,
+    KEY_GPS_LONGITUDE,
+    KEY_GPS_ALTITUDE,
+    KEY_GPS_ALTITUDE_REF,
 ];
 
 /// Empty packet used when a photo has no sidecar yet and metadata is the first
@@ -51,6 +84,9 @@ const EMPTY_XMP_PACKET: &str = "\u{feff}<?xpacket begin=\"\u{feff}\" id=\"W5M0Mp
     xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"\n\
     xmlns:dc=\"http://purl.org/dc/elements/1.1/\"\n\
     xmlns:lr=\"http://ns.adobe.com/lightroom/1.0/\"\n\
+    xmlns:photoshop=\"http://ns.adobe.com/photoshop/1.0/\"\n\
+    xmlns:exif=\"http://ns.adobe.com/exif/1.0/\"\n\
+    xmlns:Iptc4xmpCore=\"http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/\"\n\
     xmlns:lumio=\"https://lumio.app/ns/1.0/\">\n\
   </rdf:Description>\n\
  </rdf:RDF>\n\
@@ -156,7 +192,27 @@ impl MetadataIssue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct IptcMetadata {
+    pub title: String,
+    pub description: String,
+    pub creator: String,
+    pub copyright: String,
+    pub headline: String,
+    pub credit: String,
+    pub source: String,
+    pub city: String,
+    pub state: String,
+    pub country: String,
+    pub location: String,
+    pub country_code: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub altitude: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoMetadata {
     /// 0-5 stars. XMP `-1` (rejected) is read as zero stars plus a reject flag.
@@ -166,6 +222,7 @@ pub struct PhotoMetadata {
     pub favorite: bool,
     pub keywords: Vec<String>,
     pub hierarchical_keywords: Vec<String>,
+    pub iptc: IptcMetadata,
     pub source: MetadataSource,
     /// BLAKE3 fingerprint of the metadata packet this value was read from.
     /// Empty when the photo has no XMP yet.
@@ -181,6 +238,89 @@ impl PhotoMetadata {
             || self.favorite
             || !self.keywords.is_empty()
             || !self.hierarchical_keywords.is_empty()
+            || !self.iptc.title.is_empty()
+            || !self.iptc.description.is_empty()
+            || !self.iptc.creator.is_empty()
+            || !self.iptc.copyright.is_empty()
+            || !self.iptc.headline.is_empty()
+            || !self.iptc.credit.is_empty()
+            || !self.iptc.source.is_empty()
+            || !self.iptc.city.is_empty()
+            || !self.iptc.state.is_empty()
+            || !self.iptc.country.is_empty()
+            || !self.iptc.location.is_empty()
+            || !self.iptc.country_code.is_empty()
+            || self.iptc.latitude.is_some()
+            || self.iptc.longitude.is_some()
+            || self.iptc.altitude.is_some()
+    }
+}
+
+/// IPTC and geolocation fields edited as one logical group.
+/// Missing string fields are left alone; an empty string clears the property.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct IptcUpdate {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub creator: Option<String>,
+    pub copyright: Option<String>,
+    pub headline: Option<String>,
+    pub credit: Option<String>,
+    pub source: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub country: Option<String>,
+    pub location: Option<String>,
+    pub country_code: Option<String>,
+    pub latitude: Option<f64>,
+    #[serde(default)]
+    pub clear_latitude: bool,
+    pub longitude: Option<f64>,
+    #[serde(default)]
+    pub clear_longitude: bool,
+    pub altitude: Option<f64>,
+    #[serde(default)]
+    pub clear_altitude: bool,
+}
+
+impl IptcUpdate {
+    fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.description.is_none()
+            && self.creator.is_none()
+            && self.copyright.is_none()
+            && self.headline.is_none()
+            && self.credit.is_none()
+            && self.source.is_none()
+            && self.city.is_none()
+            && self.state.is_none()
+            && self.country.is_none()
+            && self.location.is_none()
+            && self.country_code.is_none()
+            && self.latitude.is_none()
+            && !self.clear_latitude
+            && self.longitude.is_none()
+            && !self.clear_longitude
+            && self.altitude.is_none()
+            && !self.clear_altitude
+    }
+
+    fn normalized(mut self) -> Self {
+        self.title = normalize_optional(self.title);
+        self.description = normalize_optional(self.description);
+        self.creator = normalize_optional(self.creator);
+        self.copyright = normalize_optional(self.copyright);
+        self.headline = normalize_optional(self.headline);
+        self.credit = normalize_optional(self.credit);
+        self.source = normalize_optional(self.source);
+        self.city = normalize_optional(self.city);
+        self.state = normalize_optional(self.state);
+        self.country = normalize_optional(self.country);
+        self.location = normalize_optional(self.location);
+        self.country_code =
+            normalize_optional(self.country_code).map(|value| value.to_ascii_uppercase());
+        self
     }
 }
 
@@ -199,6 +339,7 @@ pub struct MetadataUpdate {
     pub favorite: Option<bool>,
     pub keywords: Option<Vec<String>>,
     pub hierarchical_keywords: Option<Vec<String>>,
+    pub iptc: Option<IptcUpdate>,
 }
 
 impl MetadataUpdate {
@@ -211,16 +352,47 @@ impl MetadataUpdate {
             && self.favorite.is_none()
             && self.keywords.is_none()
             && self.hierarchical_keywords.is_none()
+            && self.iptc.as_ref().is_none_or(IptcUpdate::is_empty)
     }
 
     fn normalized(mut self) -> Self {
         self.rating = self.rating.map(|rating| rating.min(5));
         self.keywords = self.keywords.map(normalize_keywords);
         self.hierarchical_keywords = self.hierarchical_keywords.map(normalize_keywords);
+        self.iptc = self.iptc.map(IptcUpdate::normalized);
         self
     }
 
+    fn validate(&self) -> Result<()> {
+        let Some(iptc) = &self.iptc else {
+            return Ok(());
+        };
+        if let Some(latitude) = iptc.latitude {
+            if !latitude.is_finite() || !(-90.0..=90.0).contains(&latitude) {
+                return Err(LumioError::Metadata(
+                    "Latitude must be between -90 and 90 degrees.".into(),
+                ));
+            }
+        }
+        if let Some(longitude) = iptc.longitude {
+            if !longitude.is_finite() || !(-180.0..=180.0).contains(&longitude) {
+                return Err(LumioError::Metadata(
+                    "Longitude must be between -180 and 180 degrees.".into(),
+                ));
+            }
+        }
+        if let Some(altitude) = iptc.altitude {
+            if !altitude.is_finite() {
+                return Err(LumioError::Metadata(
+                    "Altitude must be a finite number.".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn touches(&self, key: &str) -> bool {
+        let iptc = self.iptc.as_ref();
         match key {
             KEY_RATING => self.rating.is_some(),
             KEY_LABEL => self.label.is_some() || self.clear_label,
@@ -228,9 +400,34 @@ impl MetadataUpdate {
             KEY_FAVORITE => self.favorite.is_some(),
             KEY_SUBJECT => self.keywords.is_some(),
             KEY_HIERARCHICAL => self.hierarchical_keywords.is_some(),
+            KEY_TITLE => iptc.is_some_and(|value| value.title.is_some()),
+            KEY_DESCRIPTION => iptc.is_some_and(|value| value.description.is_some()),
+            KEY_CREATOR => iptc.is_some_and(|value| value.creator.is_some()),
+            KEY_RIGHTS => iptc.is_some_and(|value| value.copyright.is_some()),
+            KEY_HEADLINE => iptc.is_some_and(|value| value.headline.is_some()),
+            KEY_CREDIT => iptc.is_some_and(|value| value.credit.is_some()),
+            KEY_SOURCE => iptc.is_some_and(|value| value.source.is_some()),
+            KEY_CITY => iptc.is_some_and(|value| value.city.is_some()),
+            KEY_STATE => iptc.is_some_and(|value| value.state.is_some()),
+            KEY_COUNTRY => iptc.is_some_and(|value| value.country.is_some()),
+            KEY_LOCATION => iptc.is_some_and(|value| value.location.is_some()),
+            KEY_COUNTRY_CODE => iptc.is_some_and(|value| value.country_code.is_some()),
+            KEY_GPS_LATITUDE => {
+                iptc.is_some_and(|value| value.latitude.is_some() || value.clear_latitude)
+            }
+            KEY_GPS_LONGITUDE => {
+                iptc.is_some_and(|value| value.longitude.is_some() || value.clear_longitude)
+            }
+            KEY_GPS_ALTITUDE | KEY_GPS_ALTITUDE_REF => {
+                iptc.is_some_and(|value| value.altitude.is_some() || value.clear_altitude)
+            }
             _ => false,
         }
     }
+}
+
+fn normalize_optional(value: Option<String>) -> Option<String> {
+    value.map(|value| value.trim().to_string())
 }
 
 fn normalize_keywords(values: Vec<String>) -> Vec<String> {
@@ -248,7 +445,7 @@ fn normalize_keywords(values: Vec<String>) -> Vec<String> {
     normalized
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataWriteResult {
     pub metadata: PhotoMetadata,
@@ -311,6 +508,7 @@ struct XmpProperty {
     canonical: String,
     text: Option<String>,
     items: Option<Vec<String>>,
+    localized: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -334,14 +532,19 @@ impl XmpDocument {
             .unwrap_or_default()
     }
 
-    /// Snapshot of every property Lumio does not write, keyed by expanded name
-    /// and canonicalised so XML formatting and Description layout can change.
-    fn preservation_snapshot(&self) -> BTreeMap<String, Vec<String>> {
+    /// Text value for a language alternative, preferring `x-default`.
+    fn localized(&self, key: &str) -> Option<&str> {
+        self.properties
+            .iter()
+            .find(|property| property.key == key)
+            .and_then(|property| property.localized.as_deref())
+    }
+
+    /// Snapshot of every property, keyed by expanded name and canonicalised so
+    /// XML formatting and Description layout can change.
+    fn snapshot(&self) -> BTreeMap<String, Vec<String>> {
         let mut snapshot: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for property in &self.properties {
-            if WRITABLE_KEYS.contains(&property.key.as_str()) {
-                continue;
-            }
             snapshot
                 .entry(property.key.clone())
                 .or_default()
@@ -350,6 +553,16 @@ impl XmpDocument {
         for values in snapshot.values_mut() {
             values.sort();
         }
+        snapshot
+    }
+
+    /// Snapshot of every property Lumio does not write, retained for tests and
+    /// diagnostics. Verification compares the full snapshot and ignores only
+    /// the properties touched by the current update.
+    #[allow(dead_code)]
+    fn preservation_snapshot(&self) -> BTreeMap<String, Vec<String>> {
+        let mut snapshot = self.snapshot();
+        snapshot.retain(|key, _| !WRITABLE_KEYS.contains(&key.as_str()));
         snapshot
     }
 }
@@ -559,6 +772,7 @@ fn add_description(description: &RawNode, document: &mut XmpDocument) {
             canonical: value.clone(),
             text: Some(value.clone()),
             items: None,
+            localized: Some(value.clone()),
         });
     }
     for child in &description.children {
@@ -576,6 +790,7 @@ fn add_property(node: &RawNode, document: &mut XmpDocument) {
         canonical: canonical_value(node),
         text: leaf_text(node),
         items: list_items(node),
+        localized: localized_text(node),
     });
 }
 
@@ -718,6 +933,33 @@ fn leaf_text(node: &RawNode) -> Option<String> {
         return None;
     }
     Some(normalize_text(&node.text))
+}
+
+/// Prefer the `x-default` item of an RDF Alt container. This keeps titles,
+/// descriptions and copyright notices usable without flattening translations.
+fn localized_text(node: &RawNode) -> Option<String> {
+    if node.children.len() == 1 {
+        let container = &node.children[0];
+        if container.is(RDF_NAMESPACE, "Alt") {
+            let mut first: Option<String> = None;
+            for child in &container.children {
+                if !child.is(RDF_NAMESPACE, "li") || !child.children.is_empty() {
+                    continue;
+                }
+                let value = normalize_text(&child.text);
+                if child.attr(&format!("{{{XML_NAMESPACE}}}lang")) == Some("x-default") {
+                    return Some(value);
+                }
+                if first.is_none() {
+                    first = Some(value);
+                }
+            }
+            if first.is_some() {
+                return first;
+            }
+        }
+    }
+    leaf_text(node)
 }
 
 /// If the property holds an RDF Bag/Seq/Alt of simple text values, return the
@@ -900,7 +1142,152 @@ fn metadata_from_document(document: &XmpDocument, mut metadata: PhotoMetadata) -
 
     metadata.keywords = document.list(KEY_SUBJECT);
     metadata.hierarchical_keywords = document.list(KEY_HIERARCHICAL);
+    metadata.iptc = read_iptc(document);
     metadata
+}
+
+fn read_iptc(document: &XmpDocument) -> IptcMetadata {
+    let altitude = document
+        .simple(KEY_GPS_ALTITUDE)
+        .and_then(|raw| parse_altitude(raw, document.simple(KEY_GPS_ALTITUDE_REF)));
+    IptcMetadata {
+        title: document
+            .localized(KEY_TITLE)
+            .unwrap_or_default()
+            .to_string(),
+        description: document
+            .localized(KEY_DESCRIPTION)
+            .unwrap_or_default()
+            .to_string(),
+        creator: document
+            .list(KEY_CREATOR)
+            .into_iter()
+            .next()
+            .or_else(|| document.simple(KEY_CREATOR).map(str::to_string))
+            .unwrap_or_default(),
+        copyright: document
+            .localized(KEY_RIGHTS)
+            .unwrap_or_default()
+            .to_string(),
+        headline: document
+            .simple(KEY_HEADLINE)
+            .unwrap_or_default()
+            .to_string(),
+        credit: document.simple(KEY_CREDIT).unwrap_or_default().to_string(),
+        source: document.simple(KEY_SOURCE).unwrap_or_default().to_string(),
+        city: document.simple(KEY_CITY).unwrap_or_default().to_string(),
+        state: document.simple(KEY_STATE).unwrap_or_default().to_string(),
+        country: document.simple(KEY_COUNTRY).unwrap_or_default().to_string(),
+        location: document
+            .simple(KEY_LOCATION)
+            .unwrap_or_default()
+            .to_string(),
+        country_code: document
+            .simple(KEY_COUNTRY_CODE)
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_uppercase(),
+        latitude: document
+            .simple(KEY_GPS_LATITUDE)
+            .and_then(parse_gps_coordinate)
+            .filter(|value| (-90.0..=90.0).contains(value)),
+        longitude: document
+            .simple(KEY_GPS_LONGITUDE)
+            .and_then(parse_gps_coordinate)
+            .filter(|value| (-180.0..=180.0).contains(value)),
+        altitude,
+    }
+}
+
+/// Parse the several coordinate spellings found in XMP: decimal degrees,
+/// ExifTool's `9,44.73N` form and human-readable DMS strings.
+fn parse_gps_coordinate(raw: &str) -> Option<f64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let hemisphere = trimmed
+        .chars()
+        .rev()
+        .find(|character| character.is_ascii_alphabetic())
+        .and_then(|character| {
+            matches!(character.to_ascii_uppercase(), 'N' | 'S' | 'E' | 'W')
+                .then(|| character.to_ascii_uppercase())
+        });
+
+    let cleaned: String = trimmed
+        .chars()
+        .map(|character| {
+            if character.is_ascii_digit() || matches!(character, '.' | '-' | '+' | ',') {
+                character
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    let parts: Vec<f64> = cleaned
+        .split(|character: char| character == ',' || character.is_whitespace())
+        .filter(|part| !part.is_empty())
+        .map(str::parse::<f64>)
+        .collect::<std::result::Result<_, _>>()
+        .ok()?;
+    if parts.is_empty() || parts.len() > 3 {
+        return None;
+    }
+
+    let mut value = parts[0].abs();
+    if parts.len() >= 2 {
+        if !(0.0..60.0).contains(&parts[1]) {
+            return None;
+        }
+        value += parts[1] / 60.0;
+    }
+    if parts.len() == 3 {
+        if !(0.0..60.0).contains(&parts[2]) {
+            return None;
+        }
+        value += parts[2] / 3600.0;
+    }
+    if !value.is_finite() {
+        return None;
+    }
+
+    match hemisphere {
+        Some('S' | 'W') => Some(-value),
+        Some('N' | 'E') => Some(value),
+        _ => {
+            if parts[0].is_sign_negative() {
+                Some(-value)
+            } else {
+                Some(value)
+            }
+        }
+    }
+}
+
+fn parse_altitude(raw: &str, reference: Option<&str>) -> Option<f64> {
+    let token = raw
+        .trim()
+        .split(|character: char| character.is_whitespace() || character == 'm')
+        .find(|part| !part.is_empty())?;
+    let value = if let Some((numerator, denominator)) = token.split_once('/') {
+        numerator.trim().parse::<f64>().ok()? / denominator.trim().parse::<f64>().ok()?
+    } else {
+        token.replace(',', ".").parse::<f64>().ok()?
+    };
+    if !value.is_finite() {
+        return None;
+    }
+    let below_sea_level = reference.is_some_and(|reference| {
+        let reference = reference.trim().to_ascii_lowercase();
+        reference == "1" || reference.contains("below")
+    });
+    if below_sea_level && value > 0.0 {
+        Some(-value)
+    } else {
+        Some(value)
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1143,6 +1530,24 @@ fn run_exiftool(
     Err(format!("ExifTool could not write metadata: {detail}"))
 }
 
+fn push_text_arg(args: &mut Vec<String>, tag: &str, value: &Option<String>) {
+    match value {
+        Some(value) if value.is_empty() => args.push(format!("-{tag}=")),
+        Some(value) => args.push(format!("-{tag}={value}")),
+        None => {}
+    }
+}
+
+fn push_localized_arg(args: &mut Vec<String>, tag: &str, value: &Option<String>) {
+    match value {
+        // Clearing removes the whole language alternative. Setting writes only
+        // x-default so translations added by other tools survive.
+        Some(value) if value.is_empty() => args.push(format!("-{tag}=")),
+        Some(value) => args.push(format!("-{tag}-x-default={value}")),
+        None => {}
+    }
+}
+
 fn exiftool_args(target: &WriteTarget, update: &MetadataUpdate) -> Vec<String> {
     let mut args: Vec<String> = Vec::new();
     if matches!(target, WriteTarget::Sidecar { .. }) {
@@ -1184,6 +1589,42 @@ fn exiftool_args(target: &WriteTarget, update: &MetadataUpdate) -> Vec<String> {
         args.push("-XMP-lr:HierarchicalSubject=".into());
         for keyword in keywords {
             args.push(format!("-XMP-lr:HierarchicalSubject={keyword}"));
+        }
+    }
+    if let Some(iptc) = &update.iptc {
+        push_localized_arg(&mut args, "XMP-dc:Title", &iptc.title);
+        push_localized_arg(&mut args, "XMP-dc:Description", &iptc.description);
+        push_text_arg(&mut args, "XMP-dc:Creator", &iptc.creator);
+        push_localized_arg(&mut args, "XMP-dc:Rights", &iptc.copyright);
+        push_text_arg(&mut args, "XMP-photoshop:Headline", &iptc.headline);
+        push_text_arg(&mut args, "XMP-photoshop:Credit", &iptc.credit);
+        push_text_arg(&mut args, "XMP-photoshop:Source", &iptc.source);
+        push_text_arg(&mut args, "XMP-photoshop:City", &iptc.city);
+        push_text_arg(&mut args, "XMP-photoshop:State", &iptc.state);
+        push_text_arg(&mut args, "XMP-photoshop:Country", &iptc.country);
+        push_text_arg(&mut args, "XMP-iptcCore:Location", &iptc.location);
+        push_text_arg(&mut args, "XMP-iptcCore:CountryCode", &iptc.country_code);
+
+        if iptc.clear_latitude {
+            args.push("-XMP-exif:GPSLatitude=".into());
+        } else if let Some(latitude) = iptc.latitude {
+            args.push(format!("-XMP-exif:GPSLatitude={latitude}"));
+        }
+        if iptc.clear_longitude {
+            args.push("-XMP-exif:GPSLongitude=".into());
+        } else if let Some(longitude) = iptc.longitude {
+            args.push(format!("-XMP-exif:GPSLongitude={longitude}"));
+        }
+        if iptc.clear_altitude {
+            args.push("-XMP-exif:GPSAltitude=".into());
+            args.push("-XMP-exif:GPSAltitudeRef=".into());
+        } else if let Some(altitude) = iptc.altitude {
+            args.push(format!("-XMP-exif:GPSAltitude={}", altitude.abs()));
+            args.push(if altitude < 0.0 {
+                "-XMP-exif:GPSAltitudeRef=Below Sea Level".into()
+            } else {
+                "-XMP-exif:GPSAltitudeRef=Above Sea Level".into()
+            });
         }
     }
     args
@@ -1292,6 +1733,91 @@ fn verify_target_fields(
             return Err("The hierarchical keywords were not written correctly.".into());
         }
     }
+    if let Some(iptc) = &update.iptc {
+        verify_iptc(iptc, &metadata.iptc)?;
+    }
+    Ok(())
+}
+
+fn verify_text_field(
+    expected: &Option<String>,
+    actual: &str,
+    label: &str,
+) -> std::result::Result<(), String> {
+    if let Some(expected) = expected {
+        if actual != expected {
+            return Err(format!(
+                "The {label} was not written correctly (expected “{expected}”, found “{actual}”)."
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_coordinate(
+    expected: Option<f64>,
+    clear: bool,
+    actual: Option<f64>,
+    label: &str,
+    tolerance: f64,
+) -> std::result::Result<(), String> {
+    if clear {
+        if actual.is_some() {
+            return Err(format!("The {label} could not be cleared."));
+        }
+        return Ok(());
+    }
+    if let Some(expected) = expected {
+        match actual {
+            Some(actual) if (actual - expected).abs() <= tolerance => {}
+            _ => {
+                return Err(format!(
+                    "The {label} was not written correctly (expected {expected}, found {actual:?})."
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_iptc(update: &IptcUpdate, actual: &IptcMetadata) -> std::result::Result<(), String> {
+    verify_text_field(&update.title, &actual.title, "IPTC title")?;
+    verify_text_field(&update.description, &actual.description, "IPTC description")?;
+    verify_text_field(&update.creator, &actual.creator, "IPTC creator")?;
+    verify_text_field(&update.copyright, &actual.copyright, "IPTC copyright")?;
+    verify_text_field(&update.headline, &actual.headline, "IPTC headline")?;
+    verify_text_field(&update.credit, &actual.credit, "IPTC credit")?;
+    verify_text_field(&update.source, &actual.source, "IPTC source")?;
+    verify_text_field(&update.city, &actual.city, "IPTC city")?;
+    verify_text_field(&update.state, &actual.state, "IPTC state")?;
+    verify_text_field(&update.country, &actual.country, "IPTC country")?;
+    verify_text_field(&update.location, &actual.location, "IPTC location")?;
+    verify_text_field(
+        &update.country_code,
+        &actual.country_code,
+        "IPTC country code",
+    )?;
+    verify_coordinate(
+        update.latitude,
+        update.clear_latitude,
+        actual.latitude,
+        "latitude",
+        1e-5,
+    )?;
+    verify_coordinate(
+        update.longitude,
+        update.clear_longitude,
+        actual.longitude,
+        "longitude",
+        1e-5,
+    )?;
+    verify_coordinate(
+        update.altitude,
+        update.clear_altitude,
+        actual.altitude,
+        "altitude",
+        0.05,
+    )?;
     Ok(())
 }
 
@@ -1300,11 +1826,14 @@ fn verify_preservation(
     after: &XmpDocument,
     update: &MetadataUpdate,
 ) -> std::result::Result<(), String> {
-    let before = before.preservation_snapshot();
-    let after = after.preservation_snapshot();
+    let before = before.snapshot();
+    let after = after.snapshot();
 
     let mut problems = Vec::new();
     for (key, values) in &before {
+        if update.touches(key) {
+            continue;
+        }
         match after.get(key) {
             Some(after_values) if after_values == values => {}
             Some(_) => problems.push(format!("{key} changed")),
@@ -1505,6 +2034,7 @@ pub fn write_photo_metadata(
     config: Option<&Path>,
 ) -> Result<MetadataWriteResult> {
     let update = update.clone().normalized();
+    update.validate()?;
     if update.is_empty() {
         return Err(LumioError::Metadata(
             "No metadata changes were requested.".into(),
@@ -1722,8 +2252,8 @@ mod tests {
             .unwrap();
         assert_eq!(history, "seq[exposure 0.5|tone curve]");
         assert!(snapshot.contains_key("{http://example.com/private/1.0/}Secret"));
-        assert!(snapshot.contains_key("{http://ns.adobe.com/photoshop/1.0/}City"));
         assert!(!snapshot.contains_key(KEY_RATING));
+        assert!(!snapshot.contains_key(KEY_CITY));
     }
 
     #[test]
@@ -1769,6 +2299,239 @@ mod tests {
         assert!(content.contains("brush mask two"));
         assert!(content.contains("keep this exactly"));
         assert!(content.contains("Palawan"));
+    }
+
+    #[test]
+    fn reads_iptc_location_and_gps_metadata() {
+        let bytes = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+    xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
+    xmlns:exif="http://ns.adobe.com/exif/1.0/">
+   <dc:title><rdf:Alt>
+    <rdf:li xml:lang="de">Deutscher Titel</rdf:li>
+    <rdf:li xml:lang="x-default">English title</rdf:li>
+   </rdf:Alt></dc:title>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">A description</rdf:li></rdf:Alt></dc:description>
+   <dc:creator><rdf:Seq><rdf:li>Ada Lovelace</rdf:li><rdf:li>Grace Hopper</rdf:li></rdf:Seq></dc:creator>
+   <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">© Lumio</rdf:li></rdf:Alt></dc:rights>
+   <photoshop:Headline>Headline text</photoshop:Headline>
+   <photoshop:Credit>Credit line</photoshop:Credit>
+   <photoshop:Source>News desk</photoshop:Source>
+   <photoshop:City>Palawan</photoshop:City>
+   <photoshop:State>Mimaropa</photoshop:State>
+   <photoshop:Country>Philippines</photoshop:Country>
+   <Iptc4xmpCore:Location>El Nido</Iptc4xmpCore:Location>
+   <Iptc4xmpCore:CountryCode>ph</Iptc4xmpCore:CountryCode>
+   <exif:GPSLatitude>9,44.73S</exif:GPSLatitude>
+   <exif:GPSLongitude>118,44.1E</exif:GPSLongitude>
+   <exif:GPSAltitude>247/2</exif:GPSAltitude>
+   <exif:GPSAltitudeRef>0</exif:GPSAltitudeRef>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>"#.as_bytes();
+        let metadata = metadata_from_bytes(bytes, MetadataSource::Sidecar, "rev".into());
+        let iptc = metadata.iptc;
+        assert_eq!(iptc.title, "English title");
+        assert_eq!(iptc.description, "A description");
+        assert_eq!(iptc.creator, "Ada Lovelace");
+        assert_eq!(iptc.copyright, "© Lumio");
+        assert_eq!(iptc.headline, "Headline text");
+        assert_eq!(iptc.credit, "Credit line");
+        assert_eq!(iptc.source, "News desk");
+        assert_eq!(iptc.city, "Palawan");
+        assert_eq!(iptc.state, "Mimaropa");
+        assert_eq!(iptc.country, "Philippines");
+        assert_eq!(iptc.location, "El Nido");
+        assert_eq!(iptc.country_code, "PH");
+        assert!((iptc.latitude.unwrap() + 9.745_5).abs() < 1e-4);
+        assert!((iptc.longitude.unwrap() - 118.735).abs() < 1e-4);
+        assert_eq!(iptc.altitude, Some(123.5));
+        assert!(metadata.issues.is_empty());
+    }
+
+    #[test]
+    fn parses_coordinate_spellings_and_altitude_references() {
+        assert!((parse_gps_coordinate("48,51.4N").unwrap() - 48.856_7).abs() < 1e-4);
+        assert!((parse_gps_coordinate("118,44.1W").unwrap() + 118.735).abs() < 1e-4);
+        assert!((parse_gps_coordinate("33 deg 52' 4\" S").unwrap() + 33.867_8).abs() < 1e-4);
+        assert!((parse_gps_coordinate("-33.8688").unwrap() + 33.868_8).abs() < 1e-6);
+        assert_eq!(parse_gps_coordinate("not a coordinate"), None);
+        assert_eq!(parse_altitude("247/2", Some("0")), Some(123.5));
+        assert_eq!(parse_altitude("25/2", Some("Below Sea Level")), Some(-12.5));
+    }
+
+    #[test]
+    fn writes_iptc_fields_preserves_translations_and_unrelated_properties() {
+        let Some(exiftool) = exiftool() else {
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let raw = temp.path().join("IMG_0002.RAF");
+        fs::write(&raw, b"raw").unwrap();
+        let sidecar = temp.path().join("IMG_0002.RAF.xmp");
+        fs::write(
+            &sidecar,
+            r#"<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:darktable="http://darktable.sf.net/">
+   <dc:title><rdf:Alt>
+    <rdf:li xml:lang="de">Alter Titel</rdf:li>
+    <rdf:li xml:lang="x-default">Old title</rdf:li>
+   </rdf:Alt></dc:title>
+   <darktable:history><rdf:Seq><rdf:li>exposure 0.5</rdf:li></rdf:Seq></darktable:history>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#,
+        )
+        .unwrap();
+        let config = config(temp.path());
+        let update = MetadataUpdate {
+            iptc: Some(IptcUpdate {
+                title: Some("New title".into()),
+                description: Some("New description".into()),
+                creator: Some("Ada Lovelace".into()),
+                copyright: Some("© Lumio".into()),
+                headline: Some("New headline".into()),
+                credit: Some("Credit line".into()),
+                source: Some("News desk".into()),
+                city: Some("Palawan".into()),
+                state: Some("Mimaropa".into()),
+                country: Some("Philippines".into()),
+                location: Some("El Nido".into()),
+                country_code: Some("ph".into()),
+                latitude: Some(9.745_5),
+                longitude: Some(-118.735),
+                altitude: Some(-12.5),
+                ..IptcUpdate::default()
+            }),
+            ..MetadataUpdate::default()
+        };
+        let result = write_photo_metadata(
+            &raw,
+            Some(&sidecar),
+            &update,
+            None,
+            &exiftool,
+            Some(&config),
+        )
+        .unwrap();
+
+        let iptc = result.metadata.iptc;
+        assert_eq!(iptc.title, "New title");
+        assert_eq!(iptc.description, "New description");
+        assert_eq!(iptc.creator, "Ada Lovelace");
+        assert_eq!(iptc.copyright, "© Lumio");
+        assert_eq!(iptc.headline, "New headline");
+        assert_eq!(iptc.credit, "Credit line");
+        assert_eq!(iptc.source, "News desk");
+        assert_eq!(iptc.city, "Palawan");
+        assert_eq!(iptc.state, "Mimaropa");
+        assert_eq!(iptc.country, "Philippines");
+        assert_eq!(iptc.location, "El Nido");
+        assert_eq!(iptc.country_code, "PH");
+        assert!((iptc.latitude.unwrap() - 9.745_5).abs() < 1e-4);
+        assert!((iptc.longitude.unwrap() + 118.735).abs() < 1e-4);
+        assert!((iptc.altitude.unwrap() + 12.5).abs() < 0.01);
+
+        let content = fs::read_to_string(&sidecar).unwrap();
+        assert!(content.contains("Alter Titel"));
+        assert!(content.contains("exposure 0.5"));
+        assert!(
+            !content.contains("Old title"),
+            "the x-default value should be replaced without dropping translations"
+        );
+    }
+
+    #[test]
+    fn clears_iptc_text_and_geolocation_fields() {
+        let Some(exiftool) = exiftool() else {
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let raw = temp.path().join("IMG_0003.RAF");
+        fs::write(&raw, b"raw").unwrap();
+        let sidecar = temp.path().join("IMG_0003.RAF.xmp");
+        fs::write(
+            &sidecar,
+            r#"<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+    xmlns:exif="http://ns.adobe.com/exif/1.0/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">Old title</rdf:li></rdf:Alt></dc:title>
+   <photoshop:City>Palawan</photoshop:City>
+   <photoshop:Country>Philippines</photoshop:Country>
+   <exif:GPSLatitude>9,44.73N</exif:GPSLatitude>
+   <exif:GPSLongitude>118,44.1E</exif:GPSLongitude>
+   <exif:GPSAltitude>247/2</exif:GPSAltitude>
+   <exif:GPSAltitudeRef>0</exif:GPSAltitudeRef>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#,
+        )
+        .unwrap();
+        let config = config(temp.path());
+        let update = MetadataUpdate {
+            iptc: Some(IptcUpdate {
+                title: Some(String::new()),
+                country: Some(String::new()),
+                clear_latitude: true,
+                clear_longitude: true,
+                clear_altitude: true,
+                ..IptcUpdate::default()
+            }),
+            ..MetadataUpdate::default()
+        };
+        let result = write_photo_metadata(
+            &raw,
+            Some(&sidecar),
+            &update,
+            None,
+            &exiftool,
+            Some(&config),
+        )
+        .unwrap();
+        assert!(result.metadata.iptc.title.is_empty());
+        assert!(result.metadata.iptc.country.is_empty());
+        assert_eq!(result.metadata.iptc.city, "Palawan");
+        assert_eq!(result.metadata.iptc.latitude, None);
+        assert_eq!(result.metadata.iptc.longitude, None);
+        assert_eq!(result.metadata.iptc.altitude, None);
+    }
+
+    #[test]
+    fn rejects_coordinates_outside_valid_ranges() {
+        let temp = tempfile::tempdir().unwrap();
+        let raw = temp.path().join("photo.dng");
+        fs::write(&raw, b"raw").unwrap();
+        let update = MetadataUpdate {
+            iptc: Some(IptcUpdate {
+                latitude: Some(91.0),
+                ..IptcUpdate::default()
+            }),
+            ..MetadataUpdate::default()
+        };
+        let error = write_photo_metadata(
+            &raw,
+            None,
+            &update,
+            None,
+            Path::new("/nonexistent/exiftool"),
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(error.code(), "metadata");
+        assert!(error.to_string().contains("Latitude"));
     }
 
     #[test]
@@ -1871,11 +2634,20 @@ mod tests {
         let config = config(temp.path());
         let update = MetadataUpdate {
             rating: Some(3),
+            iptc: Some(IptcUpdate {
+                city: Some("Paris".into()),
+                latitude: Some(48.8566),
+                longitude: Some(2.3508),
+                ..IptcUpdate::default()
+            }),
             ..MetadataUpdate::default()
         };
         let result =
             write_photo_metadata(&raw, None, &update, Some(""), &exiftool, Some(&config)).unwrap();
         assert_eq!(result.metadata.rating, 3);
+        assert_eq!(result.metadata.iptc.city, "Paris");
+        assert!((result.metadata.iptc.latitude.unwrap() - 48.8566).abs() < 1e-4);
+        assert!((result.metadata.iptc.longitude.unwrap() - 2.3508).abs() < 1e-4);
         assert!(result.created_sidecar);
         assert!(result.target.exists());
         assert_eq!(result.target, temp.path().join("new.NEF.xmp"));
@@ -1883,6 +2655,7 @@ mod tests {
         let read = read_photo_metadata(&raw, Some(&result.target));
         assert_eq!(read.revision, result.metadata.revision);
         assert_eq!(read.rating, 3);
+        assert_eq!(read.iptc.city, "Paris");
     }
 
     #[test]

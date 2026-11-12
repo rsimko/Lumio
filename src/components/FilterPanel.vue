@@ -47,8 +47,8 @@ const resultLabel = computed(() => {
 
 function rowClass(selected: boolean): string {
   return selected
-    ? 'border-accent/40 bg-accent-soft text-accent'
-    : 'border-line bg-main text-muted hover:border-line-strong hover:bg-panel-2 hover:text-ink';
+    ? 'rounded-full border-accent/40 bg-accent-soft text-accent'
+    : 'rounded-md border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-ink';
 }
 
 function scopeUnavailable(scope: 'folder' | 'library'): boolean {
@@ -104,20 +104,20 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
         <p v-else class="mt-0.5 text-2xs text-subtle">Choose a folder or add one first.</p>
       </div>
       <button
-        class="btn-icon-sm"
+        class="inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-2xs font-medium text-muted transition hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
         :disabled="!active"
         title="Clear all filters"
-        aria-label="Clear all filters"
         @click="store.clearFilters()"
       >
-        <RotateCcw class="h-3.5 w-3.5" />
+        <RotateCcw class="h-3 w-3" />
+        Clear
       </button>
     </div>
 
     <div class="space-y-1">
       <button
         type="button"
-        class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition"
+        class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-xs font-medium transition"
         :class="[
           rowClass(!store.isLibraryScope),
           scopeUnavailable('folder') ? 'cursor-not-allowed opacity-40' : '',
@@ -141,7 +141,7 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
 
       <button
         type="button"
-        class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition"
+        class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-xs font-medium transition"
         :class="[
           rowClass(store.isLibraryScope),
           scopeUnavailable('library') ? 'cursor-not-allowed opacity-40' : '',
@@ -186,7 +186,7 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
             v-for="value in RATING_FILTER_VALUES"
             :key="value"
             type="button"
-            class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition"
+            class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left transition"
             :class="rowClass(ratingActive(value))"
             :title="ratingTitle(value)"
             :aria-label="ratingTitle(value)"
@@ -214,7 +214,7 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
             v-for="label in LABEL_FILTER_VALUES"
             :key="label"
             type="button"
-            class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition"
+            class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-xs font-medium transition"
             :class="rowClass(labelActive(label))"
             :aria-pressed="labelActive(label)"
             @click="store.toggleLabelFilter(label)"
@@ -244,7 +244,7 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
             v-for="value in CULL_FILTER_VALUES"
             :key="value"
             type="button"
-            class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-medium capitalize transition"
+            class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-xs font-medium capitalize transition"
             :class="rowClass(cullActive(value))"
             :title="cullTitle(value)"
             :aria-pressed="cullActive(value)"
@@ -275,7 +275,7 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
             v-for="value in FAVORITE_FILTER_VALUES"
             :key="value"
             type="button"
-            class="flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition"
+            class="flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-xs font-medium transition"
             :class="rowClass(favoriteActive(value))"
             :aria-pressed="favoriteActive(value)"
             @click="store.toggleFavoriteFilter(value)"
@@ -295,24 +295,6 @@ function favoriteActive(value: FavoriteFilterValue): boolean {
           </button>
         </div>
       </section>
-
-      <button
-        class="btn w-full justify-center"
-        :disabled="!active"
-        @click="store.clearFilters()"
-      >
-        <RotateCcw class="h-3.5 w-3.5" />
-        Clear all filters
-      </button>
-
-      <p class="text-2xs leading-relaxed text-subtle">
-        Values in one group match any selection. Different groups must all match.
-        Filters are session-only.
-        <template v-if="store.activeFilterCount">
-          {{ store.activeFilterCount }}
-          {{ store.activeFilterCount === 1 ? 'filter is' : 'filters are' }} active.
-        </template>
-      </p>
     </template>
   </div>
 </template>

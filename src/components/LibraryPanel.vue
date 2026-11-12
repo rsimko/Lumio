@@ -71,16 +71,6 @@ function commitResize(width: number) {
           <FolderPlus v-else class="h-3.5 w-3.5" />
         </button>
       </div>
-      <button
-        v-else
-        class="btn-icon-sm"
-        :disabled="!store.hasActiveFilters"
-        title="Clear all filters"
-        aria-label="Clear all filters"
-        @click="store.clearFilters()"
-      >
-        <X class="h-3.5 w-3.5" />
-      </button>
     </div>
 
     <div

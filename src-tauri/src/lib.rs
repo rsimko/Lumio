@@ -42,6 +42,7 @@ pub fn run() {
             commands::get_histogram,
             commands::get_raw_histogram,
             commands::get_camera_info,
+            commands::get_full_exif,
             commands::clear_thumbnail_cache,
             commands::edit_assets,
             commands::open_asset,

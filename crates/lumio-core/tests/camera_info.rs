@@ -35,6 +35,34 @@ fn missing_files_return_empty_information() {
 }
 
 #[test]
+fn full_exif_returns_grouped_camera_tags() {
+    let exif = lumio_core::read_full_exif(&fixture(), None, None);
+
+    assert!(!exif.entries.is_empty());
+    assert!(matches!(exif.source.as_str(), "exiftool" | "embedded"));
+    assert!(
+        exif.entries
+            .iter()
+            .any(|entry| entry.tag == "Make" && entry.value.contains("Lumio Camera Co."))
+    );
+    // File-system and XMP details belong to other sections of the app.
+    assert!(
+        exif.entries
+            .iter()
+            .all(|entry| entry.group != "System"
+                && entry.group != "File"
+                && !entry.group.starts_with("XMP"))
+    );
+}
+
+#[test]
+fn missing_files_return_an_empty_full_exif() {
+    let exif = lumio_core::read_full_exif(Path::new("/nonexistent/photo.cr3"), None, None);
+    assert_eq!(exif.source, "none");
+    assert!(exif.entries.is_empty());
+}
+
+#[test]
 fn reads_gps_coordinates_and_altitude_from_camera_exif() {
     let Some(exiftool) =
         lumio_core::ingest::metadata::discover_exiftool(None).map(|info| info.path)

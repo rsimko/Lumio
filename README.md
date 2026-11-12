@@ -94,10 +94,13 @@ Cataloguing, search and hierarchical keyword editing come later.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
   the same cached preview; both tabs share one tile and the histogram opens by default. RAW
   photos have a RAW button that recomputes the histogram from decoded sensor samples.
-- Collapse info-panel sections such as Metadata, Keywords, IPTC, Location, Camera and lens, and
-  File to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO,
+- Collapse info-panel sections ordered Metadata, File, Camera and lens, IPTC, Location and
+  Keywords to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO,
   focal length and GPS coordinates are read from embedded EXIF; RAW files also try the rawler
   decoder and their companion JPEG. Reading this information does not require ExifTool.
+- Open **Full EXIF** from the Camera and lens section for a searchable window with every EXIF
+  tag grouped by IFD and maker notes. It uses ExifTool when available, including formats such as
+  RAF, and falls back to the built-in EXIF reader otherwise.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size,
   corner roundness and keyboard shortcuts.
 - A tabbed Settings dialog keeps appearance, library, editor, ingest and storage preferences

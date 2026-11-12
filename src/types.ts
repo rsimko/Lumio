@@ -268,6 +268,19 @@ export interface CameraInfo {
   altitude: number | null;
 }
 
+export interface ExifEntry {
+  /** ExifTool group such as `ExifIFD`, `IFD0`, `GPS` or `Canon`. */
+  group: string;
+  tag: string;
+  value: string;
+}
+
+export interface FullExif {
+  /** `exiftool`, `embedded` or `none`. */
+  source: 'exiftool' | 'embedded' | 'none';
+  entries: ExifEntry[];
+}
+
 export interface HistogramData {
   /** 256 counts, one per 8-bit red value. */
   red: number[];

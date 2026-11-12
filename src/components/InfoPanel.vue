@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ChartNoAxesColumn,
   ExternalLink,
+  FileSearch,
   FolderOpen,
   Image as ImageIcon,
   Images,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
+import ExifDialog from '@/components/ExifDialog.vue';
 import InfoSection from '@/components/InfoSection.vue';
 import IptcEditor from '@/components/IptcEditor.vue';
 import KeywordsEditor from '@/components/KeywordsEditor.vue';
@@ -37,7 +39,7 @@ import {
   kindLabel,
 } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
-import type { CameraInfo, HistogramData } from '@/types';
+import type { CameraInfo, HistogramData, PhotoAsset } from '@/types';
 
 const store = useLibraryStore();
 
@@ -238,6 +240,21 @@ const hasCameraInfo = computed(() => {
   );
 });
 
+const exifOpen = ref(false);
+const exifAsset = ref<PhotoAsset | null>(null);
+
+function openExif(): void {
+  const current = asset.value;
+  if (!current) return;
+  exifAsset.value = current;
+  exifOpen.value = true;
+}
+
+function closeExif(): void {
+  exifOpen.value = false;
+  exifAsset.value = null;
+}
+
 const dimensions = computed(() => {
   if (!asset.value) return '—';
   const known = dimensionsFor(asset.value);
@@ -437,63 +454,6 @@ function revealAssociationKind(kind: 'jpeg' | 'xmp'): void {
         </div>
 
         <MetadataEditor class="mb-2" />
-        <KeywordsEditor class="mb-2" />
-        <IptcEditor class="mb-2" />
-        <LocationEditor
-          class="mb-2"
-          :camera-latitude="cameraInfo?.latitude ?? null"
-          :camera-longitude="cameraInfo?.longitude ?? null"
-          :camera-altitude="cameraInfo?.altitude ?? null"
-        />
-
-        <InfoSection title="Camera and lens" class="info-section-left">
-          <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">
-            Reading camera metadata…
-          </div>
-          <div
-            v-else-if="cameraStatus === 'error'"
-            class="py-0.5 text-2xs leading-relaxed text-danger"
-          >
-            {{ cameraError }}
-          </div>
-          <template v-else-if="hasCameraInfo">
-            <div v-if="cameraInfo?.make" class="info-row">
-              <span class="info-label">Camera make</span>
-              <span class="info-value">{{ cameraInfo.make }}</span>
-            </div>
-            <div v-if="cameraInfo?.model" class="info-row">
-              <span class="info-label">Camera model</span>
-              <span class="info-value">{{ cameraInfo.model }}</span>
-            </div>
-            <div v-if="cameraInfo?.lens" class="info-row">
-              <span class="info-label">Lens</span>
-              <span class="info-value">{{ cameraInfo.lens }}</span>
-            </div>
-            <div v-if="cameraInfo?.shutterSpeed != null" class="info-row">
-              <span class="info-label">Shutter</span>
-              <span class="info-value tabular-nums">
-                {{ formatShutterSpeed(cameraInfo.shutterSpeed) }}
-              </span>
-            </div>
-            <div v-if="cameraInfo?.aperture != null" class="info-row">
-              <span class="info-label">Aperture</span>
-              <span class="info-value tabular-nums">
-                {{ formatAperture(cameraInfo.aperture) }}
-              </span>
-            </div>
-            <div v-if="cameraInfo?.iso != null" class="info-row">
-              <span class="info-label">ISO</span>
-              <span class="info-value tabular-nums">{{ cameraInfo.iso }}</span>
-            </div>
-            <div v-if="cameraInfo?.focalLength != null" class="info-row">
-              <span class="info-label">Focal length</span>
-              <span class="info-value tabular-nums">
-                {{ formatFocalLength(cameraInfo.focalLength) }}
-              </span>
-            </div>
-          </template>
-          <p v-else class="py-0.5 text-2xs text-subtle">No camera metadata found.</p>
-        </InfoSection>
 
         <InfoSection title="File" class="info-section-left">
           <div class="info-row">
@@ -563,6 +523,75 @@ function revealAssociationKind(kind: 'jpeg' | 'xmp'): void {
             </span>
           </div>
         </InfoSection>
+
+        <InfoSection title="Camera and lens" class="info-section-left">
+          <template #actions>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded border border-line bg-panel px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider text-subtle transition hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+              title="View every EXIF tag for this photo"
+              @click="openExif"
+            >
+              <FileSearch class="h-3 w-3" />
+              Full EXIF
+            </button>
+          </template>
+          <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">
+            Reading camera metadata…
+          </div>
+          <div
+            v-else-if="cameraStatus === 'error'"
+            class="py-0.5 text-2xs leading-relaxed text-danger"
+          >
+            {{ cameraError }}
+          </div>
+          <template v-else-if="hasCameraInfo">
+            <div v-if="cameraInfo?.make" class="info-row">
+              <span class="info-label">Camera make</span>
+              <span class="info-value">{{ cameraInfo.make }}</span>
+            </div>
+            <div v-if="cameraInfo?.model" class="info-row">
+              <span class="info-label">Camera model</span>
+              <span class="info-value">{{ cameraInfo.model }}</span>
+            </div>
+            <div v-if="cameraInfo?.lens" class="info-row">
+              <span class="info-label">Lens</span>
+              <span class="info-value">{{ cameraInfo.lens }}</span>
+            </div>
+            <div v-if="cameraInfo?.shutterSpeed != null" class="info-row">
+              <span class="info-label">Shutter</span>
+              <span class="info-value tabular-nums">
+                {{ formatShutterSpeed(cameraInfo.shutterSpeed) }}
+              </span>
+            </div>
+            <div v-if="cameraInfo?.aperture != null" class="info-row">
+              <span class="info-label">Aperture</span>
+              <span class="info-value tabular-nums">
+                {{ formatAperture(cameraInfo.aperture) }}
+              </span>
+            </div>
+            <div v-if="cameraInfo?.iso != null" class="info-row">
+              <span class="info-label">ISO</span>
+              <span class="info-value tabular-nums">{{ cameraInfo.iso }}</span>
+            </div>
+            <div v-if="cameraInfo?.focalLength != null" class="info-row">
+              <span class="info-label">Focal length</span>
+              <span class="info-value tabular-nums">
+                {{ formatFocalLength(cameraInfo.focalLength) }}
+              </span>
+            </div>
+          </template>
+          <p v-else class="py-0.5 text-2xs text-subtle">No camera metadata found.</p>
+        </InfoSection>
+
+        <IptcEditor class="mb-2" />
+        <LocationEditor
+          class="mb-2"
+          :camera-latitude="cameraInfo?.latitude ?? null"
+          :camera-longitude="cameraInfo?.longitude ?? null"
+          :camera-altitude="cameraInfo?.altitude ?? null"
+        />
+        <KeywordsEditor class="mb-2" />
       </template>
 
       <template v-else-if="store.selectedFolder || store.isLibraryScope">
@@ -674,4 +703,6 @@ function revealAssociationKind(kind: 'jpeg' | 'xmp'): void {
       @commit="commitResize"
     />
   </aside>
+
+  <ExifDialog v-if="exifOpen && exifAsset" :asset="exifAsset" @close="closeExif" />
 </template>

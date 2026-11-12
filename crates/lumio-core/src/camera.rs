@@ -4,6 +4,7 @@ use std::path::Path;
 
 use exif::{In, Tag, Value};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 use crate::types::{extension_of, is_raw_extension};
 
@@ -85,6 +86,192 @@ impl CameraInfo {
             self.altitude = other.altitude;
         }
     }
+}
+
+/// One tag in the full EXIF view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExifEntry {
+    /// ExifTool group such as `ExifIFD`, `IFD0`, `GPS` or a maker-specific
+    /// group like `Canon`.
+    pub group: String,
+    pub tag: String,
+    pub value: String,
+}
+
+/// Complete metadata listing for the EXIF viewer.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FullExif {
+    /// `exiftool` when the external tool produced the listing, `embedded`
+    /// when it came from the built-in EXIF reader, or `none`.
+    pub source: String,
+    pub entries: Vec<ExifEntry>,
+}
+
+/// Reads every EXIF tag for the photo. ExifTool provides grouped maker notes
+/// and formats such as RAF that the built-in reader cannot open; the native
+/// `exif` crate remains the fallback when ExifTool is unavailable.
+pub fn read_full_exif(
+    primary: &Path,
+    companion: Option<&Path>,
+    configured_exiftool: Option<&Path>,
+) -> FullExif {
+    if let Some(tool) = crate::ingest::metadata::discover_exiftool(configured_exiftool) {
+        for path in std::iter::once(primary).chain(companion) {
+            if let Some(entries) = read_exiftool_entries(&tool.path, path) {
+                if !entries.is_empty() {
+                    return FullExif {
+                        source: "exiftool".to_string(),
+                        entries,
+                    };
+                }
+            }
+        }
+    }
+
+    for path in std::iter::once(primary).chain(companion) {
+        if let Some(entries) = read_embedded_entries(path) {
+            if !entries.is_empty() {
+                return FullExif {
+                    source: "embedded".to_string(),
+                    entries,
+                };
+            }
+        }
+    }
+
+    FullExif {
+        source: "none".to_string(),
+        entries: Vec::new(),
+    }
+}
+
+/// ExifTool groups that are not part of the image's EXIF metadata. XMP, IPTC
+/// and file-system details have their own sections elsewhere in the app.
+fn is_exif_group(group: &str) -> bool {
+    if matches!(
+        group,
+        "System"
+            | "File"
+            | "ExifTool"
+            | "SourceFile"
+            | "IPTC"
+            | "IPTC-NAA"
+            | "Photoshop"
+            | "ICC_Profile"
+            | "ICC-header"
+            | "XML"
+            | "JFIF"
+            | "JFXX"
+            | "APP0"
+            | "APP1"
+            | "APP2"
+            | "APP3"
+            | "APP4"
+            | "APP5"
+            | "APP6"
+            | "APP7"
+            | "APP8"
+            | "APP9"
+            | "APP10"
+            | "APP11"
+            | "APP12"
+            | "APP13"
+            | "APP14"
+            | "APP15"
+    ) {
+        return false;
+    }
+    !group.starts_with("XMP") && !group.starts_with("Photoshop")
+}
+
+fn read_exiftool_entries(tool: &Path, path: &Path) -> Option<Vec<ExifEntry>> {
+    let output = std::process::Command::new(tool)
+        .args(["-json", "-G1", "-s", "-a", "-charset", "filename=UTF8"])
+        .arg(path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let parsed: JsonValue = serde_json::from_slice(&output.stdout).ok()?;
+    let object = parsed.as_array()?.first()?.as_object()?;
+    let mut entries = Vec::new();
+    for (key, value) in object {
+        let Some((group, tag)) = key.split_once(':') else {
+            continue;
+        };
+        if !is_exif_group(group) {
+            continue;
+        }
+        let Some(value) = render_json_value(value) else {
+            continue;
+        };
+        if value.contains("(Binary data") {
+            continue;
+        }
+        entries.push(ExifEntry {
+            group: group.to_string(),
+            tag: tag.to_string(),
+            value: truncate_value(value),
+        });
+    }
+    Some(entries)
+}
+
+fn render_json_value(value: &JsonValue) -> Option<String> {
+    let rendered = match value {
+        JsonValue::Null => return None,
+        JsonValue::String(text) => text.clone(),
+        JsonValue::Bool(flag) => flag.to_string(),
+        JsonValue::Number(number) => number.to_string(),
+        JsonValue::Array(items) => items
+            .iter()
+            .filter_map(render_json_value)
+            .collect::<Vec<_>>()
+            .join(", "),
+        JsonValue::Object(_) => value.to_string(),
+    };
+    let rendered = rendered.trim();
+    (!rendered.is_empty()).then(|| rendered.to_string())
+}
+
+fn truncate_value(value: String) -> String {
+    const LIMIT: usize = 4000;
+    if value.chars().count() <= LIMIT {
+        return value;
+    }
+    let mut truncated: String = value.chars().take(LIMIT).collect();
+    truncated.push('…');
+    truncated
+}
+
+fn read_embedded_entries(path: &Path) -> Option<Vec<ExifEntry>> {
+    let file = File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let exif = exif::Reader::new().read_from_container(&mut reader).ok()?;
+    let mut entries = Vec::new();
+    for field in exif.fields() {
+        if matches!(&field.value, Value::Undefined(..) | Value::Unknown(..)) {
+            continue;
+        }
+        let value = field.display_value().with_unit(&exif).to_string();
+        if value.trim().is_empty() {
+            continue;
+        }
+        entries.push(ExifEntry {
+            group: match field.ifd_num.index() {
+                0 => "EXIF".to_string(),
+                1 => "Thumbnail".to_string(),
+                index => format!("IFD{index}"),
+            },
+            tag: field.tag.to_string(),
+            value: truncate_value(value),
+        });
+    }
+    Some(entries)
 }
 
 /// Reads camera details from the original and, when needed, its companion
@@ -328,4 +515,50 @@ fn positive(value: f64) -> Option<f64> {
 fn clean(value: String) -> Option<String> {
     let value = value.trim_matches('\0').trim();
     (!value.is_empty()).then(|| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn exif_groups_exclude_non_exif_metadata() {
+        for group in [
+            "System",
+            "File",
+            "ExifTool",
+            "IPTC",
+            "Photoshop",
+            "ICC_Profile",
+            "XML",
+            "JFIF",
+            "XMP",
+            "XMP-dc",
+            "XMP-photoshop",
+        ] {
+            assert!(!is_exif_group(group), "{group} should be excluded");
+        }
+        for group in ["IFD0", "ExifIFD", "GPS", "InteropIFD", "Canon", "Composite"] {
+            assert!(is_exif_group(group), "{group} should be included");
+        }
+    }
+
+    #[test]
+    fn json_values_are_rendered_flat() {
+        assert_eq!(render_json_value(&json!("1/50")), Some("1/50".into()));
+        assert_eq!(render_json_value(&json!(160)), Some("160".into()));
+        assert_eq!(render_json_value(&json!(true)), Some("true".into()));
+        assert_eq!(render_json_value(&json!(["a", "b"])), Some("a, b".into()));
+        assert_eq!(render_json_value(&json!(null)), None);
+        assert_eq!(render_json_value(&json!("  ")), None);
+    }
+
+    #[test]
+    fn long_values_are_truncated() {
+        let value = "x".repeat(5000);
+        let truncated = truncate_value(value);
+        assert_eq!(truncated.chars().count(), 4001);
+        assert!(truncated.ends_with('…'));
+    }
 }

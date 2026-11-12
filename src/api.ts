@@ -10,6 +10,7 @@ import type {
   ExcludedAsset,
   FolderImageCounts,
   FolderNode,
+  FullExif,
   HistogramData,
   IngestConflictResolution,
   IngestEvent,
@@ -59,6 +60,7 @@ export const api = {
     invoke<HistogramData>('get_histogram', { asset, edge }),
   rawHistogram: (asset: PhotoAsset) => invoke<HistogramData>('get_raw_histogram', { asset }),
   cameraInfo: (asset: PhotoAsset) => invoke<CameraInfo>('get_camera_info', { asset }),
+  fullExif: (asset: PhotoAsset) => invoke<FullExif>('get_full_exif', { asset }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),
   openAsset: (path: string) => invoke<void>('open_asset', { path }),
   openMaps: (latitude: number, longitude: number) =>

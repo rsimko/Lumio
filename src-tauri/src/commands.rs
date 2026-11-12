@@ -665,6 +665,30 @@ pub async fn get_camera_info(
 }
 
 #[tauri::command]
+pub async fn get_full_exif(
+    state: State<'_, AppState>,
+    asset: PhotoAsset,
+) -> Result<lumio_core::FullExif, CommandError> {
+    let asset = prepare_asset(&state, asset)?;
+    let exiftool = state.config().ingest_settings().exiftool_path.clone();
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::read_full_exif(
+            &asset.primary_path,
+            asset.companion_jpeg.as_deref(),
+            exiftool.as_deref(),
+        )
+    })
+    .await
+    {
+        Ok(exif) => Ok(exif),
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("Full EXIF task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
 pub fn clear_thumbnail_cache(state: State<'_, AppState>) -> Result<(), CommandError> {
     state.thumbs.clear()?;
     Ok(())

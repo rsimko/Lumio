@@ -298,9 +298,7 @@ function removeSelectedRoot() {
         <div class="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden" v-if="store.scanState === 'loading'">
           <div class="h-full w-1/3 animate-pulse bg-accent" />
         </div>
-        <Transition name="fade" mode="out-in">
-          <component :is="viewComponent" :key="store.viewMode" />
-        </Transition>
+        <component :is="viewComponent" :key="store.viewMode" />
       </template>
 
       <div v-else class="flex h-full items-center justify-center p-8 text-center">

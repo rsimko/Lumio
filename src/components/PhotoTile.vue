@@ -43,12 +43,12 @@ const thumb = useThumbnail(
   () => props.asset,
   () => Math.max(props.width, props.height),
 );
-const loaded = ref(false);
+const loaded = ref(Boolean(thumb.value?.src));
 
 watch(
   () => thumb.value?.src,
-  () => {
-    loaded.value = false;
+  (src, previous) => {
+    if (src !== previous) loaded.value = false;
   },
 );
 

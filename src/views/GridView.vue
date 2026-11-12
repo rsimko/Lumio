@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import PhotoTile from '@/components/PhotoTile.vue';
+import { useBrowseScroll } from '@/composables/useBrowseScroll';
 import { useScrollMetrics } from '@/composables/useScrollMetrics';
 import { computeGrid, visibleRowRange } from '@/lib/layout';
 import { useLibraryStore } from '@/stores/library';
@@ -9,7 +10,9 @@ import type { PhotoAsset } from '@/types';
 
 const store = useLibraryStore();
 const scroller = ref<HTMLElement | null>(null);
-const { width, height, scrollTop } = useScrollMetrics(scroller);
+const metrics = useScrollMetrics(scroller);
+const { width, height, scrollTop } = metrics;
+useBrowseScroll(scroller, metrics, () => store.selectedFolder);
 
 const layout = computed(() =>
   computeGrid(store.assets.length, width.value, store.settings.thumbnailSize),
@@ -72,10 +75,7 @@ function scrollSelectionIntoView() {
   }
 }
 
-watch(
-  [() => store.selectedIndex, () => layout.value.cell, height],
-  scrollSelectionIntoView,
-);
+watch(() => store.selectedIndex, scrollSelectionIntoView);
 
 watch(
   () => store.selectedFolder,

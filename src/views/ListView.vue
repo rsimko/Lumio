@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 
 import PhotoListAssociationRow from '@/components/PhotoListAssociationRow.vue';
 import PhotoListRow from '@/components/PhotoListRow.vue';
+import { useBrowseScroll } from '@/composables/useBrowseScroll';
 import { useScrollMetrics } from '@/composables/useScrollMetrics';
 import {
   assetRowTop,
@@ -18,7 +19,9 @@ import { useLibraryStore } from '@/stores/library';
 
 const store = useLibraryStore();
 const scroller = ref<HTMLElement | null>(null);
-const { width, height, scrollTop } = useScrollMetrics(scroller);
+const metrics = useScrollMetrics(scroller);
+const { width, height, scrollTop } = metrics;
+useBrowseScroll(scroller, metrics, () => store.selectedFolder);
 
 const compact = computed(() => width.value > 0 && width.value < 700);
 const showFolder = computed(() => store.scanRecursive || store.assets.some((asset) => asset.relativeDir));
@@ -60,7 +63,7 @@ function scrollSelectionIntoView() {
   }
 }
 
-watch([() => store.selectedIndex, height, showAssociations], scrollSelectionIntoView);
+watch(() => store.selectedIndex, scrollSelectionIntoView);
 
 watch(
   () => store.selectedFolder,

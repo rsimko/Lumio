@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import PhotoTile from '@/components/PhotoTile.vue';
+import { useBrowseScroll } from '@/composables/useBrowseScroll';
 import { useScrollMetrics } from '@/composables/useScrollMetrics';
 import { aspectFor } from '@/composables/useThumbnails';
 import { computeMasonry, visibleItems } from '@/lib/layout';
@@ -10,7 +11,9 @@ import type { PhotoAsset } from '@/types';
 
 const store = useLibraryStore();
 const scroller = ref<HTMLElement | null>(null);
-const { width, height, scrollTop } = useScrollMetrics(scroller);
+const metrics = useScrollMetrics(scroller);
+const { width, height, scrollTop } = metrics;
+useBrowseScroll(scroller, metrics, () => store.selectedFolder);
 
 const aspects = computed(() => store.assets.map((asset) => aspectFor(asset)));
 
@@ -69,7 +72,7 @@ function scrollSelectionIntoView() {
   }
 }
 
-watch([() => store.selectedIndex, () => layout.value], scrollSelectionIntoView);
+watch(() => store.selectedIndex, scrollSelectionIntoView);
 
 watch(
   () => store.selectedFolder,

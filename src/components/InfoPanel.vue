@@ -2,9 +2,7 @@
 import {
   AlertTriangle,
   ChartNoAxesColumn,
-  Check,
   ExternalLink,
-  FileText,
   FolderOpen,
   Image as ImageIcon,
   Info,
@@ -13,7 +11,6 @@ import {
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
-import AssociationBadges from '@/components/AssociationBadges.vue';
 import InfoSection from '@/components/InfoSection.vue';
 import MetadataEditor from '@/components/MetadataEditor.vue';
 import PhotoHistogram from '@/components/PhotoHistogram.vue';
@@ -267,6 +264,45 @@ async function revealPrimary() {
     store.addToast(errorMessage(error), 'error');
   }
 }
+
+interface AssociationRow {
+  key: string;
+  kind: 'jpeg' | 'xmp';
+  path: string | null;
+  extra: boolean;
+}
+
+const associationRows = computed<AssociationRow[]>(() => {
+  const current = asset.value;
+  if (!current) return [];
+  const rows: AssociationRow[] = [
+    { key: 'jpeg', kind: 'jpeg', path: current.companionJpeg, extra: false },
+    { key: 'xmp', kind: 'xmp', path: current.xmpSidecar, extra: false },
+  ];
+  for (const path of current.extraCompanions) {
+    rows.push({ key: `jpeg:${path}`, kind: 'jpeg', path, extra: true });
+  }
+  for (const path of current.extraSidecars) {
+    rows.push({ key: `xmp:${path}`, kind: 'xmp', path, extra: true });
+  }
+  return rows;
+});
+
+function associationLabel(row: AssociationRow): string {
+  if (row.kind === 'jpeg') {
+    return row.extra ? 'Extra companion JPEG' : 'Companion JPEG';
+  }
+  return row.extra ? 'Extra XMP sidecar' : 'XMP sidecar';
+}
+
+async function revealAssociation(path: string | null): Promise<void> {
+  if (!path) return;
+  try {
+    await api.revealAsset(path);
+  } catch (error) {
+    store.addToast(errorMessage(error), 'error');
+  }
+}
 </script>
 
 <template>
@@ -486,62 +522,40 @@ async function revealPrimary() {
         </InfoSection>
 
         <InfoSection title="Associations">
-          <template #actions>
+          <div
+            v-for="row in associationRows"
+            :key="row.key"
+            class="flex min-h-6 items-center gap-1.5"
+          >
             <span
-              v-if="asset.companionJpeg || asset.xmpSidecar"
-              class="flex shrink-0 items-center gap-1"
+              class="badge w-8 shrink-0 justify-center ring-1"
+              :class="
+                row.kind === 'jpeg'
+                  ? 'bg-success/15 text-success ring-success/20'
+                  : 'bg-accent-soft text-accent ring-accent/20'
+              "
+              :title="associationLabel(row)"
             >
-              <AssociationBadges :asset="asset" />
+              {{ row.kind === 'jpeg' ? 'JPG' : 'XMP' }}
             </span>
-          </template>
-
-          <div class="info-row">
-            <span class="info-label">Companion JPEG</span>
             <span
-              class="info-value flex items-center justify-end gap-1"
-              :class="asset.companionJpeg ? 'text-ink' : 'text-subtle'"
+              class="min-w-0 flex-1 truncate text-2xs"
+              :class="row.path ? 'text-ink' : 'text-subtle'"
+              :title="row.path ?? `${associationLabel(row)} not found`"
             >
-              <Check v-if="asset.companionJpeg" class="h-3 w-3 shrink-0 text-success" />
-              <span class="truncate" :title="asset.companionJpeg ?? ''">
-                {{ asset.companionJpeg ? basename(asset.companionJpeg) : 'Not found' }}
-              </span>
+              {{ row.path ? basename(row.path) : 'Not found' }}
             </span>
+            <button
+              v-if="row.path"
+              class="btn-icon-sm"
+              :title="`Show ${basename(row.path)} in Finder`"
+              :aria-label="`Show ${basename(row.path)} in Finder`"
+              @click="revealAssociation(row.path)"
+            >
+              <FolderOpen class="h-3 w-3" />
+            </button>
+            <span v-else class="h-6 w-6 shrink-0" aria-hidden="true" />
           </div>
-
-          <div class="info-row">
-            <span class="info-label">XMP sidecar</span>
-            <span
-              class="info-value flex items-center justify-end gap-1"
-              :class="asset.xmpSidecar ? 'text-ink' : 'text-subtle'"
-            >
-              <FileText v-if="asset.xmpSidecar" class="h-3 w-3 shrink-0 text-success" />
-              <span class="truncate" :title="asset.xmpSidecar ?? ''">
-                {{ asset.xmpSidecar ? basename(asset.xmpSidecar) : 'Not found' }}
-              </span>
-            </span>
-          </div>
-
-          <template v-if="asset.extraCompanions.length">
-            <div class="info-row">
-              <span class="info-label">Other JPEGs</span>
-              <span class="info-value text-subtle">
-                <span v-for="path in asset.extraCompanions" :key="path" class="block truncate" :title="path">
-                  {{ basename(path) }}
-                </span>
-              </span>
-            </div>
-          </template>
-
-          <template v-if="asset.extraSidecars.length">
-            <div class="info-row">
-              <span class="info-label">Other XMP</span>
-              <span class="info-value text-subtle">
-                <span v-for="path in asset.extraSidecars" :key="path" class="block truncate" :title="path">
-                  {{ basename(path) }}
-                </span>
-              </span>
-            </div>
-          </template>
         </InfoSection>
       </template>
 

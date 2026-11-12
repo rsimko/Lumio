@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { Flag, Heart, X } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 import AssociationBadges from '@/components/AssociationBadges.vue';
-import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
@@ -13,6 +13,12 @@ import {
   kindLabel,
   sourceLabel,
 } from '@/lib/format';
+import { LIST_GRID_CLASS } from '@/lib/list-rows';
+import {
+  COLOR_LABEL_NAMES,
+  COLOR_LABEL_SWATCHES,
+  formatRating,
+} from '@/lib/metadata';
 import { useLibraryStore } from '@/stores/library';
 import type { PhotoAsset } from '@/types';
 
@@ -54,6 +60,8 @@ const dimensions = computed(() => {
   return known ? formatDimensions(known.width, known.height) : '—';
 });
 
+const metadata = computed(() => props.asset.metadata);
+
 const subline = computed(() => {
   if (props.showFolder && props.asset.relativeDir) {
     return props.asset.relativeDir;
@@ -68,9 +76,7 @@ const subline = computed(() => {
     class="group relative grid h-[58px] cursor-default items-center gap-3 border-b border-line/60 px-4 text-xs transition-colors"
     :class="[
       selected ? 'bg-accent-soft/70' : 'hover:bg-panel-2/60',
-      compact
-        ? 'grid-cols-[minmax(0,1fr)_96px_54px_100px_72px]'
-        : 'grid-cols-[minmax(0,1fr)_104px_60px_104px_84px_112px_72px]',
+      compact ? LIST_GRID_CLASS.compact : LIST_GRID_CLASS.full,
     ]"
     @click="emit('select', $event)"
     @dblclick="$emit('open')"
@@ -112,7 +118,55 @@ const subline = computed(() => {
     </div>
 
     <div class="flex min-w-0 items-center">
-      <MetadataBadges :asset="asset" variant="list" />
+      <span
+        v-if="metadata.rating > 0"
+        class="truncate text-2xs font-semibold tracking-tight text-amber-500 tabular-nums"
+        :title="`${metadata.rating} ${metadata.rating === 1 ? 'star' : 'stars'}`"
+      >
+        {{ formatRating(metadata.rating) }}
+      </span>
+      <span v-else class="text-2xs text-subtle" title="No rating">—</span>
+    </div>
+
+    <div class="flex min-w-0 items-center">
+      <span
+        v-if="metadata.label"
+        class="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/25"
+        :class="COLOR_LABEL_SWATCHES[metadata.label]"
+        :title="`${COLOR_LABEL_NAMES[metadata.label]} label`"
+      />
+      <span v-else class="text-2xs text-subtle" title="No label">—</span>
+    </div>
+
+    <div class="flex min-w-0 items-center gap-1">
+      <span
+        v-if="metadata.favorite"
+        class="inline-flex shrink-0 text-rose-500"
+        title="Favorite"
+      >
+        <Heart class="h-3 w-3" fill="currentColor" />
+      </span>
+      <span
+        v-if="metadata.cull === 'pick'"
+        class="inline-flex shrink-0 text-success"
+        title="Picked"
+      >
+        <Flag class="h-3 w-3" fill="currentColor" />
+      </span>
+      <span
+        v-else-if="metadata.cull === 'reject'"
+        class="inline-flex shrink-0 text-danger"
+        title="Rejected"
+      >
+        <X class="h-3 w-3" />
+      </span>
+      <span
+        v-if="!metadata.favorite && metadata.cull === null"
+        class="text-2xs text-subtle"
+        title="No culling flag or favorite"
+      >
+        —
+      </span>
     </div>
 
     <span

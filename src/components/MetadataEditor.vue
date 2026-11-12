@@ -94,7 +94,6 @@ function toggleFavorite(): void {
         <span v-if="count > 1">
           {{ count }} photos<span v-if="anyMixed"> · Mixed</span>
         </span>
-        <span v-else>{{ source }}</span>
       </span>
     </template>
 

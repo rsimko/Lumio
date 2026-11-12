@@ -9,6 +9,7 @@ import {
   assetRowTop,
   buildListRows,
   firstVisibleListRow,
+  LIST_GRID_CLASS,
   LIST_ROW_HEIGHT,
   listRowsHeight,
   type ListRow,
@@ -73,14 +74,12 @@ watch(
   <div class="flex h-full flex-col">
     <div
       class="grid h-8 shrink-0 items-center gap-3 border-b border-line bg-app/60 px-4 text-2xs font-semibold uppercase tracking-[0.1em] text-subtle"
-      :class="
-        compact
-          ? 'grid-cols-[minmax(0,1fr)_96px_54px_100px_72px]'
-          : 'grid-cols-[minmax(0,1fr)_104px_60px_104px_84px_112px_72px]'
-      "
+      :class="compact ? LIST_GRID_CLASS.compact : LIST_GRID_CLASS.full"
     >
       <span>Name</span>
-      <span title="Rating, label and culling">Marks</span>
+      <span>Rating</span>
+      <span>Label</span>
+      <span title="Culling flag and favorite">Cull</span>
       <span>Type</span>
       <span>Dimensions</span>
       <template v-if="!compact">

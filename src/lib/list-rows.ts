@@ -4,6 +4,15 @@ import type { PhotoAsset } from '@/types';
 export const LIST_ROW_HEIGHT = 58;
 export const LIST_ASSOCIATION_ROW_HEIGHT = 44;
 
+/**
+ * Column templates shared by the list header and photo rows so the metadata
+ * fields always line up with their headings.
+ */
+export const LIST_GRID_CLASS = {
+  compact: 'grid-cols-[minmax(0,1fr)_68px_40px_52px_54px_96px_72px]',
+  full: 'grid-cols-[minmax(0,1fr)_76px_44px_56px_60px_104px_84px_112px_72px]',
+} as const;
+
 export interface ListAssetRow {
   type: 'asset';
   asset: PhotoAsset;

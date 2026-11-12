@@ -111,7 +111,7 @@ function removeSelectedRoot() {
           <Loader2 class="h-3 w-3 animate-spin" />
           Scanning…
         </span>
-        <template v-else-if="store.scanState === 'ready'">
+        <template v-else-if="store.scanState === 'ready' && store.viewMode !== 'filmstrip'">
           <span class="tabular-nums">
             {{ formatCount(store.stats.total) }}
             {{ pluralize(store.stats.total, 'photo') }}

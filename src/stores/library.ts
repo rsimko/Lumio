@@ -80,6 +80,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   lastRootId: null,
   lastFolder: null,
   filmstripVisible: true,
+  filmstripHeight: 88,
   listShowAssociations: false,
   externalEditors: [],
   defaultEditorPath: null,
@@ -143,12 +144,16 @@ function readSystemDark(): boolean {
 function normalizeUiSettings(ui: Partial<UiSettings>): UiSettings {
   const merged = { ...DEFAULT_UI_SETTINGS, ...ui };
   const size = Number.isFinite(merged.uiFontSize) ? Math.round(merged.uiFontSize) : BASE_FONT_SIZE;
+  const filmstripHeight = Number.isFinite(merged.filmstripHeight)
+    ? Math.round(merged.filmstripHeight)
+    : DEFAULT_UI_SETTINGS.filmstripHeight;
   const externalEditors = normalizeExternalEditors(merged.externalEditors);
   return {
     ...merged,
     uiFont: merged.uiFont === 'system' ? 'system' : 'avenir',
     monoFont: merged.monoFont === 'system' ? 'system' : 'jetbrains',
     uiFontSize: Math.min(17, Math.max(11, size)),
+    filmstripHeight: Math.min(280, Math.max(64, filmstripHeight)),
     externalEditors,
     defaultEditorPath: normalizeDefaultEditorPath(merged.defaultEditorPath, externalEditors),
     shortcuts: normalizeShortcutOverrides(merged.shortcuts),

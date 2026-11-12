@@ -410,7 +410,7 @@ async function revealAssociation(path: string | null): Promise<void> {
             />
           </div>
 
-          <div class="mt-2.5 flex items-center gap-1.5">
+          <div class="mb-2 mt-2.5 flex items-center gap-1.5">
             <button
               class="btn min-w-0 flex-1 justify-center px-2"
               title="Open with the default application"
@@ -442,7 +442,7 @@ async function revealAssociation(path: string | null): Promise<void> {
           </div>
         </div>
 
-        <MetadataEditor />
+        <MetadataEditor class="mb-2" />
 
         <InfoSection title="Camera and lens">
           <div v-if="cameraStatus === 'loading'" class="py-0.5 text-2xs text-subtle">

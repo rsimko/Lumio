@@ -700,6 +700,7 @@ mod tests {
         ui.ui_font = "system".into();
         ui.mono_font = "system".into();
         ui.ui_font_size = 16;
+        ui.filmstrip_height = 132;
         ui.list_show_associations = true;
         ui.external_editors.push(crate::types::ExternalEditor {
             name: "Photoshop".into(),
@@ -759,6 +760,7 @@ mod tests {
         assert_eq!(ui.ui_font, "avenir");
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
+        assert_eq!(ui.filmstrip_height, 88);
         assert!(!ui.list_show_associations);
         assert!(ui.external_editors.is_empty());
         assert!(ui.default_editor_path.is_none());

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
@@ -13,8 +12,10 @@ const props = withDefaults(
   defineProps<{
     asset: PhotoAsset;
     selected?: boolean;
+    /** Requested preview edge in CSS pixels; grows with the filmstrip height. */
+    size?: number;
   }>(),
-  { selected: false },
+  { selected: false, size: 84 },
 );
 
 const emit = defineEmits<{
@@ -37,7 +38,7 @@ function onDragStart(event: DragEvent) {
 
 const thumb = useThumbnail(
   () => props.asset,
-  () => 76,
+  () => props.size,
 );
 const loaded = ref(false);
 watch(
@@ -88,16 +89,6 @@ const title = computed(() => {
       decoding="async"
       @load="loaded = true"
       @error="markPreviewFailed(thumb)"
-    />
-    <span
-      v-if="asset.kind === 'raw'"
-      class="absolute left-1 top-1 rounded bg-black/55 px-1 py-px text-3xs font-semibold uppercase tracking-wider text-white/85 backdrop-blur-[2px]"
-    >
-      RAW
-    </span>
-    <MetadataBadges
-      :asset="asset"
-      class="pointer-events-none absolute bottom-1 left-1"
     />
   </div>
 </template>

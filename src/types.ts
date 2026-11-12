@@ -248,6 +248,8 @@ export interface UiSettings {
   lastRootId: string | null;
   lastFolder: string | null;
   filmstripVisible: boolean;
+  /** Height of the bottom filmstrip in pixels. */
+  filmstripHeight: number;
   listShowAssociations: boolean;
   /** Applications offered by “Edit with” in the photo context menu. */
   externalEditors: ExternalEditor[];

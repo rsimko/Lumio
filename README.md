@@ -26,7 +26,7 @@ Cataloguing, search and the keyword editor come later.
 - Scan the current folder, or include every subfolder recursively.
 - View photos in five layouts: grid, masonry, justified, list and filmstrip. The bottom
   navigation strip belongs to the filmstrip view; grid, masonry, justified and list stay
-  strip-free.
+  strip-free. Drag the strip's top edge to make its thumbnails larger or smaller.
 - Select one or many photos: click, ⌘/Ctrl-click to toggle, Shift-click for a range,
   ⌘/Ctrl+A to select all, Shift+arrows to extend and Escape to clear.
 - Drag any selected photo — or a single unselected photo — onto a folder row to move the
@@ -64,7 +64,7 @@ Cataloguing, search and the keyword editor come later.
 - Rate photos from 1–5 stars, apply one of five standard color labels, mark Pick/Reject/Unflag
   and toggle favorites from the info panel, with `1`–`5`, `Option`+`6`–`0`, `P`, `X`, `U` and
   `Shift+F` working in both browse and fullscreen. Multi-selection shows mixed values and applies
-  changes as one batch; tiles, list rows, the filmstrip and the viewer show compact indicators.
+  changes as one batch; tiles, list rows and the viewer show compact indicators.
 - Edits update the existing XMP rather than regenerating it. RAW, TIFF, PNG and WebP use a
   sidecar; a standalone JPEG embeds XMP; a JPEG with a sidecar writes only that sidecar. Writes
   are staged, read back field-by-field, and checked so unrelated XMP (Darktable history, masks,
@@ -186,9 +186,9 @@ Lumio deliberately separates the bytes it displays from the original:
    [`rawler`](https://github.com/dnglab/dnglab). No full RAW demosaic happens in M1.
 3. If neither exists, the tile shows an honest placeholder instead of a broken image.
 
-The preview source is shown as a short label on tiles and as a badge in the filmstrip and
-fullscreen viewer. Images are resized with a box filter into a bucketed, content-addressed
-thumbnail cache under the OS application cache directory.
+The preview source is shown as a short label on tiles, a tooltip in the filmstrip and a badge
+in the fullscreen viewer. Images are resized with a box filter into a bucketed,
+content-addressed thumbnail cache under the OS application cache directory.
 
 ## Project layout
 

@@ -241,6 +241,8 @@ pub struct UiSettings {
     pub last_root_id: Option<String>,
     pub last_folder: Option<PathBuf>,
     pub filmstrip_visible: bool,
+    #[serde(default = "default_filmstrip_height")]
+    pub filmstrip_height: u32,
     #[serde(default)]
     pub list_show_associations: bool,
     /// User-selected applications offered in the photo context menu.
@@ -267,6 +269,10 @@ fn default_ui_font_size() -> u32 {
     13
 }
 
+fn default_filmstrip_height() -> u32 {
+    88
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -282,6 +288,7 @@ impl Default for UiSettings {
             last_root_id: None,
             last_folder: None,
             filmstrip_visible: true,
+            filmstrip_height: default_filmstrip_height(),
             list_show_associations: false,
             external_editors: Vec::new(),
             default_editor_path: None,

@@ -8,10 +8,16 @@ const props = defineProps<{
   data: HistogramData | null;
   loading: boolean;
   error: string | null;
+  /** True while a sensor histogram is being loaded. */
+  raw?: boolean;
 }>();
 
 const WIDTH = 256;
 const HEIGHT = 96;
+
+const loadingLabel = computed(() =>
+  props.raw ? 'Analyzing RAW data…' : 'Analyzing preview…',
+);
 
 const peak = computed(() => {
   if (!props.data) return 1;
@@ -57,7 +63,7 @@ const lumaPath = computed(() => (props.data ? curve(props.data.luma) : ''));
       class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-subtle"
     >
       <Loader2 class="h-4 w-4 animate-spin" />
-      <span class="text-2xs">Analyzing preview…</span>
+      <span class="text-2xs">{{ loadingLabel }}</span>
     </div>
     <div
       v-else-if="error"
@@ -77,7 +83,7 @@ const lumaPath = computed(() => (props.data ? curve(props.data.luma) : ''));
       viewBox="0 0 256 96"
       preserveAspectRatio="none"
       role="img"
-      :aria-label="`RGB histogram of ${data.pixels.toLocaleString()} preview pixels`"
+      :aria-label="`${data.raw ? 'RAW' : 'RGB'} histogram of ${data.pixels.toLocaleString()} ${data.raw ? 'sensor' : 'preview'} pixels`"
     >
       <g stroke="rgb(255 255 255 / 0.08)" stroke-width="1" vector-effect="non-scaling-stroke">
         <line x1="64" y1="0" x2="64" y2="96" />
@@ -91,7 +97,9 @@ const lumaPath = computed(() => (props.data ? curve(props.data.luma) : ''));
         <path :d="greenPath" fill="rgb(76 175 110)" fill-opacity="0.5" />
         <path :d="bluePath" fill="rgb(64 128 230)" fill-opacity="0.5" />
       </g>
+      <!-- RAW samples are split by CFA colour and have no true luminance value. -->
       <path
+        v-if="!data.raw"
         :d="lumaPath"
         fill="none"
         stroke="rgb(255 255 255 / 0.62)"

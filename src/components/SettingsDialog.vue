@@ -336,7 +336,7 @@ function addEditor() {
           <div class="flex items-center justify-between gap-4 px-3 py-2.5">
             <div>
               <p class="text-xs font-medium text-ink">Show info panel</p>
-              <p class="mt-0.5 text-2xs text-subtle">File details, associations and preview source.</p>
+              <p class="mt-0.5 text-2xs text-subtle">File details, camera data and associations.</p>
             </div>
             <button
               class="switch"

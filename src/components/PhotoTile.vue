@@ -6,7 +6,7 @@ import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
 import { ASSET_DRAG_MIME } from '@/lib/assets';
-import { formatDimensions, sourceLabel } from '@/lib/format';
+import { formatDimensions, previewSourceBadge, sourceLabel } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 import type { PhotoAsset } from '@/types';
 
@@ -81,7 +81,7 @@ const dotTitle = computed(() => {
 const footerSource = computed(() => {
   if (!thumb.value || thumb.value.status === 'loading') return 'Loading preview…';
   if (thumb.value.status === 'error') return 'Preview unavailable';
-  return sourceLabel(thumb.value.source);
+  return previewSourceBadge(thumb.value.source, props.asset.kind);
 });
 </script>
 

@@ -109,6 +109,34 @@ export function sourceLabel(source: PreviewSource): string {
   }
 }
 
+/** Short label for badges and preview captions. */
+export function previewSourceBadge(source: PreviewSource, kind?: AssetKind): string {
+  switch (source) {
+    case 'companionJpeg':
+      return 'JPG';
+    case 'embeddedRaw':
+      return 'EMBEDDED';
+    case 'original':
+      switch (kind) {
+        case 'raw':
+          return 'RAW';
+        case 'jpeg':
+          return 'JPG';
+        case 'png':
+          return 'PNG';
+        case 'tiff':
+          return 'TIFF';
+        case 'webp':
+          return 'WEBP';
+        default:
+          return 'FILE';
+      }
+    case 'placeholder':
+    default:
+      return 'NONE';
+  }
+}
+
 export function sourceDescription(source: PreviewSource): string {
   switch (source) {
     case 'original':

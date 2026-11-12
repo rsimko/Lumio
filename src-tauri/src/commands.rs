@@ -9,9 +9,9 @@ use lumio_core::ingest::{
 };
 use lumio_core::metadata::{MetadataSource, MetadataUpdate, MetadataWriteResult, PhotoMetadata};
 use lumio_core::types::{
-    AddFolderOutcome, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset, FolderImageCounts,
-    FolderNode, MoveAssetsOutcome, PhotoAsset, RootInfo, RootRemovalMode, ScanResult,
-    ThumbnailResult, UiSettings,
+    AddFolderOutcome, AssetKind, AssetRemovalMode, AssetRemovalOutcome, ExcludedAsset,
+    FolderImageCounts, FolderNode, MoveAssetsOutcome, PhotoAsset, RootInfo, RootRemovalMode,
+    ScanResult, ThumbnailResult, UiSettings,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -542,6 +542,55 @@ pub async fn get_histogram(
         Err(error) => Err(CommandError::new(
             "internal",
             format!("Histogram task failed: {error}"),
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn get_raw_histogram(
+    state: State<'_, AppState>,
+    asset: PhotoAsset,
+) -> Result<Histogram, CommandError> {
+    let asset = prepare_asset(&state, asset)?;
+    if asset.kind != AssetKind::Raw {
+        return Err(CommandError::new(
+            "unsupported",
+            "RAW histograms are only available for RAW photos.",
+        ));
+    }
+
+    let gate = state.thumb_gate.clone();
+    let inflight = state.inflight.clone();
+
+    // Decoding a full RAW image is expensive. Reuse the thumbnail queue so
+    // repeated toggles share one decode and previews are not starved.
+    let key = format!("raw:{}", asset.id);
+    let lock = {
+        let mut map = inflight
+            .lock()
+            .map_err(|_| CommandError::new("internal", "Histogram queue poisoned"))?;
+        map.entry(key)
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    };
+
+    let _guard = lock.lock().await;
+    let permit = gate
+        .acquire()
+        .await
+        .map_err(|_| CommandError::new("internal", "Thumbnail queue closed"))?;
+    match tokio::task::spawn_blocking(move || {
+        lumio_core::compute_raw_histogram_file(&asset.primary_path)
+    })
+    .await
+    {
+        Ok(result) => {
+            drop(permit);
+            Ok(result?)
+        }
+        Err(error) => Err(CommandError::new(
+            "internal",
+            format!("RAW histogram task failed: {error}"),
         )),
     }
 }

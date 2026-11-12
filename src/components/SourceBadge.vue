@@ -1,32 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { sourceDescription, sourceLabel } from '@/lib/format';
-import type { PreviewSource } from '@/types';
+import { previewSourceBadge, sourceDescription } from '@/lib/format';
+import type { AssetKind, PreviewSource } from '@/types';
 
 const props = withDefaults(
   defineProps<{
     source: PreviewSource;
-    compact?: boolean;
+    kind?: AssetKind;
     /** Solid dark treatment for badges drawn over photo pixels. */
     overlay?: boolean;
   }>(),
-  { compact: false, overlay: false },
+  { overlay: false },
 );
 
-const label = computed(() => {
-  if (!props.compact) return sourceLabel(props.source);
-  switch (props.source) {
-    case 'companionJpeg':
-      return 'JPEG';
-    case 'embeddedRaw':
-      return 'RAW';
-    case 'original':
-      return 'Original';
-    default:
-      return 'None';
-  }
-});
+const label = computed(() => previewSourceBadge(props.source, props.kind));
 
 const classes = computed(() => {
   if (props.overlay) {
@@ -47,11 +35,7 @@ const classes = computed(() => {
 </script>
 
 <template>
-  <span
-    class="badge ring-1"
-    :class="classes"
-    :title="sourceDescription(source)"
-  >
+  <span class="badge ring-1" :class="classes" :title="sourceDescription(source)">
     {{ label }}
   </span>
 </template>

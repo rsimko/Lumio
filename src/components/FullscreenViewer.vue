@@ -7,7 +7,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import MetadataBadges from '@/components/MetadataBadges.vue';
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue';
 import { dimensionsFor, markPreviewFailed, useThumbnail } from '@/composables/useThumbnails';
-import { formatCount, formatDimensions, sourceLabel } from '@/lib/format';
+import { formatCount, formatDimensions, previewSourceBadge } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 
 const store = useLibraryStore();
@@ -27,7 +27,7 @@ const thumb = useThumbnail(
 const sourceText = computed(() => {
   if (!thumb.value || thumb.value.status === 'loading') return 'Loading preview…';
   if (thumb.value.status === 'error') return 'Preview unavailable';
-  return sourceLabel(thumb.value.source);
+  return previewSourceBadge(thumb.value.source, store.selectedAsset?.kind);
 });
 
 const sourceDot = computed(() => {

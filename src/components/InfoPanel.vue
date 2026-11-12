@@ -33,7 +33,6 @@ import {
   formatFocalLength,
   formatShutterSpeed,
   kindLabel,
-  sourceDescription,
 } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 import type { CameraInfo, HistogramData } from '@/types';
@@ -50,11 +49,17 @@ const thumb = useThumbnail(
 type DetailTab = 'preview' | 'histogram';
 
 const detailTab = ref<DetailTab>('histogram');
+type HistogramMode = 'preview' | 'raw';
+const histogramMode = ref<HistogramMode>('preview');
 const histogram = ref<HistogramData | null>(null);
 const histogramStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
 const histogramError = ref<string | null>(null);
 const histogramCache = new Map<string, HistogramData>();
 let histogramRequest = 0;
+
+const showRawHistogram = computed(
+  () => histogramMode.value === 'raw' && asset.value?.kind === 'raw',
+);
 
 function resetHistogram(): void {
   histogramRequest += 1;
@@ -75,6 +80,34 @@ async function loadHistogram(): Promise<void> {
   const current = asset.value;
   if (!current || detailTab.value !== 'histogram') {
     resetHistogram();
+    return;
+  }
+
+  if (showRawHistogram.value) {
+    const rawKey = `${current.id}:raw`;
+    const cached = histogramCache.get(rawKey);
+    if (cached) {
+      resetHistogram();
+      histogram.value = cached;
+      histogramStatus.value = 'ready';
+      return;
+    }
+
+    const request = ++histogramRequest;
+    histogram.value = null;
+    histogramError.value = null;
+    histogramStatus.value = 'loading';
+    try {
+      const data = await api.rawHistogram(current);
+      if (request !== histogramRequest) return;
+      rememberHistogram(rawKey, data);
+      histogram.value = data;
+      histogramStatus.value = 'ready';
+    } catch (error) {
+      if (request !== histogramRequest) return;
+      histogramError.value = errorMessage(error);
+      histogramStatus.value = 'error';
+    }
     return;
   }
 
@@ -115,6 +148,7 @@ watch(
   [
     () => asset.value?.id ?? null,
     () => detailTab.value,
+    () => showRawHistogram.value,
     () => thumb.value?.status ?? 'idle',
     () => thumb.value?.edge ?? 0,
   ],
@@ -123,6 +157,10 @@ watch(
   },
   { immediate: true },
 );
+
+function toggleRawHistogram(): void {
+  histogramMode.value = histogramMode.value === 'raw' ? 'preview' : 'raw';
+}
 
 const cameraInfo = ref<CameraInfo | null>(null);
 const cameraStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -276,12 +314,32 @@ async function revealPrimary() {
                 Histogram
               </button>
             </div>
-            <span
-              v-if="detailTab === 'histogram' && histogram"
-              class="text-2xs tabular-nums text-subtle"
+            <div
+              v-if="detailTab === 'histogram'"
+              class="flex items-center gap-1.5"
             >
-              {{ formatCount(histogram.pixels) }} px
-            </span>
+              <button
+                v-if="asset.kind === 'raw'"
+                class="rounded border px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider transition"
+                :class="
+                  showRawHistogram
+                    ? 'border-accent/40 bg-accent-soft text-accent'
+                    : 'border-line bg-panel text-subtle hover:bg-panel-2 hover:text-ink'
+                "
+                :aria-pressed="showRawHistogram"
+                :title="
+                  showRawHistogram
+                    ? 'Show the histogram from the rendered preview'
+                    : 'Show the histogram from RAW sensor data'
+                "
+                @click="toggleRawHistogram"
+              >
+                RAW
+              </button>
+              <span v-if="histogram" class="text-2xs tabular-nums text-subtle">
+                {{ formatCount(histogram.pixels) }} px
+              </span>
+            </div>
           </div>
 
           <div
@@ -305,7 +363,7 @@ async function revealPrimary() {
                 @error="markPreviewFailed(thumb)"
               />
               <div class="pointer-events-none absolute inset-x-0 top-0 flex bg-gradient-to-b from-black/50 to-transparent p-2">
-                <SourceBadge :source="source" overlay />
+                <SourceBadge :source="source" :kind="asset.kind" overlay />
               </div>
               <Loader2
                 v-if="thumb?.status === 'loading'"
@@ -318,6 +376,7 @@ async function revealPrimary() {
               :data="histogram"
               :loading="histogramStatus === 'loading'"
               :error="histogramError"
+              :raw="showRawHistogram"
             />
           </div>
 
@@ -430,21 +489,6 @@ async function revealPrimary() {
               {{ asset.relativeDir || 'Library root' }}
             </span>
           </div>
-        </InfoSection>
-
-        <InfoSection title="Preview source">
-          <div class="flex items-center gap-2">
-            <SourceBadge :source="source" />
-            <span v-if="thumb?.edge" class="text-2xs tabular-nums text-subtle">
-              {{ thumb.edge }} px cache
-            </span>
-          </div>
-          <p class="mt-1.5 text-2xs leading-relaxed text-muted">
-            {{ sourceDescription(source) }}
-          </p>
-          <p v-if="thumb?.error" class="mt-1.5 text-2xs leading-relaxed text-danger">
-            {{ thumb.error }}
-          </p>
         </InfoSection>
 
         <InfoSection title="Associations">
@@ -584,7 +628,7 @@ async function revealPrimary() {
         </InfoSection>
 
         <p class="mx-3 my-3 rounded-md border border-dashed border-line px-2.5 py-2 text-2xs leading-relaxed text-subtle">
-          Select a photo to inspect its files and preview source.
+          Select a photo to inspect its files and metadata.
         </p>
       </template>
 

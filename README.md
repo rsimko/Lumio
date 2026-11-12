@@ -1,5 +1,8 @@
 # Lumio
 
+IMPORTANT !!!
+This is a persolan project and I am building it for my personal needs and it is adjusted to my workflow. I am not planning to make an official release version. Application is vibe-coded and I do not take any responsibility if it doesn't work as you expect, That said, feel free to fork it and do whatever you please with the codebase.
+
 Lumio is a local-first browser for RAW photography. Point it at folders that already
 contain photos and it shows them in place — nothing is imported, moved or renamed. Photos are
 only written when you explicitly rate, label, flag or favorite them, and even then only the XMP
@@ -71,13 +74,15 @@ Cataloguing, search and the keyword editor come later.
   only the keyword editor UI is deferred.
 - Associate RAW + JPEG pairs and XMP sidecars that already exist next to the originals.
 - See exactly where each preview came from: original image, companion JPEG, camera-embedded
-  RAW preview, or a placeholder when none can be extracted.
+  RAW preview, or a placeholder when none can be extracted. Preview badges use the short
+  `EMBEDDED`, `JPG`, `RAW` or file-type labels.
 - Switch the info panel tile between the preview and an RGB/luminance histogram computed from
-  the same cached preview; both tabs share one tile and the histogram opens by default.
-- Collapse info-panel sections such as Metadata, Camera and lens, File, Preview source and
-  Associations to keep the panel compact. Camera make/model, lens, shutter, aperture, ISO and
-  focal length are read from embedded EXIF; RAW files also try the rawler decoder and their
-  companion JPEG. Reading this information does not require ExifTool.
+  the same cached preview; both tabs share one tile and the histogram opens by default. RAW
+  photos have a RAW button that recomputes the histogram from decoded sensor samples.
+- Collapse info-panel sections such as Metadata, Camera and lens, File and Associations to keep
+  the panel compact. Camera make/model, lens, shutter, aperture, ISO and focal length are read
+  from embedded EXIF; RAW files also try the rawler decoder and their companion JPEG. Reading
+  this information does not require ExifTool.
 - Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
   keyboard shortcuts.
 - Settings for the Avenir interface font, bundled JetBrains Mono, and text size.
@@ -181,9 +186,9 @@ Lumio deliberately separates the bytes it displays from the original:
    [`rawler`](https://github.com/dnglab/dnglab). No full RAW demosaic happens in M1.
 3. If neither exists, the tile shows an honest placeholder instead of a broken image.
 
-The preview source is shown on the tile, in the info panel and in the fullscreen viewer.
-Images are resized with a box filter into a bucketed, content-addressed thumbnail cache
-under the OS application cache directory.
+The preview source is shown as a short label on tiles and as a badge in the filmstrip and
+fullscreen viewer. Images are resized with a box filter into a bucketed, content-addressed
+thumbnail cache under the OS application cache directory.
 
 ## Project layout
 

@@ -11,6 +11,7 @@ import {
   isPathInside,
   kindLabel,
   parentPath,
+  previewSourceBadge,
   sourceDescription,
   sourceLabel,
 } from '@/lib/format';
@@ -60,6 +61,15 @@ describe('format helpers', () => {
     expect(sourceLabel('companionJpeg')).toBe('Companion JPEG');
     expect(sourceLabel('placeholder')).toBe('No preview');
     expect(sourceDescription('original')).toContain('displayed image');
+  });
+
+  it('uses short preview badge labels', () => {
+    expect(previewSourceBadge('embeddedRaw')).toBe('EMBEDDED');
+    expect(previewSourceBadge('companionJpeg')).toBe('JPG');
+    expect(previewSourceBadge('original', 'raw')).toBe('RAW');
+    expect(previewSourceBadge('original', 'jpeg')).toBe('JPG');
+    expect(previewSourceBadge('original', 'tiff')).toBe('TIFF');
+    expect(previewSourceBadge('placeholder')).toBe('NONE');
   });
 
   it('handles POSIX paths', () => {

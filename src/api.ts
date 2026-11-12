@@ -56,6 +56,7 @@ export const api = {
     invoke<ThumbnailResult>('get_thumbnail', { asset, edge, preferThumbnail }),
   histogram: (asset: PhotoAsset, edge: number) =>
     invoke<HistogramData>('get_histogram', { asset, edge }),
+  rawHistogram: (asset: PhotoAsset) => invoke<HistogramData>('get_raw_histogram', { asset }),
   cameraInfo: (asset: PhotoAsset) => invoke<CameraInfo>('get_camera_info', { asset }),
   clearThumbnailCache: () => invoke<void>('clear_thumbnail_cache'),
   openAsset: (path: string) => invoke<void>('open_asset', { path }),

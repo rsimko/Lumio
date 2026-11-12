@@ -17,7 +17,9 @@ pub use camera::{CameraInfo, read_camera_info};
 pub use config::ConfigStore;
 pub use error::{LumioError, Result};
 pub use folders::create_folder;
-pub use histogram::{HISTOGRAM_BINS, Histogram, compute_histogram};
+pub use histogram::{
+    HISTOGRAM_BINS, Histogram, compute_histogram, compute_raw_histogram, compute_raw_histogram_file,
+};
 pub use scan::{
     count_folder_images, count_folder_images_excluding, list_subfolders, list_subfolders_excluding,
     scan_photos, scan_photos_excluding,

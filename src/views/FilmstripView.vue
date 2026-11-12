@@ -68,7 +68,7 @@ function openContextMenu(event: MouseEvent) {
       </div>
 
       <div class="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
-        <SourceBadge :source="source" />
+        <SourceBadge :source="source" :kind="store.selectedAsset.kind" />
         <span class="rounded bg-black/35 px-1.5 py-0.5 text-2xs tabular-nums text-white/85 backdrop-blur-[2px]">
           {{ dimensions }}
         </span>

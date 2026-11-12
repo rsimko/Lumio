@@ -224,6 +224,8 @@ export interface HistogramData {
   /** Rec. 709 luminance counts. */
   luma: number[];
   pixels: number;
+  /** True when the counts come from RAW sensor samples. */
+  raw: boolean;
 }
 
 export interface ExternalEditor {

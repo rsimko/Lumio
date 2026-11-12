@@ -84,7 +84,7 @@ function onKeydown(event: KeyboardEvent): void {
       v-if="multiline"
       v-model="draft"
       rows="2"
-      class="w-full resize-y rounded-md border bg-panel px-2 py-1.5 text-xs leading-relaxed text-ink outline-none transition placeholder:text-subtle/60 focus:border-accent/70 focus:ring-1 focus:ring-accent/30"
+      class="w-full resize-y rounded-md border bg-main px-2 py-1.5 text-xs leading-relaxed text-ink outline-none transition placeholder:text-subtle/60 focus:border-accent/70 focus:ring-1 focus:ring-accent/30"
       :class="invalid ? 'border-danger/60' : 'border-line'"
       :placeholder="mixed ? 'Mixed values' : placeholder"
       :maxlength="maxlength"
@@ -98,7 +98,7 @@ function onKeydown(event: KeyboardEvent): void {
     <input
       v-else
       v-model="draft"
-      class="w-full rounded-md border bg-panel px-2 py-1.5 text-xs text-ink outline-none transition placeholder:text-subtle/60 focus:border-accent/70 focus:ring-1 focus:ring-accent/30"
+      class="w-full rounded-md border bg-main px-2 py-1.5 text-xs text-ink outline-none transition placeholder:text-subtle/60 focus:border-accent/70 focus:ring-1 focus:ring-accent/30"
       :class="invalid ? 'border-danger/60' : 'border-line'"
       :placeholder="mixed ? 'Mixed values' : placeholder"
       :maxlength="maxlength"

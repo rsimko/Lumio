@@ -6,6 +6,7 @@ import {
   navigateSelection,
   rangeSelection,
   reconcileSelection,
+  retainVisibleSelection,
   selectAllSelection,
   singleSelection,
   toggleSelection,
@@ -57,6 +58,17 @@ describe('selection helpers', () => {
 
     const gone = { ids: ['x'], primaryId: 'x', anchorId: 'x' };
     expect(reconcileSelection(order, gone, 2)).toEqual(singleSelection('c'));
+  });
+
+  it('retains visible selection without choosing a replacement', () => {
+    const state = { ids: ['a', 'c', 'e'], primaryId: 'c', anchorId: 'a' };
+    expect(retainVisibleSelection(['a', 'b', 'c'], state)).toEqual({
+      ids: ['a', 'c'],
+      primaryId: 'c',
+      anchorId: 'a',
+    });
+    expect(retainVisibleSelection(['b'], state)).toEqual(emptySelection());
+    expect(retainVisibleSelection([], state)).toEqual(emptySelection());
   });
 
   it('navigates and extends with shift-arrow', () => {

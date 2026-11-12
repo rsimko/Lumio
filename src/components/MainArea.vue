@@ -4,10 +4,13 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  Funnel,
   Images,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Trash2,
+  X,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -40,7 +43,7 @@ const viewComponent = computed(() => {
 
 const showHeader = computed(() => Boolean(store.selectedFolder));
 const showSkeleton = computed(
-  () => store.scanState === 'loading' && store.assets.length === 0,
+  () => store.scanState === 'loading' && store.totalCount === 0,
 );
 const showAssets = computed(
   () =>
@@ -48,7 +51,14 @@ const showAssets = computed(
     store.assets.length > 0,
 );
 const showEmptyFolder = computed(
-  () => store.scanState === 'ready' && store.assets.length === 0,
+  () => store.scanState === 'ready' && store.totalCount === 0,
+);
+const showFilteredEmpty = computed(
+  () =>
+    store.scanState === 'ready' &&
+    store.totalCount > 0 &&
+    store.assets.length === 0 &&
+    store.hasActiveFilters,
 );
 const showError = computed(() => store.scanState === 'error');
 const showWelcome = computed(
@@ -112,9 +122,38 @@ function removeSelectedRoot() {
           Scanning…
         </span>
         <template v-else-if="store.scanState === 'ready' && store.viewMode !== 'filmstrip'">
+          <div
+            v-if="store.hasActiveFilters"
+            class="inline-flex items-center overflow-hidden rounded-md border border-accent/30 bg-accent-soft"
+          >
+            <button
+              class="flex items-center gap-1 px-1.5 py-0.5 font-medium text-accent transition hover:bg-accent/10"
+              title="Open filters"
+              @click="store.setLeftPanelTab('filters')"
+            >
+              <Funnel class="h-3 w-3" />
+              {{ store.activeFilterCount }}
+              {{ store.activeFilterCount === 1 ? 'filter' : 'filters' }}
+            </button>
+            <button
+              class="flex h-full items-center border-l border-accent/20 px-1 py-0.5 text-accent/80 transition hover:bg-accent/10 hover:text-accent"
+              title="Clear all filters"
+              aria-label="Clear all filters"
+              @click="store.clearFilters()"
+            >
+              <X class="h-3 w-3" />
+            </button>
+          </div>
           <span class="tabular-nums">
-            {{ formatCount(store.stats.total) }}
-            {{ pluralize(store.stats.total, 'photo') }}
+            <template v-if="store.hasActiveFilters">
+              {{ formatCount(store.assets.length) }} of
+              {{ formatCount(store.totalCount) }}
+              {{ pluralize(store.totalCount, 'photo') }}
+            </template>
+            <template v-else>
+              {{ formatCount(store.totalCount) }}
+              {{ pluralize(store.totalCount, 'photo') }}
+            </template>
           </span>
           <span v-if="store.scanElapsedMs" class="hidden tabular-nums md:inline">
             · scanned in {{ formatDuration(store.scanElapsedMs) }}
@@ -257,6 +296,31 @@ function removeSelectedRoot() {
               @click="removeSelectedRoot()"
             >
               Remove from library
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="showFilteredEmpty" class="flex h-full items-center justify-center p-8">
+        <div class="max-w-sm text-center">
+          <div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-panel-2 text-subtle">
+            <Funnel class="h-5 w-5" />
+          </div>
+          <h2 class="text-sm font-semibold text-ink">No photos match these filters</h2>
+          <p class="mt-1 text-xs leading-relaxed text-muted">
+            None of the {{ formatCount(store.totalCount) }}
+            {{ pluralize(store.totalCount, 'photo') }} in this folder match the
+            {{ store.activeFilterCount }}
+            {{ store.activeFilterCount === 1 ? 'active filter' : 'active filters' }}.
+          </p>
+          <div class="mt-4 flex items-center justify-center gap-2">
+            <button class="btn-primary" @click="store.clearFilters()">
+              <RotateCcw class="h-3.5 w-3.5" />
+              Clear filters
+            </button>
+            <button class="btn" @click="store.setLeftPanelTab('filters')">
+              <Funnel class="h-3.5 w-3.5" />
+              Edit filters
             </button>
           </div>
         </div>

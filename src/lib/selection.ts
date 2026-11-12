@@ -122,6 +122,26 @@ export function reconcileSelection(
   return { ids, primaryId, anchorId };
 }
 
+/**
+ * Keep selected IDs that remain visible without selecting a replacement.
+ * Filtering can hide every selected photo; in that case the editor should
+ * become empty rather than acting on an arbitrary survivor.
+ */
+export function retainVisibleSelection(
+  order: readonly string[],
+  state: SelectionState,
+): SelectionState {
+  const available = new Set(order);
+  const selected = new Set(state.ids);
+  const ids = order.filter((id) => selected.has(id));
+  if (!ids.length) return emptySelection();
+  const primaryId =
+    state.primaryId && available.has(state.primaryId) ? state.primaryId : ids[0];
+  const anchorId =
+    state.anchorId && available.has(state.anchorId) ? state.anchorId : primaryId;
+  return { ids, primaryId, anchorId };
+}
+
 /** Arrow-key navigation; Shift keeps the original anchor and extends. */
 export function navigateSelection(
   order: readonly string[],

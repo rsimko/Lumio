@@ -2,6 +2,7 @@
 import { FolderPlus, FolderTree, Loader2, RefreshCw, Trash2, X } from 'lucide-vue-next';
 
 import FolderTreeNode from '@/components/FolderTreeNode.vue';
+import FilterPanel from '@/components/FilterPanel.vue';
 import ResizeHandle from '@/components/ResizeHandle.vue';
 import { useLibraryStore } from '@/stores/library';
 import type { FolderNode, RootInfo } from '@/types';
@@ -36,8 +37,10 @@ function commitResize(width: number) {
     :style="{ width: `${store.settings.libraryWidth}px` }"
   >
     <div class="flex h-10 shrink-0 items-center justify-between px-3">
-      <span class="panel-heading">Library</span>
-      <div class="flex items-center gap-0.5">
+      <span class="panel-heading">
+        {{ store.leftPanelTab === 'filters' ? 'Filters' : 'Library' }}
+      </span>
+      <div v-if="store.leftPanelTab === 'library'" class="flex items-center gap-0.5">
         <button
           class="btn-icon-sm"
           :title="`Refresh selected folder (${store.shortcutLabel('library.refresh')})`"
@@ -68,10 +71,24 @@ function commitResize(width: number) {
           <FolderPlus v-else class="h-3.5 w-3.5" />
         </button>
       </div>
+      <button
+        v-else
+        class="btn-icon-sm"
+        :disabled="!store.hasActiveFilters"
+        title="Clear all filters"
+        aria-label="Clear all filters"
+        @click="store.clearFilters()"
+      >
+        <X class="h-3.5 w-3.5" />
+      </button>
     </div>
 
     <div
-      v-if="store.recoveryWarning && !store.recoveryWarningDismissed"
+      v-if="
+        store.leftPanelTab === 'library' &&
+        store.recoveryWarning &&
+        !store.recoveryWarningDismissed
+      "
       class="mx-2 mb-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-2xs leading-snug text-warning"
     >
       <div class="flex items-start gap-1.5">
@@ -87,44 +104,48 @@ function commitResize(width: number) {
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
-      <div v-if="store.initializing" class="space-y-1 px-2 py-1">
-        <div
-          v-for="row in 5"
-          :key="row"
-          class="h-6 animate-pulse rounded bg-panel-2"
-          :style="{ width: `${100 - row * 9}%` }"
-        />
-      </div>
-
-      <div v-else-if="!store.roots.length" class="flex flex-col items-center px-3 py-8 text-center">
-        <div class="mb-3 grid h-10 w-10 place-items-center rounded-full bg-panel-2 text-subtle">
-          <FolderPlus class="h-5 w-5" />
-        </div>
-        <p class="text-xs font-medium text-ink">No folders yet</p>
-        <p class="mt-1 text-2xs leading-relaxed text-subtle">
-          Add a folder that already contains photos. Lumio never moves or changes the originals.
-        </p>
-        <button class="btn-primary mt-3 w-full" :disabled="store.addingRoot" @click="store.addRoot()">
-          <FolderPlus class="h-3.5 w-3.5" />
-          Add folder
-        </button>
-      </div>
+      <FilterPanel v-if="store.leftPanelTab === 'filters'" />
 
       <template v-else>
-        <FolderTreeNode
-          v-for="root in store.roots"
-          :key="root.id"
-          :node="rootNode(root)"
-          :root-id="root.id"
-          :depth="0"
-          is-root
-          :available="root.available"
-        />
+        <div v-if="store.initializing" class="space-y-1 px-2 py-1">
+          <div
+            v-for="row in 5"
+            :key="row"
+            class="h-6 animate-pulse rounded bg-panel-2"
+            :style="{ width: `${100 - row * 9}%` }"
+          />
+        </div>
+
+        <div v-else-if="!store.roots.length" class="flex flex-col items-center px-3 py-8 text-center">
+          <div class="mb-3 grid h-10 w-10 place-items-center rounded-full bg-panel-2 text-subtle">
+            <FolderPlus class="h-5 w-5" />
+          </div>
+          <p class="text-xs font-medium text-ink">No folders yet</p>
+          <p class="mt-1 text-2xs leading-relaxed text-subtle">
+            Add a folder that already contains photos. Lumio never moves or changes the originals.
+          </p>
+          <button class="btn-primary mt-3 w-full" :disabled="store.addingRoot" @click="store.addRoot()">
+            <FolderPlus class="h-3.5 w-3.5" />
+            Add folder
+          </button>
+        </div>
+
+        <template v-else>
+          <FolderTreeNode
+            v-for="root in store.roots"
+            :key="root.id"
+            :node="rootNode(root)"
+            :root-id="root.id"
+            :depth="0"
+            is-root
+            :available="root.available"
+          />
+        </template>
       </template>
     </div>
 
     <div
-      v-if="store.selectedFolderCount > 1"
+      v-if="store.leftPanelTab === 'library' && store.selectedFolderCount > 1"
       class="mx-1.5 mb-1 flex shrink-0 items-center gap-1.5 rounded-md border border-accent/30 bg-accent-soft/60 px-2 py-1 text-2xs"
     >
       <span class="min-w-0 flex-1 truncate font-medium text-accent">
@@ -155,7 +176,7 @@ function commitResize(width: number) {
         <Loader2 class="h-3 w-3 animate-spin" />
         Scanning…
       </span>
-      <span v-else-if="store.scanState === 'ready'">{{ store.stats.total }} photos</span>
+      <span v-else-if="store.scanState === 'ready'">{{ store.totalCount }} photos</span>
       <span v-else>Ready</span>
     </div>
 

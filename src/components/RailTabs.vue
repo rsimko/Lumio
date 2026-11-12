@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Images, Keyboard, Layers, Map, Settings } from 'lucide-vue-next';
+import { Funnel, Images, Keyboard, Layers, Map, Settings } from 'lucide-vue-next';
 
 import { useLibraryStore } from '@/stores/library';
 
@@ -16,11 +16,36 @@ function planned(feature: string) {
     aria-label="Workspace tabs"
   >
     <button
-      class="flex h-8 w-8 items-center justify-center rounded-md bg-accent-soft text-accent"
+      class="flex h-8 w-8 items-center justify-center rounded-md transition"
+      :class="
+        store.leftPanelTab === 'library'
+          ? 'bg-accent-soft text-accent'
+          : 'text-subtle hover:bg-panel-2 hover:text-muted'
+      "
       title="Library"
-      aria-current="page"
+      :aria-current="store.leftPanelTab === 'library' ? 'page' : undefined"
+      @click="store.setLeftPanelTab('library')"
     >
       <Images class="h-4 w-4" />
+    </button>
+    <button
+      class="relative flex h-8 w-8 items-center justify-center rounded-md transition"
+      :class="
+        store.leftPanelTab === 'filters'
+          ? 'bg-accent-soft text-accent'
+          : 'text-subtle hover:bg-panel-2 hover:text-muted'
+      "
+      title="Filters"
+      :aria-current="store.leftPanelTab === 'filters' ? 'page' : undefined"
+      @click="store.setLeftPanelTab('filters')"
+    >
+      <Funnel class="h-4 w-4" />
+      <span
+        v-if="store.hasActiveFilters"
+        class="absolute -right-0.5 -top-0.5 min-w-[14px] rounded-full bg-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-accent-ink"
+      >
+        {{ store.activeFilterCount }}
+      </span>
     </button>
     <button
       class="flex h-8 w-8 items-center justify-center rounded-md text-subtle transition hover:bg-panel-2 hover:text-muted"

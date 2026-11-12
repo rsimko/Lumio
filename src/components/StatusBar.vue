@@ -2,7 +2,7 @@
 import { AlertTriangle, Loader2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
-import { formatCount, formatDuration } from '@/lib/format';
+import { formatCount, formatDuration, pluralize } from '@/lib/format';
 import { useLibraryStore } from '@/stores/library';
 
 const store = useLibraryStore();
@@ -41,11 +41,15 @@ const statusDot = computed(() => {
         {{ formatCount(store.selectedCount) }} selected
       </span>
       <span v-if="store.selectedIndex >= 0" class="tabular-nums">
-        {{ store.selectedIndex + 1 }} / {{ formatCount(store.stats.total) }}
+        {{ store.selectedIndex + 1 }} / {{ formatCount(store.assets.length) }}
       </span>
       <span v-else-if="store.scanState === 'ready'" class="tabular-nums">
-        {{ formatCount(store.stats.total) }} photos
+        {{ formatCount(store.assets.length) }}
+        {{ pluralize(store.assets.length, 'photo') }}<span v-if="store.hasActiveFilters">
+          of {{ formatCount(store.totalCount) }}</span
+        >
       </span>
+      <span v-if="store.hasActiveFilters" class="font-medium text-accent">Filtered</span>
       <span v-if="store.settings.recursive" class="text-accent">Recursive</span>
       <span v-if="store.scanState === 'ready' && store.scanElapsedMs" class="hidden tabular-nums md:inline">
         Scanned in {{ formatDuration(store.scanElapsedMs) }}

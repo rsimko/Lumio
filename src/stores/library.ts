@@ -11,6 +11,18 @@ import {
   normalizeExternalEditors,
 } from '@/lib/editors';
 import { fontFamilyStack, resolveFontChoice } from '@/lib/fonts';
+import {
+  activeFilterCount as countActiveFilters,
+  emptyFilters,
+  filterAssets,
+  hasActiveFilters as filtersAreActive,
+  toggleFilterValue,
+  type AssetFilters,
+  type CullFilterValue,
+  type FavoriteFilterValue,
+  type LabelFilterValue,
+  type RatingFilterValue,
+} from '@/lib/filters';
 import { basename, isPathInside, parentPath } from '@/lib/format';
 import { pruneFolderRemovalTargets } from '@/lib/folders';
 import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
@@ -37,6 +49,7 @@ import {
   emptySelection,
   navigateSelection,
   reconcileSelection,
+  retainVisibleSelection,
   selectAllSelection,
   singleSelection,
   type SelectionState,
@@ -186,7 +199,11 @@ export const useLibraryStore = defineStore('library', () => {
   /** Folder rows highlighted for bulk actions; independent from the folder being browsed. */
   const selectedFolderPaths = ref<ReadonlySet<string>>(new Set());
   const folderSelectionAnchor = ref<string | null>(null);
-  const assets = shallowRef<PhotoAsset[]>([]);
+  /** Every asset from the current scan, before the Filters tab narrows the view. */
+  const allAssets = shallowRef<PhotoAsset[]>([]);
+  const filters = ref<AssetFilters>(emptyFilters());
+  const assets = computed(() => filterAssets(allAssets.value, filters.value));
+  const leftPanelTab = ref<'library' | 'filters'>('library');
   const warnings = ref<ScanWarning[]>([]);
   const scanState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const scanError = ref<string | null>(null);
@@ -369,11 +386,15 @@ export const useLibraryStore = defineStore('library', () => {
 
   const assetIndex = computed(() => {
     const index = new Map<string, PhotoAsset>();
-    for (const asset of assets.value) index.set(asset.id, asset);
+    for (const asset of allAssets.value) index.set(asset.id, asset);
     return index;
   });
 
   const assetOrder = computed(() => assets.value.map((asset) => asset.id));
+  const totalCount = computed(() => allAssets.value.length);
+  const filteredCount = computed(() => assets.value.length);
+  const hasActiveFilters = computed(() => filtersAreActive(filters.value));
+  const activeFilterCount = computed(() => countActiveFilters(filters.value));
   let focusIndexAfterScan: number | null = null;
 
   const selectedAsset = computed(() => {
@@ -423,20 +444,37 @@ export const useLibraryStore = defineStore('library', () => {
     anchorId.value = next.anchorId;
   }
 
+  // Filters can hide selected photos. Drop those IDs without choosing a
+  // replacement so metadata editors never imply an unintended active photo.
+  watch([filters, () => assetOrder.value.join('|')], () => {
+    if (!selectedIds.value.size) return;
+    const next = retainVisibleSelection(assetOrder.value, {
+      ids: [...selectedIds.value],
+      primaryId: primaryId.value,
+      anchorId: anchorId.value,
+    });
+    const unchanged =
+      next.ids.length === selectedIds.value.size &&
+      next.ids.every((id) => selectedIds.value.has(id)) &&
+      next.primaryId === primaryId.value &&
+      next.anchorId === anchorId.value;
+    if (!unchanged) applySelection(next);
+  });
+
   const stats = computed<FolderStats>(() => {
     let raw = 0;
     let jpeg = 0;
     let other = 0;
     let withXmp = 0;
     let withCompanion = 0;
-    for (const asset of assets.value) {
+    for (const asset of allAssets.value) {
       if (asset.kind === 'raw') raw += 1;
       else if (asset.kind === 'jpeg') jpeg += 1;
       else other += 1;
       if (asset.xmpSidecar) withXmp += 1;
       if (asset.companionJpeg) withCompanion += 1;
     }
-    return { total: assets.value.length, raw, jpeg, other, withXmp, withCompanion };
+    return { total: allAssets.value.length, raw, jpeg, other, withXmp, withCompanion };
   });
 
   const folderName = computed(() => {
@@ -706,7 +744,7 @@ export const useLibraryStore = defineStore('library', () => {
     silent: boolean,
   ): Promise<void> {
     const wanted = new Set(targetIds);
-    const assetsToUpdate = assets.value.filter((asset) => wanted.has(asset.id));
+    const assetsToUpdate = allAssets.value.filter((asset) => wanted.has(asset.id));
     if (!assetsToUpdate.length) {
       if (!silent) addToast('Select a photo to edit metadata.', 'info');
       return;
@@ -725,7 +763,7 @@ export const useLibraryStore = defineStore('library', () => {
     // The optimistic value was applied when the edit was enqueued. Reapply it
     // in case a previous write merged a server snapshot over it in the meantime.
     const snapshots = new Map<string, PhotoMetadata>();
-    assets.value = assets.value.map((asset) => {
+    allAssets.value = allAssets.value.map((asset) => {
       if (!wanted.has(asset.id)) return asset;
       snapshots.set(asset.id, asset.metadata);
       return { ...asset, metadata: applyMetadataUpdate(asset.metadata, update) };
@@ -736,7 +774,7 @@ export const useLibraryStore = defineStore('library', () => {
 
       if (outcome.updated.length) {
         const byId = new Map(outcome.updated.map((result) => [result.assetId, result]));
-        assets.value = assets.value.map((asset) => {
+        allAssets.value = allAssets.value.map((asset) => {
           const result = byId.get(asset.id);
           if (!result) return asset;
           return mergeMetadataResult(
@@ -761,7 +799,7 @@ export const useLibraryStore = defineStore('library', () => {
 
       if (outcome.failed.length) {
         const failedIds = new Set(outcome.failed.map((failure) => failure.assetId));
-        assets.value = assets.value.map((asset) => {
+        allAssets.value = allAssets.value.map((asset) => {
           const snapshot = snapshots.get(asset.id);
           if (!snapshot || !failedIds.has(asset.id)) return asset;
           return { ...asset, metadata: snapshot };
@@ -776,7 +814,7 @@ export const useLibraryStore = defineStore('library', () => {
       }
     } catch (error) {
       // Restore the optimistic values when the request fails as a whole.
-      assets.value = assets.value.map((asset) => {
+      allAssets.value = allAssets.value.map((asset) => {
         const snapshot = snapshots.get(asset.id);
         return snapshot ? { ...asset, metadata: snapshot } : asset;
       });
@@ -806,7 +844,7 @@ export const useLibraryStore = defineStore('library', () => {
     // Apply immediately for responsive controls. The queued task re-applies it
     // and only then records its rollback snapshot.
     const wanted = new Set(targetIds);
-    assets.value = assets.value.map((asset) =>
+    allAssets.value = allAssets.value.map((asset) =>
       wanted.has(asset.id)
         ? { ...asset, metadata: applyMetadataUpdate(asset.metadata, update) }
         : asset,
@@ -902,6 +940,42 @@ export const useLibraryStore = defineStore('library', () => {
 
   function clearSelection(): void {
     applySelection(emptySelection());
+  }
+
+  function toggleRatingFilter(value: RatingFilterValue): void {
+    filters.value = {
+      ...filters.value,
+      ratings: toggleFilterValue(filters.value.ratings, value),
+    };
+  }
+
+  function toggleLabelFilter(value: LabelFilterValue): void {
+    filters.value = {
+      ...filters.value,
+      labels: toggleFilterValue(filters.value.labels, value),
+    };
+  }
+
+  function toggleCullFilter(value: CullFilterValue): void {
+    filters.value = {
+      ...filters.value,
+      culls: toggleFilterValue(filters.value.culls, value),
+    };
+  }
+
+  function toggleFavoriteFilter(value: FavoriteFilterValue): void {
+    filters.value = {
+      ...filters.value,
+      favorites: toggleFilterValue(filters.value.favorites, value),
+    };
+  }
+
+  function clearFilters(): void {
+    filters.value = emptyFilters();
+  }
+
+  function setLeftPanelTab(tab: 'library' | 'filters'): void {
+    leftPanelTab.value = tab;
   }
 
   function navigateBy(offset: number, extend = false): void {
@@ -1022,13 +1096,13 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const result = await api.scanFolder(folder, settings.value.recursive);
       if (token !== scanToken) return;
-      assets.value = result.assets;
+      allAssets.value = result.assets;
       warnings.value = result.warnings;
       scanElapsedMs.value = result.elapsedMs;
       scanState.value = 'ready';
       applySelection(
         reconcileSelection(
-          result.assets.map((asset) => asset.id),
+          assetOrder.value,
           currentSelection(),
           focusIndexAfterScan,
         ),
@@ -1036,7 +1110,7 @@ export const useLibraryStore = defineStore('library', () => {
       focusIndexAfterScan = null;
     } catch (error) {
       if (token !== scanToken) return;
-      assets.value = [];
+      allAssets.value = [];
       warnings.value = [];
       applySelection(emptySelection());
       focusIndexAfterScan = null;
@@ -1066,7 +1140,7 @@ export const useLibraryStore = defineStore('library', () => {
     selectedRootId.value = rootId;
     selectedFolder.value = path;
     applySelection(emptySelection());
-    assets.value = [];
+    allAssets.value = [];
     warnings.value = [];
     scanElapsedMs.value = 0;
     scanError.value = null;
@@ -1440,7 +1514,7 @@ export const useLibraryStore = defineStore('library', () => {
         selectedFolder.value = null;
         applyFolderSelection(emptySelection());
         applySelection(emptySelection());
-        assets.value = [];
+        allAssets.value = [];
         warnings.value = [];
         scanState.value = 'idle';
         scanError.value = null;
@@ -1772,6 +1846,18 @@ export const useLibraryStore = defineStore('library', () => {
     hasRoots,
     // scanning
     assets,
+    totalCount,
+    filteredCount,
+    filters,
+    hasActiveFilters,
+    activeFilterCount,
+    toggleRatingFilter,
+    toggleLabelFilter,
+    toggleCullFilter,
+    toggleFavoriteFilter,
+    clearFilters,
+    leftPanelTab,
+    setLeftPanelTab,
     assetIndex,
     warnings,
     warningsCount,

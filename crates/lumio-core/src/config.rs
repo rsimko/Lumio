@@ -697,9 +697,10 @@ mod tests {
 
         let mut store = ConfigStore::open(&config_path).unwrap();
         let mut ui = store.config().ui.clone();
-        ui.ui_font = "system".into();
-        ui.mono_font = "system".into();
+        ui.ui_font = "Avenir Next".into();
+        ui.mono_font = "Fira Code".into();
         ui.ui_font_size = 16;
+        ui.thumbnail_radius = 11;
         ui.filmstrip_height = 132;
         ui.list_show_associations = true;
         ui.external_editors.push(crate::types::ExternalEditor {
@@ -712,6 +713,9 @@ mod tests {
 
         let reopened = ConfigStore::open(&config_path).unwrap();
         assert_eq!(reopened.config().ui, ui);
+        assert_eq!(reopened.config().ui.ui_font, "Avenir Next");
+        assert_eq!(reopened.config().ui.mono_font, "Fira Code");
+        assert_eq!(reopened.config().ui.thumbnail_radius, 11);
         assert_eq!(
             reopened
                 .config()
@@ -760,6 +764,7 @@ mod tests {
         assert_eq!(ui.ui_font, "avenir");
         assert_eq!(ui.mono_font, "jetbrains");
         assert_eq!(ui.ui_font_size, 13);
+        assert_eq!(ui.thumbnail_radius, 5);
         assert_eq!(ui.filmstrip_height, 88);
         assert!(!ui.list_show_associations);
         assert!(ui.external_editors.is_empty());

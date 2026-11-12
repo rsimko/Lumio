@@ -53,7 +53,7 @@ Cataloguing, search and the keyword editor come later.
 - Delete photos from the library only or from disk, from the toolbar, the info panel, the
   Delete key, or by right-clicking a photo. Disk deletion moves every associated file to the
   system Trash after an explicit warning; library-only deletion hides the group and can be
-  reversed in Settings → Hidden photos.
+  reversed in Settings → Library → Hidden photos.
 - Double-click any thumbnail to open it in filmstrip view.
 - See photo counts beside every folder in the tree; counts follow the Include subfolders setting.
 - Companion JPEG and XMP associations are shown as badges in list view and the info panel.
@@ -83,9 +83,12 @@ Cataloguing, search and the keyword editor come later.
   the panel compact. Camera make/model, lens, shutter, aperture, ISO and focal length are read
   from embedded EXIF; RAW files also try the rawler decoder and their companion JPEG. Reading
   this information does not require ExifTool.
-- Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size and
-  keyboard shortcuts.
-- Settings for the Avenir interface font, bundled JetBrains Mono, and text size.
+- Light and dark themes, a unified teal accent palette, adjustable panels, thumbnail size,
+  corner roundness and keyboard shortcuts.
+- A tabbed Settings dialog keeps appearance, library, editor, ingest and storage preferences
+  separate, with every section composed from independent cards.
+- Settings for any installed interface or monospace font family, with Avenir and bundled
+  JetBrains Mono as the defaults, plus text size.
 - Scan, permission and per-file errors are surfaced without hiding the rest of the folder.
 
 ## Non-destructive by default
@@ -106,7 +109,7 @@ above:
   Moves refuse to overwrite an existing destination, and a failed batch is rolled back where
   possible. Cross-volume moves fall back to copy-then-remove.
 - Delete from library only hides the photo group in Lumio. Every file stays on disk and the
-  group can be restored from Settings → Hidden photos.
+  group can be restored from Settings → Library → Hidden photos.
 - The optional Delete from disk action moves a photo group, root or subfolder to the system
   Trash, where it can still be restored. It requires acknowledging a warning, and Lumio refuses
   filesystem roots, home folders, system folders, mount points, hidden/package folders and paths

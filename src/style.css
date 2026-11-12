@@ -9,6 +9,7 @@
   --font-mono:
     'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, monospace;
   --font-scale: 1;
+  --thumb-radius: 5px;
 
   --c-app: 190 193 193;
   --c-panel: 198 199 199;
@@ -169,6 +170,10 @@
 
   .panel-heading {
     @apply text-2xs font-semibold uppercase tracking-[0.12em] text-subtle;
+  }
+
+  .thumb-frame {
+    border-radius: var(--thumb-radius, 5px);
   }
 
   .info-row {

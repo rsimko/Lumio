@@ -61,7 +61,7 @@ const title = computed(() => {
 
 <template>
   <div
-    class="group relative h-full w-full overflow-hidden rounded bg-canvas ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
+    class="thumb-frame group relative h-full w-full overflow-hidden bg-canvas ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
     :class="selected ? 'outline outline-2 outline-offset-2 outline-accent' : ''"
     :title="title"
     draggable="true"

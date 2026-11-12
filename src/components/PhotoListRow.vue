@@ -89,7 +89,7 @@ const subline = computed(() => {
 
     <div class="flex min-w-0 items-center gap-2.5">
       <div
-        class="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-canvas ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
+        class="thumb-frame relative h-10 w-10 shrink-0 overflow-hidden bg-canvas ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
       >
         <PhotoPlaceholder
           v-if="!thumb?.src"

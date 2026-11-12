@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use lumio_core::Histogram;
 use lumio_core::LumioError;
@@ -19,6 +19,47 @@ use tauri::ipc::Channel;
 
 use crate::ingest::IngestRuntime;
 use crate::state::{AppState, refresh_asset_metadata, validate_under_roots};
+
+static SYSTEM_FONT_FAMILIES: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Installed font families are stable for the lifetime of the process and the
+/// scan touches font directories, so share one sorted snapshot.
+fn load_system_font_families() -> Vec<String> {
+    let mut db = fontdb::Database::new();
+    db.load_system_fonts();
+    #[cfg(target_os = "macos")]
+    db.load_fonts_dir("/System/Library/Fonts/Supplemental");
+
+    let mut families: Vec<String> = db
+        .faces()
+        .flat_map(|face| {
+            face.families
+                .iter()
+                .map(|(family, _)| family.trim().to_owned())
+        })
+        .filter(|family| {
+            !family.is_empty()
+                && !family.starts_with('.')
+                && !family.to_ascii_uppercase().ends_with(" PUA")
+        })
+        .collect();
+    families.sort_by_key(|family| family.to_lowercase());
+    families.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+    families
+}
+
+fn sanitized_font_family(value: &str, fallback: &str) -> String {
+    let cleaned: String = value
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() || cleaned.chars().count() > 128 {
+        fallback.into()
+    } else {
+        cleaned.into()
+    }
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,12 +161,24 @@ pub fn remove_subfolder(
 }
 
 #[tauri::command]
+pub async fn list_system_fonts() -> Result<Vec<String>, CommandError> {
+    tokio::task::spawn_blocking(|| {
+        SYSTEM_FONT_FAMILIES
+            .get_or_init(load_system_font_families)
+            .clone()
+    })
+    .await
+    .map_err(|error| CommandError::new("internal", format!("Font listing failed: {error}")))
+}
+
+#[tauri::command]
 pub fn update_ui_settings(
     state: State<'_, AppState>,
     ui: UiSettings,
 ) -> Result<UiSettings, CommandError> {
     let mut ui = ui;
     ui.thumbnail_size = ui.thumbnail_size.clamp(120, 480);
+    ui.thumbnail_radius = ui.thumbnail_radius.clamp(0, 16);
     ui.library_width = ui.library_width.clamp(200, 480);
     ui.info_width = ui.info_width.clamp(240, 520);
     ui.filmstrip_height = ui.filmstrip_height.clamp(64, 280);
@@ -133,12 +186,8 @@ pub fn update_ui_settings(
     if !matches!(ui.theme.as_str(), "system" | "light" | "dark") {
         ui.theme = "system".into();
     }
-    if !matches!(ui.ui_font.as_str(), "avenir" | "system") {
-        ui.ui_font = "avenir".into();
-    }
-    if !matches!(ui.mono_font.as_str(), "jetbrains" | "system") {
-        ui.mono_font = "jetbrains".into();
-    }
+    ui.ui_font = sanitized_font_family(&ui.ui_font, "avenir");
+    ui.mono_font = sanitized_font_family(&ui.mono_font, "jetbrains");
     if !matches!(
         ui.view_mode.as_str(),
         "grid" | "masonry" | "justified" | "list" | "filmstrip"
@@ -814,4 +863,21 @@ pub fn write_text_file(path: String, contents: String) -> Result<(), CommandErro
     }
     std::fs::write(&path, contents).map_err(|error| LumioError::io(&path, error))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitized_font_family;
+
+    #[test]
+    fn font_families_keep_installed_names_and_reject_blank_values() {
+        assert_eq!(
+            sanitized_font_family(" Avenir Next ", "avenir"),
+            "Avenir Next"
+        );
+        assert_eq!(sanitized_font_family("Fira Code", "jetbrains"), "Fira Code");
+        assert_eq!(sanitized_font_family("   ", "avenir"), "avenir");
+        assert_eq!(sanitized_font_family("bad\nfont", "avenir"), "badfont");
+        assert_eq!(sanitized_font_family(&"x".repeat(129), "avenir"), "avenir");
+    }
 }

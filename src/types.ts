@@ -10,9 +10,14 @@ export type ViewMode = 'grid' | 'masonry' | 'justified' | 'list' | 'filmstrip';
 
 export type ThemeSetting = 'system' | 'light' | 'dark';
 
-export type UiFont = 'avenir' | 'system';
+/**
+ * Preset token (`avenir` or `system`) or any installed font family.
+ * The Rust settings layer applies the same validation and fallback defaults.
+ */
+export type UiFont = string;
 
-export type MonoFont = 'jetbrains' | 'system';
+/** Preset token (`jetbrains` or `system`) or any installed font family. */
+export type MonoFont = string;
 
 export type RootRemovalMode = 'libraryOnly' | 'moveToTrash';
 
@@ -243,6 +248,8 @@ export interface UiSettings {
   viewMode: ViewMode;
   recursive: boolean;
   thumbnailSize: number;
+  /** Thumbnail corner radius in pixels; zero gives sharp corners. */
+  thumbnailRadius: number;
   libraryWidth: number;
   infoWidth: number;
   lastRootId: string | null;

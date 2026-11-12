@@ -227,8 +227,10 @@ pub struct ExternalEditor {
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub theme: String,
+    /// Preset token or any installed font family.
     #[serde(default = "default_ui_font")]
     pub ui_font: String,
+    /// Preset token or any installed font family.
     #[serde(default = "default_mono_font")]
     pub mono_font: String,
     #[serde(default = "default_ui_font_size")]
@@ -236,6 +238,8 @@ pub struct UiSettings {
     pub view_mode: String,
     pub recursive: bool,
     pub thumbnail_size: u32,
+    #[serde(default = "default_thumbnail_radius")]
+    pub thumbnail_radius: u32,
     pub library_width: u32,
     pub info_width: u32,
     pub last_root_id: Option<String>,
@@ -273,6 +277,10 @@ fn default_filmstrip_height() -> u32 {
     88
 }
 
+fn default_thumbnail_radius() -> u32 {
+    5
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -283,6 +291,7 @@ impl Default for UiSettings {
             view_mode: "grid".into(),
             recursive: false,
             thumbnail_size: 184,
+            thumbnail_radius: default_thumbnail_radius(),
             library_width: 276,
             info_width: 320,
             last_root_id: None,

@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+fontdb = "0.24.0"
 lumio-core = { path = "../crates/lumio-core" }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

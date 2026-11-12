@@ -39,6 +39,7 @@ export const api = {
   removeSubfolder: (path: string, mode: RootRemovalMode) =>
     invoke<void>('remove_subfolder', { path, mode }),
   updateUiSettings: (ui: UiSettings) => invoke<UiSettings>('update_ui_settings', { ui }),
+  listSystemFonts: () => invoke<string[]>('list_system_fonts'),
   listSubfolders: (folder: string) => invoke<FolderNode[]>('list_subfolders', { folder }),
   countFolderImages: (folder: string) =>
     invoke<FolderImageCounts>('count_folder_images', { folder }),

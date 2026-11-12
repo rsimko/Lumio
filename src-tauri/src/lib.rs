@@ -29,6 +29,7 @@ pub fn run() {
             commands::remove_root,
             commands::remove_subfolder,
             commands::update_ui_settings,
+            commands::list_system_fonts,
             commands::list_subfolders,
             commands::count_folder_images,
             commands::scan_folder,

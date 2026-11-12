@@ -87,7 +87,7 @@ const footerSource = computed(() => {
 
 <template>
   <div
-    class="group relative h-full w-full cursor-default overflow-hidden rounded-[5px] bg-canvas ring-1 ring-black/[0.06] transition-shadow dark:ring-white/[0.08]"
+    class="thumb-frame group relative h-full w-full cursor-default overflow-hidden bg-canvas ring-1 ring-black/[0.06] transition-shadow dark:ring-white/[0.08]"
     :class="selected ? 'z-10 outline outline-2 outline-offset-2 outline-accent' : ''"
     :title="asset.fileName"
     draggable="true"

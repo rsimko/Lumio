@@ -10,6 +10,7 @@ import {
   normalizeDefaultEditorPath,
   normalizeExternalEditors,
 } from '@/lib/editors';
+import { fontFamilyStack, resolveFontChoice } from '@/lib/fonts';
 import { basename, isPathInside, parentPath } from '@/lib/format';
 import { pruneFolderRemovalTargets } from '@/lib/folders';
 import { DEFAULT_INGEST_SETTINGS, normalizeIngestSettings } from '@/lib/ingest';
@@ -75,6 +76,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   viewMode: 'grid',
   recursive: false,
   thumbnailSize: 184,
+  thumbnailRadius: 5,
   libraryWidth: 276,
   infoWidth: 320,
   lastRootId: null,
@@ -95,19 +97,6 @@ interface FolderRow {
   rootId: string;
   isRoot: boolean;
 }
-
-const UI_FONT_STACKS: Record<UiFont, string> = {
-  avenir:
-    "'Avenir Next', Avenir, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif",
-  system:
-    "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif",
-};
-
-const MONO_FONT_STACKS: Record<MonoFont, string> = {
-  jetbrains:
-    "'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, monospace",
-  system: "'SF Mono', ui-monospace, Menlo, Monaco, Consolas, monospace",
-};
 
 export type ToastKind = 'info' | 'success' | 'error';
 
@@ -147,12 +136,16 @@ function normalizeUiSettings(ui: Partial<UiSettings>): UiSettings {
   const filmstripHeight = Number.isFinite(merged.filmstripHeight)
     ? Math.round(merged.filmstripHeight)
     : DEFAULT_UI_SETTINGS.filmstripHeight;
+  const thumbnailRadius = Number.isFinite(merged.thumbnailRadius)
+    ? Math.round(merged.thumbnailRadius)
+    : DEFAULT_UI_SETTINGS.thumbnailRadius;
   const externalEditors = normalizeExternalEditors(merged.externalEditors);
   return {
     ...merged,
-    uiFont: merged.uiFont === 'system' ? 'system' : 'avenir',
-    monoFont: merged.monoFont === 'system' ? 'system' : 'jetbrains',
+    uiFont: resolveFontChoice(merged.uiFont, 'ui') ?? DEFAULT_UI_SETTINGS.uiFont,
+    monoFont: resolveFontChoice(merged.monoFont, 'mono') ?? DEFAULT_UI_SETTINGS.monoFont,
     uiFontSize: Math.min(17, Math.max(11, size)),
+    thumbnailRadius: Math.min(16, Math.max(0, thumbnailRadius)),
     filmstripHeight: Math.min(280, Math.max(64, filmstripHeight)),
     externalEditors,
     defaultEditorPath: normalizeDefaultEditorPath(merged.defaultEditorPath, externalEditors),
@@ -264,13 +257,20 @@ export const useLibraryStore = defineStore('library', () => {
   );
 
   watch(
-    () => [settings.value.uiFont, settings.value.monoFont, settings.value.uiFontSize] as const,
-    ([uiFont, monoFont, uiFontSize]) => {
+    () =>
+      [
+        settings.value.uiFont,
+        settings.value.monoFont,
+        settings.value.uiFontSize,
+        settings.value.thumbnailRadius,
+      ] as const,
+    ([uiFont, monoFont, uiFontSize, thumbnailRadius]) => {
       if (typeof document === 'undefined') return;
       const root = document.documentElement;
-      root.style.setProperty('--font-ui', UI_FONT_STACKS[uiFont] ?? UI_FONT_STACKS.avenir);
-      root.style.setProperty('--font-mono', MONO_FONT_STACKS[monoFont] ?? MONO_FONT_STACKS.jetbrains);
+      root.style.setProperty('--font-ui', fontFamilyStack(uiFont, 'ui'));
+      root.style.setProperty('--font-mono', fontFamilyStack(monoFont, 'mono'));
       root.style.setProperty('--font-scale', (uiFontSize / BASE_FONT_SIZE).toFixed(4));
+      root.style.setProperty('--thumb-radius', `${thumbnailRadius}px`);
     },
     { immediate: true },
   );
@@ -519,15 +519,15 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function setUiFont(font: UiFont): void {
-    if (!['avenir', 'system'].includes(font)) return;
-    if (settings.value.uiFont === font) return;
-    updateSettings({ uiFont: font });
+    const resolved = resolveFontChoice(font, 'ui');
+    if (!resolved || settings.value.uiFont === resolved) return;
+    updateSettings({ uiFont: resolved });
   }
 
   function setMonoFont(font: MonoFont): void {
-    if (!['jetbrains', 'system'].includes(font)) return;
-    if (settings.value.monoFont === font) return;
-    updateSettings({ monoFont: font });
+    const resolved = resolveFontChoice(font, 'mono');
+    if (!resolved || settings.value.monoFont === resolved) return;
+    updateSettings({ monoFont: resolved });
   }
 
   function setUiFontSize(size: number): void {
@@ -546,6 +546,12 @@ export const useLibraryStore = defineStore('library', () => {
     const clamped = Math.min(480, Math.max(120, Math.round(size)));
     if (clamped === settings.value.thumbnailSize) return;
     updateSettings({ thumbnailSize: clamped });
+  }
+
+  function setThumbnailRadius(radius: number): void {
+    const clamped = Math.min(16, Math.max(0, Math.round(radius)));
+    if (clamped === settings.value.thumbnailRadius) return;
+    updateSettings({ thumbnailRadius: clamped });
   }
 
   function setRecursive(value: boolean): void {
@@ -1851,6 +1857,7 @@ export const useLibraryStore = defineStore('library', () => {
     setUiFontSize,
     setViewMode,
     setThumbnailSize,
+    setThumbnailRadius,
     setRecursive,
     setFilmstripVisible,
     toggleFilmstrip,

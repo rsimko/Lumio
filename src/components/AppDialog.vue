@@ -6,6 +6,7 @@ const props = defineProps<{
   title: string;
   subtitle?: string;
   wide?: boolean;
+  xl?: boolean;
   full?: boolean;
   flush?: boolean;
 }>();
@@ -109,7 +110,10 @@ function startResize(event: PointerEvent): void {
           :class="[
             props.full
               ? 'relative h-[92vh] w-[min(1760px,calc(100vw-24px))]'
-              : ['w-full max-h-[86vh]', props.wide ? 'max-w-2xl' : 'max-w-lg'],
+              : [
+                'w-full max-h-[86vh]',
+                props.xl ? 'max-w-4xl' : props.wide ? 'max-w-2xl' : 'max-w-lg',
+              ],
             resizing ? 'select-none' : '',
           ]"
           :style="dialogStyle"
